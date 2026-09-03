@@ -158,6 +158,7 @@ class NegotiationManager:
             self._emit_live("status_update", {"message": f"Escalated to supply chain: {final_status}"})
             return {
                 "state": final_status,
+                "summary": f"Negotiation escalated to fallback channel: {final_status}.",
                 "deal": esc_deal,
                 "logs": self.logs,
                 "price_series": self.memory.get_price_series(),
@@ -167,6 +168,8 @@ class NegotiationManager:
 
         return {
             "state": "FAILED",
+            "summary": "Negotiation failed. No deal could be reached with any buyer.",
+            "deal": None,
             "logs": self.logs,
             "price_series": self.memory.get_price_series(),
             "next_action": "Retry Match",
@@ -181,19 +184,19 @@ class NegotiationManager:
             response = self.warehouse.respond_to_offer({"quantity": quantity, "type": "STORAGE"})
             if response.get("type") != "REJECT":
                 self._emit_live("storage", response)
-                return {"state": "ESCALATED_STORAGE", "deal": response, "logs": self.logs, "price_series": self.memory.get_price_series()}
+                return {"state": "ESCALATED_STORAGE", "summary": "Produce moved to cold storage.", "deal": response, "logs": self.logs, "price_series": self.memory.get_price_series()}
 
         if self.processor:
             self.logs.append(f"⚙️ Analyzing Alternative Value-Added Processing at {self.processor.name}...")
             response = self.processor.respond_to_offer({"price": market_price * 0.8, "quantity": quantity})
             if response.get("type") == "ACCEPT_PROCESSING":
                  self._emit_live("processing", response)
-                 return {"state": "ESCALATED_PROCESSING", "deal": response, "logs": self.logs, "price_series": self.memory.get_price_series()}
+                 return {"state": "ESCALATED_PROCESSING", "summary": "Produce sold to food processor.", "deal": response, "logs": self.logs, "price_series": self.memory.get_price_series()}
 
         if self.compost:
             self.logs.append("♻️ Zero-Waste Fallback: Engaging Ecological Recovery Agents...")
             response = self.compost.respond_to_offer({"quantity": quantity})
             self._emit_live("compost", response)
-            return {"state": "ESCALATED_COMPOST", "deal": response, "logs": self.logs, "price_series": self.memory.get_price_series()}
+            return {"state": "ESCALATED_COMPOST", "summary": "Produce sent to compost. Zero-waste recovery.", "deal": response, "logs": self.logs, "price_series": self.memory.get_price_series()}
 
-        return {"state": "FAILED", "logs": self.logs, "price_series": self.memory.get_price_series()}
+        return {"state": "FAILED", "summary": "All fallback channels exhausted.", "deal": None, "logs": self.logs, "price_series": self.memory.get_price_series()}

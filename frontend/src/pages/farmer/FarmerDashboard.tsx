@@ -12,8 +12,7 @@ export default function FarmerDashboard() {
   
   // Real-time WebSocket connection
   const token = localStorage.getItem('agri_token');
-  // Use ws://localhost:8000/ws in development
-  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/${token}`;
+  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/negotiation`;
   const { isConnected, lastMessage } = useWebSocket(wsUrl);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
@@ -22,7 +21,7 @@ export default function FarmerDashboard() {
     queryKey: ['farmer_listings'],
     queryFn: async () => {
       const res = await api.get('/listings/me');
-      return res.data;
+      return res.data?.data || [];
     }
   });
 

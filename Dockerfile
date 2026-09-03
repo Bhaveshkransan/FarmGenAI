@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --default-timeout=1000 --no-cache-dir --user -r requirements.txt
 
 # Stage 2: Production release environment
 FROM python:3.10-slim

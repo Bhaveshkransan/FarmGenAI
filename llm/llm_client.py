@@ -23,7 +23,7 @@ load_dotenv(override=False)
 
 logger = logging.getLogger("LLMClient")
 
-OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_URL: str = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen3:8b")
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 ENABLE_LLM: bool = os.getenv("ENABLE_LLM", "true").lower() in {"1", "true", "yes"}
@@ -34,7 +34,7 @@ class LLMClient:
 
     def __init__(self):
         self.enabled = ENABLE_LLM
-        self.ollama_url = OLLAMA_BASE_URL
+        self.ollama_url = OLLAMA_URL
         self.ollama_model = OLLAMA_MODEL
         self.gemini_key = GEMINI_API_KEY
 
@@ -58,7 +58,7 @@ class LLMClient:
                     "num_predict": max_tokens,
                 }
             }
-            response = requests.post(url, json=payload, timeout=5)
+            response = requests.post(url, json=payload, timeout=60)
             if response.status_code == 200:
                 text = response.json().get("response", "")
                 if text and len(text.strip()) > 0:

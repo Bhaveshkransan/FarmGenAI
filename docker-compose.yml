@@ -17,6 +17,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CHROMA_URL=http://chromadb:8000
       - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2:0.5b}
       - ENABLE_LLM=${ENABLE_LLM:-true}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeyforagrinegotiatorsigningtokens12345}
@@ -53,6 +54,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CHROMA_URL=http://chromadb:8000
       - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2:0.5b}
       - ENABLE_LLM=${ENABLE_LLM:-true}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeyforagrinegotiatorsigningtokens12345}

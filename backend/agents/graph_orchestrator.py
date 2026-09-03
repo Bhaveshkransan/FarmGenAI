@@ -1057,8 +1057,9 @@ async def reflection_node(state: NegotiationState) -> Dict[str, Any]:
                 parsed = await _parse_json_response(resp)
                 if parsed and "bid_price" in parsed:
                     # Farmer Priority: apply 2% edge for the farmer in processors too (select highest bid)
-                    priority_score = parsed["bid_price"] * 1.02
-                    return {"name": name, "bid": parsed["bid_price"], "score": priority_score, "reason": parsed.get("reason", "")}
+                    bid_price = float(parsed["bid_price"])  # cast: LLM may return string
+                    priority_score = bid_price * 1.02
+                    return {"name": name, "bid": bid_price, "score": priority_score, "reason": parsed.get("reason", "")}
                 return {"name": name, "bid": round(state["market_price"] * 0.6, 2), "score": 0, "reason": "Fallback"}
 
             p_tasks = [get_processor_bid(p) for p in processors]

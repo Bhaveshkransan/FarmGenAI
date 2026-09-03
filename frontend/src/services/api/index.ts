@@ -14,7 +14,7 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('agri_token');
-    if (token && token !== 'mock_token') {
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;

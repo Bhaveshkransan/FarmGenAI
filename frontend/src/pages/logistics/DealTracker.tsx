@@ -10,7 +10,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 export default function DealTracker() {
   const { id } = useParams();
   const token = localStorage.getItem('agri_token');
-  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/${token}`;
+  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/negotiation`;
   const { isConnected, lastMessage } = useWebSocket(wsUrl);
   const { addNotification } = useNotification();
 

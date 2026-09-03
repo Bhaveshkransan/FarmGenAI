@@ -82,7 +82,7 @@ async def _score_match(listing: Dict, requirement: Dict, buyer_user: Optional[Di
     # ── Geographic proximity (20 pts) ─────────────────────
     listing_loc = listing.get("location", "")
     req_loc = requirement.get("location", "")
-    dist = _get_distance_km(listing_loc, req_loc)
+    dist = await _get_distance_km(listing_loc, req_loc)
     if dist <= MAX_MATCH_DISTANCE_KM:
         proximity_score = max(0, 1.0 - dist / MAX_MATCH_DISTANCE_KM) * 20
         score += proximity_score

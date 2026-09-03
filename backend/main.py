@@ -138,7 +138,7 @@ app.include_router(warehouse_router, prefix="/api/v1/warehouse", tags=["Warehous
 app.include_router(role_offer_router, prefix="/api/v1/role-offers", tags=["Role Offers"])
 
 # AI Agents
-app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])
+# Legacy agents_router removed to prevent conflict with v1/agents.py
 
 # Analytics & Intelligence
 app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["Analytics"])
@@ -176,6 +176,10 @@ app.include_router(dashboard_router, prefix="/api/v1/dashboards", tags=["Dashboa
 
 # Integrations (Object Storage, Mandi feeds)
 app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["Integrations"])
+
+# Agents Telemetry
+from backend.api.v1.agents import router as agents_router
+app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])
 
 # Health check
 @app.get("/health", tags=["System"])

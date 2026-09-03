@@ -12,8 +12,14 @@ export function useWebSocket(url) {
   const connect = useCallback(() => {
     if (!url) return;
 
+    let finalUrl = url;
+    const token = localStorage.getItem('agri_token');
+    if (token && !finalUrl.includes('token=')) {
+      finalUrl = finalUrl.includes('?') ? `${finalUrl}&token=${token}` : `${finalUrl}?token=${token}`;
+    }
+
     try {
-      ws.current = new WebSocket(url);
+      ws.current = new WebSocket(finalUrl);
 
       ws.current.onopen = () => {
         setIsConnected(true);

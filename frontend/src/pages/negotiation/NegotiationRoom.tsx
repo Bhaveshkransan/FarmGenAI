@@ -14,7 +14,7 @@ export default function NegotiationRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
   const token = localStorage.getItem('agri_token');
-  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/${token}`;
+  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/negotiation`;
   const { isConnected, lastMessage } = useWebSocket(wsUrl);
   const messagesEndRef = useRef(null);
   const [messages, setMessages] = useState([]);
@@ -27,13 +27,13 @@ export default function NegotiationRoom() {
     queryKey: ['negotiation', id],
     queryFn: async () => {
       const res = await api.get(`/negotiations/${id}`);
-      return res.data;
+      return res.data?.data || res.data;
     }
   });
 
   // Handle incoming WS messages
   useEffect(() => {
-    if (lastMessage) {
+    if (lastMessage && String(lastMessage.negotiation_id) === String(id)) {
       if (lastMessage.event === 'NEGOTIATION_LOG') {
         setMessages(prev => [...prev, {
           agent: lastMessage.agent_type === 'farmer' ? 'Your AI (Farmer)' : 'Buyer Agent',
