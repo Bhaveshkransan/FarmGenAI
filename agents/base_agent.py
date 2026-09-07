@@ -180,7 +180,7 @@ class BaseAgent:
                     pass
         
         # Default empty thought or schema-aligned fallback
-        return schema or {"decision": "PROCEED", "reason": "Autonomous baseline logic"}
+        return schema if schema and "decision" in schema else None
 
     # ------------------------------------------------
     # Debug Utility

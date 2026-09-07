@@ -44,14 +44,24 @@ class Database:
         farmer_id = p.get("id") or Database.generate_id("farmer")
         p["id"] = farmer_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_farmer = await session.get(DBFarmer, farmer_id)
-                if not db_farmer:
-                    db_farmer = DBFarmer(id=farmer_id)
-                    session.add(db_farmer)
-                db_farmer.name = p.get("name")
-                db_farmer.location = p.get("location")
-                db_farmer.language = p.get("language")
+            db_farmer = await session.get(DBFarmer, farmer_id)
+            if not db_farmer:
+                db_farmer = DBFarmer(id=farmer_id)
+                session.add(db_farmer)
+            db_farmer.name = p.get("name")
+            db_farmer.contact_number = p.get("contact_number")
+            db_farmer.location = p.get("location")
+            db_farmer.village = p.get("village")
+            db_farmer.taluka = p.get("taluka")
+            db_farmer.district = p.get("district")
+            db_farmer.state = p.get("state")
+            db_farmer.latitude = p.get("latitude")
+            db_farmer.longitude = p.get("longitude")
+            db_farmer.language = p.get("language")
+            db_farmer.farm_size_acres = p.get("farm_size_acres")
+            db_farmer.farming_type = p.get("farming_type")
+            db_farmer.preferences = p.get("preferences")
+            await session.commit()
         Database.farmers[farmer_id] = p
         return p
     @classmethod
@@ -108,22 +118,40 @@ class Database:
         produce_id = p.get("id") or Database.generate_id("produce")
         p["id"] = produce_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_produce = await session.get(DBProduce, produce_id)
-                if not db_produce:
-                    db_produce = DBProduce(id=produce_id)
-                    session.add(db_produce)
-                
-                db_produce.user_id = p.get("user_id")
-                db_produce.farmer_name = p.get("farmer_name")
-                db_produce.crop = p.get("crop")
-                db_produce.quantity = p.get("quantity")
-                db_produce.min_price = p.get("min_price")
-                db_produce.shelf_life = p.get("shelf_life")
-                db_produce.location = p.get("location")
-                db_produce.quality = p.get("quality")
-                db_produce.language = p.get("language")
-                db_produce.status = p.get("status")
+            db_produce = await session.get(DBProduce, produce_id)
+            if not db_produce:
+                db_produce = DBProduce(id=produce_id)
+                session.add(db_produce)
+            
+            db_produce.user_id = p.get("user_id")
+            db_produce.farmer_name = p.get("farmer_name")
+            db_produce.crop = p.get("crop")
+            db_produce.crop_category = p.get("crop_category")
+            db_produce.variety = p.get("variety")
+            db_produce.grade = p.get("grade")
+            db_produce.quantity = p.get("quantity")
+            db_produce.unit = p.get("unit", "kg")
+            db_produce.min_sale_quantity = p.get("min_sale_quantity")
+            db_produce.expected_price = p.get("expected_price")
+            db_produce.min_price = p.get("min_price")
+            db_produce.price_unit = p.get("price_unit", "per_kg")
+            db_produce.quality_info = p.get("quality_info")
+            db_produce.harvest_date = p.get("harvest_date")
+            db_produce.availability_date = p.get("availability_date")
+            db_produce.preferred_selling_date = p.get("preferred_selling_date")
+            db_produce.shelf_life = p.get("shelf_life")
+            db_produce.location = p.get("location")
+            db_produce.latitude = p.get("latitude")
+            db_produce.longitude = p.get("longitude")
+            db_produce.storage_info = p.get("storage_info")
+            db_produce.processing_info = p.get("processing_info")
+            db_produce.transport_reqs = p.get("transport_reqs")
+            db_produce.selected_services = p.get("selected_services")
+            db_produce.images = p.get("images")
+            db_produce.description = p.get("description")
+            db_produce.language = p.get("language")
+            db_produce.status = p.get("status", "ACTIVE")
+            await session.commit()
         Database.produce[produce_id] = p
         return p
     @classmethod
@@ -138,11 +166,29 @@ class Database:
                     "user_id": r.user_id,
                     "farmer_name": r.farmer_name,
                     "crop": r.crop,
+                    "crop_category": r.crop_category,
+                    "variety": r.variety,
+                    "grade": r.grade,
                     "quantity": r.quantity,
+                    "unit": r.unit,
+                    "min_sale_quantity": r.min_sale_quantity,
+                    "expected_price": r.expected_price,
                     "min_price": r.min_price,
+                    "price_unit": r.price_unit,
+                    "quality_info": r.quality_info,
+                    "harvest_date": r.harvest_date,
+                    "availability_date": r.availability_date,
+                    "preferred_selling_date": r.preferred_selling_date,
                     "shelf_life": r.shelf_life,
                     "location": r.location,
-                    "quality": r.quality,
+                    "latitude": r.latitude,
+                    "longitude": r.longitude,
+                    "storage_info": r.storage_info,
+                    "processing_info": r.processing_info,
+                    "transport_reqs": r.transport_reqs,
+                    "selected_services": r.selected_services,
+                    "images": r.images,
+                    "description": r.description,
                     "language": r.language,
                     "status": r.status
                 })
@@ -158,11 +204,29 @@ class Database:
                     "user_id": db_produce.user_id,
                     "farmer_name": db_produce.farmer_name,
                     "crop": db_produce.crop,
+                    "crop_category": db_produce.crop_category,
+                    "variety": db_produce.variety,
+                    "grade": db_produce.grade,
                     "quantity": db_produce.quantity,
+                    "unit": db_produce.unit,
+                    "min_sale_quantity": db_produce.min_sale_quantity,
+                    "expected_price": db_produce.expected_price,
                     "min_price": db_produce.min_price,
+                    "price_unit": db_produce.price_unit,
+                    "quality_info": db_produce.quality_info,
+                    "harvest_date": db_produce.harvest_date,
+                    "availability_date": db_produce.availability_date,
+                    "preferred_selling_date": db_produce.preferred_selling_date,
                     "shelf_life": db_produce.shelf_life,
                     "location": db_produce.location,
-                    "quality": db_produce.quality,
+                    "latitude": db_produce.latitude,
+                    "longitude": db_produce.longitude,
+                    "storage_info": db_produce.storage_info,
+                    "processing_info": db_produce.processing_info,
+                    "transport_reqs": db_produce.transport_reqs,
+                    "selected_services": db_produce.selected_services,
+                    "images": db_produce.images,
+                    "description": db_produce.description,
                     "language": db_produce.language,
                     "status": db_produce.status
                 }

@@ -115,11 +115,13 @@ class NegotiationManager:
             "user_id": kwargs.get("user_id"),
             "latest_farmer_ask": None,
             "latest_buyer_offer": None,
-            "buyers_list": state_buyers
+            "buyers_list": state_buyers,
+            "farmer_agent_obj": self.farmer,
+            "buyer_agent_objs": self.buyers
         }
 
         # Invoke state graph orchestrator
-        final_state = await graph_orchestrator.ainvoke(initial_state)
+        final_state = await graph_orchestrator.ainvoke(initial_state, config={"recursion_limit": 50})
 
         # Merge logs and history events
         self.logs.extend(final_state["logs"])

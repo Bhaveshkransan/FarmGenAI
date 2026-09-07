@@ -86,6 +86,8 @@ async def create_farmer_profile(
     uid = current_user["sub"]
     profile = {**payload.dict(), "id": uid, "created_at": __import__("datetime").datetime.utcnow().isoformat()}
     _farmer_profiles[uid] = profile
+    # Persist to database
+    await Database.upsert_farmer_async(profile)
     return {"success": True, "data": profile}
 
 
@@ -98,5 +100,6 @@ async def create_buyer_profile(
     uid = current_user["sub"]
     profile = {**payload.dict(), "id": uid, "created_at": __import__("datetime").datetime.utcnow().isoformat()}
     _buyer_profiles[uid] = profile
+    # Persist to database
+    await Database.upsert_buyer_async(profile)
     return {"success": True, "data": profile}
-

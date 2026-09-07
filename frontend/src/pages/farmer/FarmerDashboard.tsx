@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/services/api';
@@ -9,6 +10,7 @@ import CreateListingForm from '@/components/forms/CreateListingForm';
 
 export default function FarmerDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Real-time WebSocket connection
   const token = localStorage.getItem('agri_token');
@@ -89,8 +91,8 @@ export default function FarmerDashboard() {
                   listings.map(listing => (
                     <tr key={listing.id} className="hover:bg-slate-50/50 transition">
                       <td className="px-5 py-4 font-medium text-slate-800">{listing.crop}</td>
-                      <td className="px-5 py-4 text-slate-600">{listing.qty} kg</td>
-                      <td className="px-5 py-4 font-medium text-emerald-600">₹{listing.price}/kg</td>
+                      <td className="px-5 py-4 text-slate-600">{listing.quantity || listing.qty} kg</td>
+                      <td className="px-5 py-4 font-medium text-emerald-600">₹{listing.min_price || listing.price}/kg</td>
                       <td className="px-5 py-4">
                         <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
                           listing.status === 'NEGOTIATING' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
@@ -100,9 +102,36 @@ export default function FarmerDashboard() {
                       </td>
                       <td className="px-5 py-4">
                         {listing.status === 'NEGOTIATING' ? (
-                          <button className="text-emerald-600 font-medium hover:underline">View Room</button>
+                          <button onClick={() => navigate(`/negotiations/${listing.id}`)} className="text-emerald-600 font-medium hover:underline">View Room</button>
                         ) : (
-                          <span className="text-slate-400">Waiting</span>
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const payload = {
+                                  crop: listing.crop,
+                                  quantity: listing.quantity || listing.qty || 100,
+                                  min_price: listing.min_price || listing.price || 10,
+                                  shelf_life: listing.spoilage_days || 7,
+                                  location: listing.location || "Nashik"
+                                };
+                                const res = await api.post('/negotiation/', payload);
+                                if (res.data && res.data.negotiation_id) {
+                                  // Update the status in UI or just navigate
+                                  navigate(`/negotiations/${res.data.negotiation_id}`);
+                                } else if (res.data && res.data.id) {
+                                  navigate(`/negotiations/${res.data.id}`);
+                                } else {
+                                  navigate(`/negotiations/${listing.id}`);
+                                }
+                              } catch(e) {
+                                console.error(e);
+                                alert("Failed to start AI negotiation");
+                              }
+                            }}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm"
+                          >
+                            AI Match & Negotiate
+                          </button>
                         )}
                       </td>
                     </tr>

@@ -68,6 +68,8 @@ class NegotiationState(TypedDict):
     rag_context: Optional[str]               # Injected market + strategy context
     market_intelligence: Optional[str]       # Market analysis output
     recommendation: Optional[str]           # Recommendation agent output
+    farmer_agent_obj: Optional[Any]
+    buyer_agent_objs: Optional[List[Any]]
 
 
 # ─────────────────────────────────────────────
@@ -490,95 +492,46 @@ async def farmer_node(state: NegotiationState) -> Dict[str, Any]:
     buyer_offer = state.get("latest_buyer_offer") or round(
         selected_buyer.get("target_price", state["min_price"]) * 0.75, 2
     )
-    farmer_ask = state.get("latest_farmer_ask") or round(state["min_price"] * 1.2, 2)
 
-    logs.append(
-        f"👨‍🌾 [Farmer] Round {current_round}: Buyer offered ₹{buyer_offer}/kg | My ask ₹{farmer_ask}/kg"
-    )
+    logs.append(f"👨‍🌾 [Farmer] Round {current_round}: Buyer offered ₹{buyer_offer}/kg")
 
-    # 1. Accept check: buyer meets farmer within 2%
-    if buyer_offer >= farmer_ask * 0.98:
-        logs.append(f"👨‍🌾 [Farmer] ACCEPTED buyer offer ₹{buyer_offer}/kg.")
-        return {"status": "DEAL", "round": current_round, "latest_farmer_ask": buyer_offer, "logs": logs}
-
-    # 2. Critical spoilage override
-    if state["spoilage_days"] <= 2:
-        logs.append("⚠️ [Farmer] Spoilage critical. Accepting near-min or escalating.")
-        if buyer_offer >= state["min_price"] * 0.85:
-            return {"status": "DEAL", "round": current_round, "latest_farmer_ask": buyer_offer, "logs": logs}
+    farmer = state.get("farmer_agent_obj")
+    if not farmer:
+        logs.append("⚠️ [Farmer] FarmerAgent object missing from state! Aborting.")
         return {"status": "REJECT", "round": current_round, "logs": logs}
 
-    # 3. Try LLM structured decision via FARMER_PROMPT
-    decision = None
-    prompt = FARMER_PROMPT.format(
-        crop=state["crop"],
-        quantity=state["quantity"],
-        min_price=state["min_price"],
-        location=state["location"],
-        shelf_life=state["spoilage_days"],
-        market_price=state["market_price"],
-        buyer_offer=buyer_offer,
-        round=current_round,
-        history=_format_history(history),
-        rag_context=state.get("rag_context", "No context available."),
-        trust_context=state.get("trust_context", "No trust context available.")
-    )
-    raw = llm_client.generate(prompt, max_tokens=120, temperature=0.3)
-    decision = await _parse_json_response(raw)
+    offer_payload = {"price": buyer_offer, "quantity": state["quantity"]}
+    context_payload = {"market_price": state["market_price"], "round": current_round}
 
-    # 4. LLM decision valid — apply it
-    if decision and decision.get("decision") in ("ACCEPT", "COUNTER", "REJECT"):
-        agent_decision = decision["decision"]
-        counter = decision.get("price")
-        reason = decision.get("reason", "")
-        message = decision.get("message", "")
-        logs.append(f"👨‍🌾 [Farmer][LLM] {agent_decision}: {message[:100]}...")
+    response = farmer.respond_to_offer(offer_payload, context=context_payload, force_deterministic=False)
 
-        if agent_decision == "ACCEPT":
-            return {"status": "DEAL", "round": current_round, "latest_farmer_ask": buyer_offer, "logs": logs}
-        if agent_decision == "REJECT":
-            return {"status": "REJECT", "round": current_round, "logs": logs}
-        # COUNTER — validate counter price
-        if counter and isinstance(counter, (int, float)):
-            counter = max(float(state["min_price"]), min(float(farmer_ask), float(counter)))
-            counter = round(counter, 2)
-        else:
-            # Fall through to deterministic
-            decision = None
+    decision_type = response.get("type", "REJECT")
+    counter_price = response.get("price", buyer_offer)
+    message = response.get("message", "")
 
-    # 5. Deterministic fallback concession (20% of gap toward buyer)
-    if not decision or not decision.get("price"):
-        gap = farmer_ask - buyer_offer
-        concession = (gap * 0.2) + random.uniform(0.1, 0.4)
-        counter = round(buyer_offer + concession, 2)
-        counter = max(float(state["min_price"]), counter)
-        if counter >= farmer_ask:
-            counter = round(farmer_ask - 0.5, 2)
-        counter = max(float(state["min_price"]), counter)
+    logs.append(f"👨‍🌾 [Farmer] {decision_type} ₹{counter_price}/kg: {message}")
 
-    # Fast-accept: if counter is within 2% of buyer offer just accept
-    if buyer_offer >= counter * 0.98:
-        logs.append(f"👨‍🌾 [Farmer] Counter ₹{counter}/kg close enough — accepting ₹{buyer_offer}/kg.")
-        return {"status": "DEAL", "round": current_round, "latest_farmer_ask": buyer_offer, "logs": logs}
-
-    logs.append(f"👨‍🌾 [Farmer] Counter ask: ₹{counter}/kg.")
-    history.append({
-        "round": current_round,
-        "agent": "Farmer",
-        "price": counter,
-        "decision": "COUNTER",
-        "quantity": state["quantity"],
-        "message": decision.get("message", f"I can offer ₹{counter}/kg.") if decision else f"I can offer ₹{counter}/kg.",
-        "reason": decision.get("reason", "Fallback concession.") if decision else "Fallback concession."
-    })
-
-    return {
-        "round": current_round,
-        "history": history,
-        "latest_farmer_ask": counter,
-        "latest_buyer_offer": buyer_offer,
-        "logs": logs,
-    }
+    if decision_type == "ACCEPT":
+        return {"status": "DEAL", "round": current_round, "latest_farmer_ask": buyer_offer, "logs": logs, "quantity": farmer.quantity}
+    elif decision_type == "REJECT":
+        return {"status": "REJECT", "round": current_round, "logs": logs}
+    else:
+        history.append({
+            "round": current_round,
+            "agent": farmer.name,
+            "price": counter_price,
+            "decision": "COUNTER",
+            "quantity": state["quantity"],
+            "message": message,
+            "reason": message
+        })
+        return {
+            "round": current_round,
+            "history": history,
+            "latest_farmer_ask": counter_price,
+            "latest_buyer_offer": buyer_offer,
+            "logs": logs
+        }
 
 
 # ─────────────────────────────────────────────
@@ -591,100 +544,63 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
     current_round = state.get("round", 0)
 
     farmer_ask = state.get("latest_farmer_ask", round(state["min_price"] * 1.2, 2))
-    active_buyers = state.get("active_buyers", [])
+    buyer_agents = state.get("buyer_agent_objs", [])
     
     logs.append(f"🤝 [Buyers Pool] Round {current_round}: Evaluating Farmer ask of ₹{farmer_ask}/kg")
     
     current_offers = []
+
+    if not buyer_agents:
+        logs.append("⚠️ [Buyers Pool] No BuyerAgent objects found in state! Aborting.")
+        return {"history": history, "current_offers": [], "logs": logs}
     
-    for buyer_profile in active_buyers:
-        buyer_name = buyer_profile.get("name", "Buyer")
-        target_price = buyer_profile.get("target_price", state["min_price"])
-        budget = float(buyer_profile.get("budget", 100000))
-        max_viable = budget / state["quantity"]
+    for buyer in buyer_agents:
+        buyer_name = buyer.name
         
-        # Previous offer by this specific buyer (default to 75% of target if first round)
-        prev_offers = [h for h in history if h.get("agent_id") == buyer_profile.get("id")]
-        buyer_offer = prev_offers[-1]["price"] if prev_offers else round(target_price * 0.75, 2)
-        
-        # 1. Accept check
-        target_threshold = target_price * 1.03
-        if farmer_ask <= target_threshold:
-            logs.append(f"🤝 [{buyer_name}] ACCEPTED farmer ask ₹{farmer_ask}/kg.")
+        offer_payload = {"price": farmer_ask, "quantity": state["quantity"]}
+        context_payload = {"market_price": state["market_price"], "round": current_round}
+
+        response = buyer.respond_to_offer(offer_payload, context=context_payload)
+
+        decision_type = response.get("type", "REJECT")
+        counter_price = response.get("price", farmer_ask)
+        message = response.get("message", "")
+
+        logs.append(f"🤝 [{buyer_name}] {decision_type} ₹{counter_price}/kg: {message}")
+
+        if decision_type == "ACCEPT":
             current_offers.append({
-                "buyer_id": buyer_profile.get("id"),
-                "buyer_name": buyer_name,
-                "price": farmer_ask,
-                "status": "ACCEPT"
+                "buyer_id": buyer.id if hasattr(buyer, "id") else f"buyer_{buyer_name}", 
+                "buyer_name": buyer_name, 
+                "price": farmer_ask, 
+                "status": "ACCEPT", 
+                "message": message
             })
-            continue
-
-        # 2. LLM check
-        decision = None
-        prompt = BUYER_PROMPT.format(
-            buyer_name=buyer_name,
-            target_price=target_price,
-            budget=budget,
-            max_quantity=buyer_profile.get("max_quantity", state["quantity"]),
-            location=buyer_profile.get("location", state["location"]),
-            farmer_ask=farmer_ask,
-            round=current_round,
-            history=_format_history([h for h in history if h.get("agent") in ("Farmer", buyer_name)]),
-            rag_context=state.get("rag_context", "No context available."),
-            trust_context=state.get("trust_context", "No trust context available.")
-        )
-        raw = llm_client.generate(prompt, max_tokens=120, temperature=0.3)
-        decision = await _parse_json_response(raw)
-
-        if decision and decision.get("decision") in ("ACCEPT", "COUNTER", "REJECT"):
-            agent_decision = decision["decision"]
-            counter = decision.get("price")
-            reason = decision.get("reason", "")
-            message = decision.get("message", "")
-            logs.append(f"🤝 [{buyer_name}][LLM] {agent_decision}: {message[:100]}...")
-
-            if agent_decision == "ACCEPT":
-                current_offers.append({"buyer_id": buyer_profile.get("id"), "buyer_name": buyer_name, "price": farmer_ask, "status": "ACCEPT", "message": message})
-                continue
-            if agent_decision == "REJECT":
-                current_offers.append({"buyer_id": buyer_profile.get("id"), "buyer_name": buyer_name, "price": buyer_offer, "status": "REJECT", "message": message})
-                continue
-                
-            if counter and isinstance(counter, (int, float)):
-                counter = min(max_viable, float(farmer_ask), float(counter))
-                counter = max(float(buyer_offer), counter)
-                counter = round(counter, 2)
-            else:
-                decision = None
-
-        # 3. Deterministic fallback
-        if not decision or not decision.get("price"):
-            gap = farmer_ask - buyer_offer
-            concession = (gap * 0.2) + random.uniform(0.1, 0.4)
-            counter = round(buyer_offer + concession, 2)
-            counter = min(farmer_ask, counter)
-            if counter <= buyer_offer:
-                counter = round(buyer_offer + 0.5, 2)
-            counter = min(max_viable, counter)
-
-        # Fast-accept
-        if farmer_ask <= counter * 1.03:
-            logs.append(f"🤝 [{buyer_name}] Counter ₹{counter}/kg close enough — accepting ₹{farmer_ask}/kg.")
-            current_offers.append({"buyer_id": buyer_profile.get("id"), "buyer_name": buyer_name, "price": farmer_ask, "status": "ACCEPT"})
-            continue
-
-        logs.append(f"🤝 [{buyer_name}] Counter bid: ₹{counter}/kg.")
-        history.append({
-            "round": current_round,
-            "agent": buyer_name,
-            "agent_id": buyer_profile.get("id"),
-            "price": counter,
-            "decision": "COUNTER",
-            "quantity": state["quantity"],
-            "message": decision.get("message", f"My counter offer is ₹{counter}/kg.") if decision else f"My counter offer is ₹{counter}/kg.",
-            "reason": decision.get("reason", "Fallback concession.") if decision else "Fallback concession."
-        })
-        current_offers.append({"buyer_id": buyer_profile.get("id"), "buyer_name": buyer_name, "price": counter, "status": "COUNTER"})
+        elif decision_type == "REJECT":
+            current_offers.append({
+                "buyer_id": buyer.id if hasattr(buyer, "id") else f"buyer_{buyer_name}", 
+                "buyer_name": buyer_name, 
+                "price": farmer_ask, 
+                "status": "REJECT", 
+                "message": message
+            })
+        else:
+            history.append({
+                "round": current_round,
+                "agent": buyer_name,
+                "agent_id": buyer.id if hasattr(buyer, "id") else f"buyer_{buyer_name}",
+                "price": counter_price,
+                "decision": "COUNTER",
+                "quantity": state["quantity"],
+                "message": message,
+                "reason": message
+            })
+            current_offers.append({
+                "buyer_id": buyer.id if hasattr(buyer, "id") else f"buyer_{buyer_name}", 
+                "buyer_name": buyer_name, 
+                "price": counter_price, 
+                "status": "COUNTER"
+            })
 
     return {
         "history": history,
@@ -1056,10 +972,13 @@ async def reflection_node(state: NegotiationState) -> Dict[str, Any]:
                 resp = await asyncio.to_thread(llm_client.generate, prompt, max_tokens=100)
                 parsed = await _parse_json_response(resp)
                 if parsed and "bid_price" in parsed:
-                    # Farmer Priority: apply 2% edge for the farmer in processors too (select highest bid)
-                    bid_price = float(parsed["bid_price"])  # cast: LLM may return string
-                    priority_score = bid_price * 1.02
-                    return {"name": name, "bid": bid_price, "score": priority_score, "reason": parsed.get("reason", "")}
+                    try:
+                        # Farmer Priority: apply 2% edge for the farmer in processors too (select highest bid)
+                        bid_price = float(parsed["bid_price"])  # cast: LLM may return string
+                        priority_score = bid_price * 1.02
+                        return {"name": name, "bid": bid_price, "score": priority_score, "reason": parsed.get("reason", "")}
+                    except (ValueError, TypeError):
+                        pass
                 return {"name": name, "bid": round(state["market_price"] * 0.6, 2), "score": 0, "reason": "Fallback"}
 
             p_tasks = [get_processor_bid(p) for p in processors]

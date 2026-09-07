@@ -23,14 +23,21 @@ class FarmerProfileCreate(BaseModel):
     """Full farmer profile — extends user with agricultural context."""
     user_id: str
     farm_name: Optional[str] = None
+    contact_number: Optional[str] = None
     farm_size_acres: Optional[float] = None
     crops_grown: List[str] = Field(default_factory=list)
     location: str
+    village: Optional[str] = None
+    taluka: Optional[str] = None
     district: Optional[str] = None
     state: str = "Maharashtra"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    farming_type: Optional[str] = None
     soil_type: Optional[str] = None
     irrigation_type: Optional[str] = None
     certifications: List[str] = Field(default_factory=list)
+    preferences: Optional[Dict] = None
 
 
 class FarmerProfileResponse(FarmerProfileCreate):
