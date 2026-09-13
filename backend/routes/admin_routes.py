@@ -28,9 +28,25 @@ async def _require_admin(current_user: dict):
 @router.get("/users")
 async def list_all_users(current_user: dict = Depends(get_current_user)):
     """Return all registered users. Admin only."""
-    _require_admin(current_user)
-    users = [await UserRepository.get_by_id(uid) for uid in Database.users.keys()]
-    users = [u for u in users if u]
+    await _require_admin(current_user)
+    from backend.db.session import AsyncSessionLocal
+    from backend.db.models.schema import DBUser
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(select(DBUser).order_by(DBUser.user_id))
+        rows = res.scalars().all()
+    users = [
+        {
+            "user_id": u.user_id,
+            "name": u.name,
+            "email": u.email,
+            "role": u.role,
+            "location": u.location,
+            "verification_status": u.verification_status,
+            "trust_score": u.trust_score,
+        }
+        for u in rows
+    ]
     return {"success": True, "data": users, "count": len(users)}
 
 

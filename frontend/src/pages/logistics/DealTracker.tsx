@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { ArrowLeft, Box, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Box, CheckCircle, Loader2 } from 'lucide-react';
 import TrackingTimeline from '@/features/logistics/components/TrackingTimeline';
 import DeliveryMap from '@/features/logistics/components/DeliveryMap';
 import PaymentCard from '@/features/logistics/components/PaymentCard';
 import { useNotification } from '@/contexts/NotificationContext';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/services/api';
 
 export default function DealTracker() {
   const { id } = useParams();
@@ -14,15 +16,24 @@ export default function DealTracker() {
   const { isConnected, lastMessage } = useWebSocket(wsUrl);
   const { addNotification } = useNotification();
 
-  // Mock deal data
+  // Fetch real deal data from negotiation API
+  const { data: negData, isLoading } = useQuery({
+    queryKey: ['deal-tracker', id],
+    queryFn: async () => {
+      const res = await api.get(`/negotiations/${id}`);
+      return res.data?.data || res.data;
+    },
+    enabled: !!id,
+  });
+
   const dealData = {
-    id: id,
-    farmer: 'Ramesh Patil',
-    buyer: 'AgroFresh Enterprises',
-    crop: 'Soybean',
-    quantity: 500,
-    price: 68,
-    amount: 34000
+    id: id || '',
+    farmer: negData?.farmer || 'Farmer',
+    buyer: (negData?.selected_buyer?.buyer_name) || 'Buyer',
+    crop: negData?.crop || '—',
+    quantity: negData?.quantity || 0,
+    price: negData?.final_price || 0,
+    amount: (negData?.final_price || 0) * (negData?.quantity || 0),
   };
 
   // State Machine logic matching the Redis Events

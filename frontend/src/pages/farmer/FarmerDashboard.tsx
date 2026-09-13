@@ -303,8 +303,11 @@ export default function FarmerDashboard() {
                                   language: 'English'
                                 };
                                 const res = await api.post('/negotiations/', payload);
-                                if (res.data?.negotiation_id) navigate(`/negotiations/${res.data.negotiation_id}`);
-                                else navigate(`/negotiations/${listing.id}`);
+                                if (res.data?.negotiation_id) {
+                                  navigate(`/negotiations/${res.data.negotiation_id}`);
+                                } else {
+                                  alert('AI negotiation started but could not get a room ID. Please check your dashboard and try again.');
+                                }
                               } catch (e) {
                                 console.error(e);
                                 alert('Failed to start AI negotiation');

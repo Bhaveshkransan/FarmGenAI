@@ -234,35 +234,35 @@ class Database:
     @classmethod
     async def delete_produce_async(cls, produce_id: str):
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_produce = await session.get(DBProduce, produce_id)
-                if db_produce:
-                    db_produce.status = "EXPIRED"
+            db_produce = await session.get(DBProduce, produce_id)
+            if db_produce:
+                db_produce.status = "EXPIRED"
+                await session.commit()
         if produce_id in Database.produce:
             Database.produce[produce_id]["status"] = "EXPIRED"
     @classmethod
     async def create_booking_async(cls, booking: dict):
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_booking = DBBooking(
-                    booking_id=booking["booking_id"],
-                    negotiation_id=booking.get("negotiation_id"),
-                    crop=booking.get("crop"),
-                    origin_location=booking.get("origin_location"),
-                    destination_location=booking.get("destination_location"),
-                    booked_by=booking.get("booked_by"),
-                    status=booking.get("status"),
-                    vehicle_id=booking.get("vehicle_id"),
-                    truck=booking.get("truck"),
-                    capacity_kg=booking.get("capacity_kg"),
-                    quantity=booking.get("quantity"),
-                    distance_km=booking.get("distance_km"),
-                    pickup_time=booking.get("pickup_time"),
-                    estimated_transit_hours=booking.get("estimated_transit_hours"),
-                    estimated_cost=booking.get("estimated_cost"),
-                    created_at=booking.get("created_at")
-                )
-                session.add(db_booking)
+            db_booking = DBBooking(
+                booking_id=booking["booking_id"],
+                negotiation_id=booking.get("negotiation_id"),
+                crop=booking.get("crop"),
+                origin_location=booking.get("origin_location"),
+                destination_location=booking.get("destination_location"),
+                booked_by=booking.get("booked_by"),
+                status=booking.get("status"),
+                vehicle_id=booking.get("vehicle_id"),
+                truck=booking.get("truck"),
+                capacity_kg=booking.get("capacity_kg"),
+                quantity=booking.get("quantity"),
+                distance_km=booking.get("distance_km"),
+                pickup_time=booking.get("pickup_time"),
+                estimated_transit_hours=booking.get("estimated_transit_hours"),
+                estimated_cost=booking.get("estimated_cost"),
+                created_at=booking.get("created_at")
+            )
+            session.add(db_booking)
+            await session.commit()
     @classmethod
     async def get_booking_async(cls, booking_id: str) -> dict | None:
         async with AsyncSessionLocal() as session:
@@ -315,42 +315,44 @@ class Database:
     @classmethod
     async def update_booking_async(cls, booking_id: str, payload: dict):
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_booking = await session.get(DBBooking, booking_id)
-                if db_booking:
-                    if "status" in payload: db_booking.status = payload["status"]
-                    if "updated_at" in payload: db_booking.updated_at = payload["updated_at"]
+            db_booking = await session.get(DBBooking, booking_id)
+            if db_booking:
+                if "status" in payload: db_booking.status = payload["status"]
+                if "updated_at" in payload: db_booking.updated_at = payload["updated_at"]
+                await session.commit()
     @classmethod
     async def create_negotiation_async(cls, payload: dict) -> dict:
         p = deepcopy(payload)
         neg_id = p.get("negotiation_id") or Database.generate_id("neg")
         p["negotiation_id"] = neg_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_neg = await session.get(DBNegotiation, neg_id)
-                if not db_neg:
-                    db_neg = DBNegotiation(negotiation_id=neg_id)
-                    session.add(db_neg)
-                db_neg.crop = p.get("crop")
-                db_neg.quantity = p.get("quantity")
-                db_neg.farmer_id = p.get("farmer_id")
-                db_neg.buyer_id = p.get("buyer_id")
-                db_neg.user_id = p.get("user_id")
-                db_neg.farmer_name = p.get("farmer_name")
-                db_neg.status = p.get("status")
-                db_neg.current_round = p.get("current_round", 0)
-                db_neg.summary = p.get("summary")
-                db_neg.final_price = p.get("final_price")
-                tp = p.get("transport_plan")
-                if isinstance(tp, dict):
-                    import json
-                    tp = json.dumps(tp)
-                db_neg.transport_plan = tp
-                db_neg.peer_node = p.get("peer_node")
-                db_neg.logs = p.get("logs", [])
-                db_neg.market_offers = p.get("market_offers", [])
-                db_neg.selected_buyer = p.get("selected_buyer", {})
-                db_neg.signatures = p.get("signatures", {})
+            db_neg = await session.get(DBNegotiation, neg_id)
+            if not db_neg:
+                db_neg = DBNegotiation(negotiation_id=neg_id)
+                session.add(db_neg)
+            db_neg.crop = p.get("crop")
+            db_neg.quantity = p.get("quantity")
+            db_neg.farmer_id = p.get("farmer_id")
+            db_neg.buyer_id = p.get("buyer_id")
+            db_neg.user_id = p.get("user_id")
+            db_neg.farmer_name = p.get("farmer_name")
+            db_neg.status = p.get("status")
+            db_neg.current_round = p.get("current_round", 0)
+            db_neg.summary = p.get("summary")
+            db_neg.final_price = p.get("final_price")
+            db_neg.market_price = p.get("market_price")
+            db_neg.min_price = p.get("min_price")
+            tp = p.get("transport_plan")
+            if isinstance(tp, dict):
+                import json
+                tp = json.dumps(tp)
+            db_neg.transport_plan = tp
+            db_neg.peer_node = p.get("peer_node")
+            db_neg.logs = p.get("logs", [])
+            db_neg.market_offers = p.get("market_offers", [])
+            db_neg.selected_buyer = p.get("selected_buyer", {})
+            db_neg.signatures = p.get("signatures", {})
+            await session.commit()
         Database.negotiations[neg_id] = p
         return p
     @classmethod
@@ -375,34 +377,38 @@ class Database:
                     "logs": db_neg.logs or [],
                     "market_offers": db_neg.market_offers or [],
                     "selected_buyer": db_neg.selected_buyer or {},
-                    "signatures": db_neg.signatures or {}
+                    "signatures": db_neg.signatures or {},
+                    "market_price": db_neg.market_price,
+                    "min_price": db_neg.min_price
                 }
             return None
     @classmethod
     async def update_negotiation_async(cls, neg_id: str, payload: dict):
         payload["negotiation_id"] = neg_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_neg = await session.get(DBNegotiation, neg_id)
-                if not db_neg:
-                    db_neg = DBNegotiation(negotiation_id=neg_id)
-                    session.add(db_neg)
-                if "crop" in payload: db_neg.crop = payload["crop"]
-                if "quantity" in payload: db_neg.quantity = payload["quantity"]
-                if "farmer_id" in payload: db_neg.farmer_id = payload["farmer_id"]
-                if "buyer_id" in payload: db_neg.buyer_id = payload["buyer_id"]
-                if "user_id" in payload: db_neg.user_id = payload["user_id"]
-                if "farmer_name" in payload: db_neg.farmer_name = payload["farmer_name"]
-                if "status" in payload: db_neg.status = payload["status"]
-                if "current_round" in payload: db_neg.current_round = payload["current_round"]
-                if "summary" in payload: db_neg.summary = payload["summary"]
-                if "final_price" in payload: db_neg.final_price = payload["final_price"]
-                if "transport_plan" in payload: db_neg.transport_plan = payload["transport_plan"]
-                if "peer_node" in payload: db_neg.peer_node = payload["peer_node"]
-                if "logs" in payload: db_neg.logs = payload["logs"]
-                if "market_offers" in payload: db_neg.market_offers = payload["market_offers"]
-                if "selected_buyer" in payload: db_neg.selected_buyer = payload["selected_buyer"]
-                if "signatures" in payload: db_neg.signatures = payload["signatures"]
+            db_neg = await session.get(DBNegotiation, neg_id)
+            if not db_neg:
+                db_neg = DBNegotiation(negotiation_id=neg_id)
+                session.add(db_neg)
+            if "crop" in payload: db_neg.crop = payload["crop"]
+            if "quantity" in payload: db_neg.quantity = payload["quantity"]
+            if "farmer_id" in payload: db_neg.farmer_id = payload["farmer_id"]
+            if "buyer_id" in payload: db_neg.buyer_id = payload["buyer_id"]
+            if "user_id" in payload: db_neg.user_id = payload["user_id"]
+            if "farmer_name" in payload: db_neg.farmer_name = payload["farmer_name"]
+            if "status" in payload: db_neg.status = payload["status"]
+            if "current_round" in payload: db_neg.current_round = payload["current_round"]
+            if "summary" in payload: db_neg.summary = payload["summary"]
+            if "final_price" in payload: db_neg.final_price = payload["final_price"]
+            if "market_price" in payload: db_neg.market_price = payload["market_price"]
+            if "min_price" in payload: db_neg.min_price = payload["min_price"]
+            if "transport_plan" in payload: db_neg.transport_plan = payload["transport_plan"]
+            if "peer_node" in payload: db_neg.peer_node = payload["peer_node"]
+            if "logs" in payload: db_neg.logs = payload["logs"]
+            if "market_offers" in payload: db_neg.market_offers = payload["market_offers"]
+            if "selected_buyer" in payload: db_neg.selected_buyer = payload["selected_buyer"]
+            if "signatures" in payload: db_neg.signatures = payload["signatures"]
+            await session.commit()
         Database.negotiations[neg_id] = payload
     @classmethod
     async def append_offer_async(cls, negotiation_id: str, payload: dict) -> dict:
@@ -410,17 +416,17 @@ class Database:
         p["id"] = Database.generate_id("offer")
         p["negotiation_id"] = negotiation_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_offer = DBOffer(
-                    id=p["id"],
-                    negotiation_id=negotiation_id,
-                    round_num=p.get("round", 0),
-                    sender=p.get("sender"),
-                    price=p.get("price"),
-                    quantity=p.get("quantity"),
-                    message=p.get("message")
-                )
-                session.add(db_offer)
+            db_offer = DBOffer(
+                id=p["id"],
+                negotiation_id=negotiation_id,
+                round_num=p.get("round", 0),
+                sender=p.get("sender") or p.get("agent"),
+                price=p.get("price"),
+                quantity=p.get("quantity"),
+                message=p.get("message")
+            )
+            session.add(db_offer)
+            await session.commit()
         Database.offers[p["id"]] = p
         return p
     @classmethod
@@ -446,18 +452,18 @@ class Database:
         p = deepcopy(payload)
         p["id"] = Database.generate_id("contract")
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_contract = DBContract(
-                    id=p["id"],
-                    negotiation_id=p.get("negotiation_id"),
-                    farmer_id=p.get("farmer_id"),
-                    buyer_id=p.get("buyer_id"),
-                    crop=p.get("crop"),
-                    quantity=p.get("quantity"),
-                    final_price=p.get("final_price"),
-                    status=p.get("status")
-                )
-                session.add(db_contract)
+            db_contract = DBContract(
+                id=p["id"],
+                negotiation_id=p.get("negotiation_id"),
+                farmer_id=p.get("farmer_id"),
+                buyer_id=p.get("buyer_id"),
+                crop=p.get("crop"),
+                quantity=p.get("quantity"),
+                final_price=p.get("final_price") or p.get("price"),
+                status=p.get("status") or p.get("state")
+            )
+            session.add(db_contract)
+            await session.commit()
         Database.contracts[p["id"]] = p
         return p
     @classmethod
@@ -466,34 +472,34 @@ class Database:
         entry = deepcopy(entry)
         entry["user_id"] = user_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_history = DBHistory(
-                    id=record_id,
-                    user_id=user_id,
-                    negotiation_id=entry.get("negotiation_id"),
-                    crop=entry.get("crop"),
-                    quantity=entry.get("quantity"),
-                    status=entry.get("status"),
-                    final_price=entry.get("final_price"),
-                    summary=entry.get("summary"),
-                    market_price=entry.get("market_price"),
-                    negotiation_rounds=entry.get("negotiation_rounds"),
-                    successful=entry.get("successful"),
-                    failure_reason=entry.get("failure_reason"),
-                    farmer_strategy=entry.get("farmer_strategy"),
-                    farmer_reward=entry.get("farmer_reward"),
-                    buyer_strategy=entry.get("buyer_strategy"),
-                    buyer_reward=entry.get("buyer_reward"),
-                    warehouse_strategy=entry.get("warehouse_strategy"),
-                    warehouse_reward=entry.get("warehouse_reward"),
-                    transport_strategy=entry.get("transport_strategy"),
-                    transport_reward=entry.get("transport_reward"),
-                    processor_strategy=entry.get("processor_strategy"),
-                    processor_reward=entry.get("processor_reward"),
-                    compost_strategy=entry.get("compost_strategy"),
-                    compost_reward=entry.get("compost_reward")
-                )
-                session.add(db_history)
+            db_history = DBHistory(
+                id=record_id,
+                user_id=user_id,
+                negotiation_id=entry.get("negotiation_id"),
+                crop=entry.get("crop"),
+                quantity=entry.get("quantity"),
+                status=entry.get("status"),
+                final_price=entry.get("final_price"),
+                summary=entry.get("summary"),
+                market_price=entry.get("market_price"),
+                negotiation_rounds=entry.get("negotiation_rounds"),
+                successful=entry.get("successful"),
+                failure_reason=entry.get("failure_reason"),
+                farmer_strategy=entry.get("farmer_strategy"),
+                farmer_reward=entry.get("farmer_reward"),
+                buyer_strategy=entry.get("buyer_strategy"),
+                buyer_reward=entry.get("buyer_reward"),
+                warehouse_strategy=entry.get("warehouse_strategy"),
+                warehouse_reward=entry.get("warehouse_reward"),
+                transport_strategy=entry.get("transport_strategy"),
+                transport_reward=entry.get("transport_reward"),
+                processor_strategy=entry.get("processor_strategy"),
+                processor_reward=entry.get("processor_reward"),
+                compost_strategy=entry.get("compost_strategy"),
+                compost_reward=entry.get("compost_reward")
+            )
+            session.add(db_history)
+            await session.commit()
         if user_id not in Database.history:
             Database.history[user_id] = []
         Database.history[user_id].append(entry)

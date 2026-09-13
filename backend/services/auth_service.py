@@ -17,7 +17,7 @@ async def signup_user(data: dict):
     role = data.get("role", "farmer").lower()
 
     # Hash password securely using Bcrypt
-    hashed_pwd = hash_password(data["password"])
+    hashed_pwd = await hash_password(data["password"])
 
     user_record = {
         "user_id": user_id,
@@ -58,7 +58,7 @@ async def signup_user(data: dict):
     await Database.add_history_async(user_id, {"type": "ACCOUNT_CREATED", "role": role, "message": f"New {role} account initialized."})
 
     # Issue access token
-    token = create_access_token({"sub": user_id, "role": role})
+    token = await create_access_token({"sub": user_id, "role": role})
 
     return {
         "user_id": user_id,
@@ -81,8 +81,8 @@ async def login_user(data: dict):
             return res.scalars().first()
 
     u = await _get_user_db()
-    if u and verify_password(data["password"], u.password):
-        token = create_access_token({"sub": u.user_id, "role": u.role})
+    if u and await verify_password(data["password"], u.password):
+        token = await create_access_token({"sub": u.user_id, "role": u.role})
         return {
             "user_id": u.user_id,
             "name": u.name,

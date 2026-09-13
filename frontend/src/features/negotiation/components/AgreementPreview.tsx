@@ -13,8 +13,8 @@ export default function AgreementPreview({ dealData, onSignAndClose }) {
     try {
       const token = localStorage.getItem('agri_token');
       if (token !== 'mock_token') {
-        // Trigger smart contract / RL feedback update
-        await api.post(`/negotiations/${dealData.id}/accept`);
+        const negId = dealData.negotiation_id || dealData.id;
+        if (negId) await api.post(`/negotiations/${negId}/accept`, { final_price: dealData.price });
       }
       addNotification('success', 'Agreement cryptographically signed and stored.');
       onSignAndClose();

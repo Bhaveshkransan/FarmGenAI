@@ -1,58 +1,39 @@
 import React from 'react';
-import { Download, Eye, FileText, CheckCircle2, Truck, ShieldAlert } from 'lucide-react';
+import { Download, Eye, FileText, CheckCircle2, Truck, ShieldAlert, Clock, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-
-const MOCK_TRANSACTIONS = [
-  {
-    id: 'TXN-9021',
-    date: '2026-08-07',
-    crop: 'Soybean (Grade A)',
-    farmer: 'Latur Agro Farms',
-    buyer: 'AgriProcure Ltd',
-    quantity: '500 kg',
-    price: '₹68/kg',
-    total: '₹34,000',
-    status: 'completed',
-    workflow: 'Complete Supply Chain'
-  },
-  {
-    id: 'TXN-9020',
-    date: '2026-08-06',
-    crop: 'Red Onion (Grade B)',
-    farmer: 'Nashik Growers',
-    buyer: 'FreshMart',
-    quantity: '2000 kg',
-    price: '₹22/kg',
-    total: '₹44,000',
-    status: 'in_transit',
-    workflow: 'Direct + Transport'
-  },
-  {
-    id: 'TXN-9019',
-    date: '2026-08-05',
-    crop: 'Cotton (Grade A)',
-    farmer: 'Amravati AgriCorp',
-    buyer: 'Vidarbha Textiles',
-    quantity: '1000 kg',
-    price: '₹65/kg',
-    total: '₹65,000',
-    status: 'disputed',
-    workflow: 'Direct Sale'
-  }
-];
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function TransactionsPage() {
-  
+  const { user } = useAuth();
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['transactions', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const res = await api.get(`/history/history/${user.id}`);
+      return (res.data?.history || []).filter(
+        (h) => h.negotiation_id && h.crop
+      );
+    },
+    enabled: !!user?.id,
+  });
+
+  const transactions = data || [];
+
   const getStatusBadge = (status) => {
-    switch (status) {
-      case 'completed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1"/> Completed</span>;
-      case 'in_transit':
+    switch ((status || '').toUpperCase()) {
+      case 'DEAL':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1"/> Deal Closed</span>;
+      case 'IN_TRANSIT':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"><Truck className="w-3 h-3 mr-1"/> In Transit</span>;
-      case 'disputed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><ShieldAlert className="w-3 h-3 mr-1"/> Disputed</span>;
+      case 'NO_DEAL':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><ShieldAlert className="w-3 h-3 mr-1"/> No Deal</span>;
+      case 'ESCALATED_STORAGE':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">In Storage</span>;
       default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800">{status}</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800"><Clock className="w-3 h-3 mr-1"/> {status || 'Pending'}</span>;
     }
   };
 
@@ -70,70 +51,90 @@ export default function TransactionsPage() {
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Transaction ID
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Details
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Participants
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
-              {MOCK_TRANSACTIONS.map((txn) => (
-                <tr key={txn.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-slate-900">{txn.id}</div>
-                    <div className="text-sm text-slate-500">{txn.date}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-slate-900">{txn.crop}</div>
-                    <div className="text-sm text-slate-500">{txn.quantity} @ {txn.price}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-slate-900"><strong>F:</strong> {txn.farmer}</div>
-                    <div className="text-sm text-slate-900"><strong>B:</strong> {txn.buyer}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-emerald-600">{txn.total}</div>
-                    <div className="text-xs text-slate-500">{txn.workflow}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(txn.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-3">
-                      <Link to={`/deal/${txn.id.split('-')[1]}/track`} className="text-slate-400 hover:text-emerald-600 tooltip-trigger" title="Track Workflow">
-                        <Eye className="w-5 h-5" />
-                      </Link>
-                      <button className="text-slate-400 hover:text-blue-600 tooltip-trigger" title="Download Receipt">
-                        <FileText className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {/* Loading */}
+      {isLoading && (
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+          <Loader2 className="animate-spin mx-auto text-emerald-500 mb-3" size={32} />
+          <p className="text-slate-500">Loading your transaction history...</p>
         </div>
-      </div>
+      )}
+
+      {/* Error */}
+      {isError && (
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+          <ShieldAlert className="mx-auto text-red-400 mb-3" size={32} />
+          <p className="text-slate-500">Failed to load transactions. Please try again.</p>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && !isError && transactions.length === 0 && (
+        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 border-dashed">
+          <FileText className="mx-auto text-slate-300 mb-3" size={40} />
+          <h3 className="font-bold text-slate-700 mb-1">No Transactions Yet</h3>
+          <p className="text-slate-500 text-sm">Start a negotiation from your dashboard to create your first deal.</p>
+        </div>
+      )}
+
+      {/* Table */}
+      {!isLoading && transactions.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Negotiation ID</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Commodity</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Farmer</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Amount</th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-slate-200">
+                {transactions.map((txn) => {
+                  const total = txn.final_price && txn.quantity
+                    ? `₹${(txn.final_price * txn.quantity).toLocaleString('en-IN')}`
+                    : '—';
+                  return (
+                    <tr key={txn.negotiation_id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-slate-900 font-mono">{txn.negotiation_id?.substring(0, 16)}...</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-slate-900">{txn.crop || '—'}</div>
+                        <div className="text-sm text-slate-500">
+                          {txn.quantity ? `${txn.quantity} kg` : '—'}
+                          {txn.final_price ? ` @ ₹${txn.final_price}/kg` : ''}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-slate-900">{txn.farmer || txn.farmer_name || 'Unknown Farmer'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-emerald-600">{total}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getStatusBadge(txn.status)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-3">
+                          <Link to={`/negotiations/${txn.negotiation_id}`} className="text-slate-400 hover:text-emerald-600" title="View Negotiation Room">
+                            <Eye className="w-5 h-5" />
+                          </Link>
+                          <button className="text-slate-400 hover:text-blue-600" title="Download Receipt">
+                            <FileText className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
