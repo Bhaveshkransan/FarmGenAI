@@ -46,6 +46,7 @@ from .routes.workflow_routes import router as workflow_router
 from .routes.transport_routes import router as transport_router
 from .routes.processor_routes import router as processor_router
 from .routes.dashboard_routes import router as dashboard_router
+from .routes.market_routes import router as market_router
 from .websocket.agent_updates import agent_update_hub
 from database.db import Database, init_db, engine
 from sqlalchemy import text
@@ -176,6 +177,9 @@ app.include_router(dashboard_router, prefix="/api/v1/dashboards", tags=["Dashboa
 
 # Integrations (Object Storage, Mandi feeds)
 app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["Integrations"])
+
+# Market Intelligence (MandiMitra)
+app.include_router(market_router, prefix="/api/v1", tags=["Market Intelligence"])
 
 # Agents Telemetry
 from backend.api.v1.agents import router as agents_router

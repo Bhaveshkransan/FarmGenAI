@@ -25,6 +25,7 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=1440
       - ENVIRONMENT=production
     volumes:
+      - ./backend:/app/backend
       - ./data:/app/data
       - ./node_storage:/app/node_storage
     depends_on:
@@ -60,6 +61,7 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeyforagrinegotiatorsigningtokens12345}
       - JWT_ALGORITHM=HS256
     volumes:
+      - ./backend:/app/backend
       - ./data:/app/data
       - ./node_storage:/app/node_storage
     depends_on:

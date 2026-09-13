@@ -44,7 +44,7 @@ class CropListingCreate(BaseModel):
     images: Optional[List[str]] = None
     description: str = Field("", example="Organic grade A")
 
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def validate_logic(cls, values):
         qty = values.get('quantity')
         min_qty = values.get('min_sale_quantity')
@@ -79,7 +79,7 @@ class CropListingUpdate(BaseModel):
     description: str = None
     status: str = None  # "ACTIVE" | "SOLD" | "EXPIRED"
 
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def validate_logic(cls, values):
         qty = values.get('quantity')
         min_qty = values.get('min_sale_quantity')

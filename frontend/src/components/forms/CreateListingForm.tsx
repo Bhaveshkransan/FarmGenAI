@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
-import { X, Sprout, ImagePlus, Loader2, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
+import { X, Sprout, Loader2, CheckCircle2, TrendingUp, BrainCircuit } from 'lucide-react';
 import { api } from '../../services/api';
 import { useNotification } from '../../contexts/NotificationContext';
 
-const CROP_CATEGORIES = ['Vegetables', 'Fruits', 'Grains', 'Pulses', 'Spices', 'Others'];
+const CROP_CATEGORIES = ['Vegetables', 'Fruits', 'Grains', 'Pulses', 'Spices', 'Cash Crops'];
 const QUALITY_GRADES = ['Premium (A+)', 'Grade A', 'Grade B', 'Grade C (Processing)'];
+
+const MAHARASHTRA_CROPS = [
+  'Onion', 'Tomato', 'Soybean', 'Cotton', 'Grapes', 
+  'Sugarcane', 'Pomegranate', 'Tur (Pigeon Pea)', 'Chana (Gram)'
+];
+
+const MAHARASHTRA_DISTRICTS = [
+  'Ahmednagar', 'Akola', 'Amravati', 'Aurangabad', 'Beed', 'Bhandara', 'Buldhana', 
+  'Chandrapur', 'Dhule', 'Gadchiroli', 'Gondia', 'Hingoli', 'Jalgaon', 'Jalna', 
+  'Kolhapur', 'Latur', 'Mumbai City', 'Mumbai Suburban', 'Nagpur', 'Nanded', 
+  'Nandurbar', 'Nashik', 'Osmanabad', 'Palghar', 'Parbhani', 'Pune', 'Raigad', 
+  'Ratnagiri', 'Sangli', 'Satara', 'Sindhudurg', 'Solapur', 'Thane', 'Wardha', 
+  'Washim', 'Yavatmal'
+];
 
 export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
   const { addNotification } = useNotification();
-  const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [insight, setInsight] = useState(null);
+  const [isInsightLoading, setIsInsightLoading] = useState(false);
 
   const methods = useForm({
     defaultValues: {
-      crop: 'Tomato',
+      crop: 'Onion',
       crop_category: 'Vegetables',
       variety: '',
       grade: 'Grade A',
@@ -36,32 +51,18 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
       taluka: '',
       district: '',
       state: 'Maharashtra',
-      storage_available: false,
-      processing_available: false,
-      full_supply_chain: false,
-      req_market_intel: true,
-      req_buyer_match: true,
-      req_ai_neg: true,
+      req_full_logistics: false,
+      req_buyer_match: false,
       req_transport: false,
       req_warehouse: false,
-      req_quality: false,
+      req_processor: false,
       description: ''
     }
   });
 
-  const { register, handleSubmit, formState: { errors }, watch, reset, trigger } = methods;
+  const { register, handleSubmit, formState: { errors }, watch, reset } = methods;
 
   if (!isOpen) return null;
-
-  const totalSteps = 10;
-  
-  const handleNext = async () => {
-    // Basic validation before proceeding (could be improved with granular Zod schemas per step)
-    const isStepValid = await trigger();
-    if (isStepValid) setCurrentStep(p => Math.min(p + 1, totalSteps));
-  };
-
-  const handlePrev = () => setCurrentStep(p => Math.max(p - 1, 1));
 
   const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
@@ -85,17 +86,15 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     try {
-      // Build selected_services dynamic object
-      const selected_services = data.full_supply_chain 
-        ? { full_supply_chain: true }
-        : {
-            market_intelligence: data.req_market_intel,
-            buyer_matching: data.req_buyer_match,
-            negotiation: data.req_ai_neg,
-            transport: data.req_transport,
-            warehouse: data.req_warehouse,
-            quality_inspection: data.req_quality
-          };
+      const selected_services = {
+        market_intelligence: true,
+        negotiation: true,
+        quality_inspection: true,
+        buyer_matching: data.req_full_logistics || data.req_buyer_match,
+        transport: data.req_full_logistics || data.req_transport,
+        warehouse: data.req_full_logistics || data.req_warehouse,
+        processor: data.req_full_logistics || data.req_processor
+      };
 
       const payload = {
         crop: data.crop,
@@ -114,8 +113,8 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
         preferred_selling_date: data.preferred_selling_date,
         shelf_life: Number(data.shelf_life),
         location: `${data.village}, ${data.taluka}, ${data.district}`,
-        storage_info: { available: data.storage_available },
-        processing_info: { available: data.processing_available },
+        storage_info: { available: false },
+        processing_info: { available: false },
         selected_services,
         images: uploadedImages,
         description: data.description
@@ -125,7 +124,6 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
       addNotification('success', 'Comprehensive listing submitted successfully.');
       reset();
       setUploadedImages([]);
-      setCurrentStep(1);
       onSuccess?.();
       onClose();
     } catch (err) {
@@ -136,6 +134,29 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
   };
 
   const formData = watch();
+  const selectedCrop = watch('crop');
+  const selectedDistrict = watch('district');
+
+  useEffect(() => {
+    if (!selectedCrop) return;
+    
+    const fetchInsight = async () => {
+      setIsInsightLoading(true);
+      try {
+        const res = await api.get(`/market-intelligence/insights?crop=${selectedCrop}&location=${selectedDistrict || 'Maharashtra'}`);
+        if (res.data?.success) {
+          setInsight(res.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch market insight", err);
+      } finally {
+        setIsInsightLoading(false);
+      }
+    };
+    
+    const timer = setTimeout(fetchInsight, 800);
+    return () => clearTimeout(timer);
+  }, [selectedCrop, selectedDistrict]);
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -145,293 +166,238 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
           <div>
             <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg">
-              <Sprout size={20} className="text-emerald-600" /> Create Market Listing
+              <Sprout size={20} className="text-emerald-600" /> New Crop Listing
             </h3>
-            <p className="text-xs text-slate-500 mt-1">Step {currentStep} of {totalSteps}</p>
+            <p className="text-xs text-slate-500 mt-1">Fill out the details below to list your crop</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition bg-white p-2 rounded-full shadow-sm border border-slate-100">
             <X size={20} />
           </button>
         </div>
         
-        {/* Progress Bar */}
-        <div className="h-1.5 w-full bg-slate-100">
-          <div 
-            className="h-full bg-emerald-500 transition-all duration-300 ease-out"
-            style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-          />
-        </div>
-        
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto flex-1 p-6 sm:p-8 bg-white">
           <FormProvider {...methods}>
-            <form id="listing-wizard-form" onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form id="listing-form" onSubmit={handleSubmit(onSubmit)} className="space-y-10">
               
-              {currentStep === 1 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Crop Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category *</label>
-                      <select {...register('crop_category')} className="w-full form-input bg-slate-50">
-                        {CROP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Crop Name *</label>
-                      <input {...register('crop')} placeholder="e.g. Tomato" className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Specific Variety *</label>
-                      <input {...register('variety')} placeholder="e.g. Nashik Red, Shriram" className="w-full form-input bg-slate-50" />
-                    </div>
+              {/* Crop Information */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">1. Crop Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category *</label>
+                    <select {...register('crop_category')} className="w-full form-input bg-slate-50">
+                      {CROP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Seasonal Crop *</label>
+                    <select {...register('crop')} className="w-full form-input bg-slate-50">
+                      {MAHARASHTRA_CROPS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Specific Variety *</label>
+                    <input {...register('variety')} placeholder="e.g. Nashik Red, Shriram" className="w-full form-input bg-slate-50" required />
                   </div>
                 </div>
-              )}
+              </div>
 
-              {currentStep === 2 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Quantity Details</h4>
-                  <div className="grid grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Total Available *</label>
-                      <input type="number" {...register('quantity', { valueAsNumber: true })} className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Unit *</label>
-                      <select {...register('unit')} className="w-full form-input bg-slate-50">
-                        <option value="kg">Kilograms (kg)</option>
-                        <option value="quintal">Quintals</option>
-                        <option value="ton">Metric Tons (MT)</option>
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Minimum Sale Quantity *</label>
-                      <p className="text-xs text-slate-500 mb-2">The smallest amount you are willing to sell to a single buyer.</p>
-                      <input type="number" {...register('min_sale_quantity', { valueAsNumber: true })} className="w-full form-input bg-slate-50" />
-                    </div>
+              {/* Quantity Details */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">2. Quantity Details</h4>
+                <div className="grid grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Total Available *</label>
+                    <input type="number" {...register('quantity', { valueAsNumber: true })} className="w-full form-input bg-slate-50" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Unit *</label>
+                    <select {...register('unit')} className="w-full form-input bg-slate-50">
+                      <option value="kg">Kilograms (kg)</option>
+                      <option value="quintal">Quintals</option>
+                      <option value="ton">Metric Tons (MT)</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Minimum Sale Quantity *</label>
+                    <p className="text-xs text-slate-500 mb-2">The smallest amount you are willing to sell to a single buyer.</p>
+                    <input type="number" {...register('min_sale_quantity', { valueAsNumber: true })} className="w-full form-input bg-slate-50" required />
                   </div>
                 </div>
-              )}
+              </div>
 
-              {currentStep === 3 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Quality Parameters</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Quality Grade *</label>
-                      <select {...register('grade')} className="w-full form-input bg-slate-50">
-                        {QUALITY_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Moisture Content (%)</label>
-                      <input type="number" {...register('moisture', { valueAsNumber: true })} placeholder="Optional" className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div className="md:col-span-2 flex items-center gap-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-                      <input type="checkbox" id="organic" {...register('isOrganic')} className="w-5 h-5 text-emerald-600 rounded" />
-                      <label htmlFor="organic" className="font-medium text-emerald-900 cursor-pointer">Certified Organic Produce</label>
-                    </div>
+              {/* Quality Parameters */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">3. Quality Parameters</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Quality Grade *</label>
+                    <select {...register('grade')} className="w-full form-input bg-slate-50">
+                      {QUALITY_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Moisture Content (%)</label>
+                    <input type="number" {...register('moisture', { valueAsNumber: true })} placeholder="Optional" className="w-full form-input bg-slate-50" />
+                  </div>
+                  <div className="md:col-span-2 flex items-center gap-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <input type="checkbox" id="organic" {...register('isOrganic')} className="w-5 h-5 text-emerald-600 rounded" />
+                    <label htmlFor="organic" className="font-medium text-emerald-900 cursor-pointer">Certified Organic Produce</label>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {currentStep === 4 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Pricing Strategy</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Expected Target Price (₹) *</label>
-                      <input type="number" step="0.5" {...register('expected_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-blue-200 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Minimum Acceptable Price (₹) *</label>
-                      <input type="number" step="0.5" {...register('min_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-red-200 focus:ring-red-500" />
-                      {errors.min_price && <p className="text-red-500 text-xs mt-1">{errors.min_price.message}</p>}
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pricing Unit *</label>
-                      <select {...register('price_unit')} className="w-full form-input bg-slate-50">
-                        <option value="per_kg">Per kg</option>
-                        <option value="per_quintal">Per quintal</option>
-                        <option value="per_ton">Per ton (MT)</option>
-                      </select>
-                    </div>
+              {/* Pricing Strategy */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">4. Pricing Strategy</h4>
+                
+                {/* AI Market Intelligence Box */}
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-4 mb-4">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold mb-2">
+                    <BrainCircuit size={18} />
+                    <h3>AI Market Intelligence</h3>
+                    {isInsightLoading && <Loader2 size={14} className="animate-spin ml-2 text-emerald-600" />}
                   </div>
-                </div>
-              )}
-
-              {currentStep === 5 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Farm Location</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Village / Locality *</label>
-                      <input {...register('village')} className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Taluka *</label>
-                      <input {...register('taluka')} className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">District *</label>
-                      <input {...register('district')} className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">State *</label>
-                      <input {...register('state')} className="w-full form-input bg-slate-50" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {currentStep === 6 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Harvest & Timeline</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Date of Harvest</label>
-                      <input type="date" {...register('harvest_date')} className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Date Available for Pickup</label>
-                      <input type="date" {...register('availability_date')} className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Preferred Selling Date</label>
-                      <input type="date" {...register('preferred_selling_date')} className="w-full form-input bg-slate-50" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Estimated Shelf Life (Days) *</label>
-                      <input type="number" {...register('shelf_life', { valueAsNumber: true })} className="w-full form-input bg-slate-50" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {currentStep === 7 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Infrastructure Backup</h4>
-                  <p className="text-sm text-slate-600 mb-4">Do you have on-farm backup options if market prices are too low?</p>
-                  
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
-                      <input type="checkbox" {...register('storage_available')} className="w-5 h-5 text-emerald-600 rounded" />
-                      <div>
-                        <p className="font-semibold text-slate-800">Storage / Cold Storage Available</p>
-                        <p className="text-xs text-slate-500">I can store this crop to wait for better prices.</p>
-                      </div>
-                    </label>
-
-                    <label className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
-                      <input type="checkbox" {...register('processing_available')} className="w-5 h-5 text-emerald-600 rounded" />
-                      <div>
-                        <p className="font-semibold text-slate-800">Processing Fallback</p>
-                        <p className="text-xs text-slate-500">I can process this (e.g. drying, puree) or sell to a local processor.</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              )}
-
-              {currentStep === 8 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Supply Chain Services</h4>
-                  
-                  <label className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200 cursor-pointer mb-6">
-                    <input type="checkbox" {...register('full_supply_chain')} className="w-5 h-5 text-blue-600 rounded" />
-                    <div>
-                      <p className="font-bold text-blue-900">Full Supply Chain Automation</p>
-                      <p className="text-sm text-blue-700">Let AI handle finding buyers, negotiating, booking transport, and quality checks.</p>
-                    </div>
-                  </label>
-
-                  {!formData.full_supply_chain && (
-                    <div className="space-y-3 border-t border-slate-100 pt-4">
-                      <p className="text-sm font-semibold text-slate-600 mb-3">Or select individual services:</p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer">
-                          <input type="checkbox" {...register('req_market_intel')} className="rounded" /> Market Intelligence
-                        </label>
-                        <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer">
-                          <input type="checkbox" {...register('req_buyer_match')} className="rounded" /> Buyer Matching
-                        </label>
-                        <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer">
-                          <input type="checkbox" {...register('req_ai_neg')} className="rounded" /> AI Negotiation
-                        </label>
-                        <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer">
-                          <input type="checkbox" {...register('req_transport')} className="rounded" /> Transport Agent
-                        </label>
-                        <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer">
-                          <input type="checkbox" {...register('req_warehouse')} className="rounded" /> Warehouse Matching
-                        </label>
-                        <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer">
-                          <input type="checkbox" {...register('req_quality')} className="rounded" /> Quality Inspector
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {currentStep === 9 && (
-                <div className="space-y-4 animate-in slide-in-from-right-4 fade-in duration-300">
-                  <h4 className="text-xl font-bold text-slate-800 mb-6">Review & Confirm</h4>
-                  
-                  <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200 space-y-6">
-                    <div className="grid grid-cols-2 gap-y-4 text-sm">
-                      <div>
-                        <p className="text-slate-500">Product</p>
-                        <p className="font-bold text-slate-800">{formData.crop} ({formData.variety})</p>
-                        <p className="text-emerald-600 font-medium">{formData.grade} {formData.isOrganic ? '- Organic' : ''}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">Volume</p>
-                        <p className="font-bold text-slate-800">{formData.quantity} {formData.unit}</p>
-                        <p className="text-slate-600">Min Sale: {formData.min_sale_quantity} {formData.unit}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">Pricing Strategy</p>
-                        <p className="font-bold text-slate-800">Target: ₹{formData.expected_price}/{formData.price_unit}</p>
-                        <p className="text-red-500 font-medium">Absolute Min: ₹{formData.min_price}/{formData.price_unit}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">Location & Timing</p>
-                        <p className="font-bold text-slate-800">{formData.village}, {formData.district}</p>
-                        <p className="text-slate-600">Shelf Life: {formData.shelf_life} days</p>
-                      </div>
-                    </div>
-                    
-                    <div className="pt-4 border-t border-slate-200">
-                      <p className="text-slate-500 text-sm mb-2">Requested Services</p>
-                      <div className="flex flex-wrap gap-2">
-                        {formData.full_supply_chain ? (
-                          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">FULL SUPPLY CHAIN</span>
-                        ) : (
-                          <>
-                            {formData.req_market_intel && <span className="px-2 py-1 bg-slate-200 text-slate-700 rounded-md text-xs">Market Intel</span>}
-                            {formData.req_buyer_match && <span className="px-2 py-1 bg-slate-200 text-slate-700 rounded-md text-xs">Buyer Match</span>}
-                            {formData.req_ai_neg && <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-md text-xs font-bold">AI Negotiator</span>}
-                            {formData.req_transport && <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-md text-xs">Transport</span>}
-                          </>
+                  {!isInsightLoading && insight ? (
+                    <div className="text-sm text-slate-700 space-y-3">
+                      {/* Price Row */}
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span className="bg-emerald-100 text-emerald-800 px-2 py-1 rounded-md font-semibold text-xs">
+                          Live Price: ₹{insight.live_price}/kg
+                        </span>
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-md font-semibold text-xs flex items-center gap-1">
+                          <TrendingUp size={12} /> Trend: {insight.trend}
+                        </span>
+                        {insight.ml_forecast_price && (
+                          <span className={`px-2 py-1 rounded-md font-semibold text-xs flex items-center gap-1 ${insight.ml_forecast_direction === 'up' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {insight.ml_forecast_direction === 'up' ? '▲' : '▼'} 7-Day Forecast: ₹{insight.ml_forecast_price}/kg
+                          </span>
                         )}
                       </div>
+                      {/* ML Forecast detail */}
+                      {insight.ml_prediction && insight.ml_forecast_price && (
+                        <div className="flex items-center gap-2 text-xs text-slate-500 italic">
+                          <span>🤖 {insight.ml_prediction}</span>
+                        </div>
+                      )}
+                      {/* LLM Recommendation */}
+                      <p className="bg-white/60 p-3 rounded-lg border border-emerald-100 font-medium">
+                        <span className="text-emerald-700 font-bold mr-1">AI Advice:</span> 
+                        {insight.recommendation}
+                      </p>
                     </div>
-                  </div>
+                  ) : isInsightLoading ? (
+                    <p className="text-xs text-slate-500 animate-pulse">Analyzing regional datasets and historical patterns for {selectedCrop}...</p>
+                  ) : null}
                 </div>
-              )}
 
-              {currentStep === 10 && (
-                <div className="space-y-6 text-center animate-in slide-in-from-bottom-4 fade-in duration-300 py-10">
-                  <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 size={48} className="text-emerald-600" />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Expected Target Price (₹) *</label>
+                    <input type="number" step="0.5" {...register('expected_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-blue-200 focus:ring-blue-500" required />
                   </div>
-                  <h4 className="text-2xl font-bold text-slate-800">Ready to Submit</h4>
-                  <p className="text-slate-500 max-w-sm mx-auto">
-                    Your listing is complete and ready to be processed by the Market Intelligence & Matching Engine.
-                  </p>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Minimum Acceptable Price (₹) *</label>
+                    <input type="number" step="0.5" {...register('min_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-red-200 focus:ring-red-500" required />
+                    {errors.min_price && <p className="text-red-500 text-xs mt-1">{errors.min_price.message}</p>}
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pricing Unit *</label>
+                    <select {...register('price_unit')} className="w-full form-input bg-slate-50">
+                      <option value="per_kg">Per kg</option>
+                      <option value="per_quintal">Per quintal</option>
+                      <option value="per_ton">Per ton (MT)</option>
+                    </select>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Farm Location */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">5. Farm Location</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Village / Locality *</label>
+                    <input {...register('village')} className="w-full form-input bg-slate-50" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Taluka *</label>
+                    <input {...register('taluka')} className="w-full form-input bg-slate-50" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">District *</label>
+                    <select {...register('district')} className="w-full form-input bg-slate-50">
+                      {MAHARASHTRA_DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">State *</label>
+                    <input {...register('state')} className="w-full form-input bg-slate-100 text-slate-500 font-medium" readOnly />
+                  </div>
+                </div>
+              </div>
+
+              {/* Harvest & Timeline */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">6. Harvest & Timeline</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Date of Harvest</label>
+                    <input type="date" {...register('harvest_date')} className="w-full form-input bg-slate-50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Date Available for Pickup</label>
+                    <input type="date" {...register('availability_date')} className="w-full form-input bg-slate-50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Preferred Selling Date</label>
+                    <input type="date" {...register('preferred_selling_date')} className="w-full form-input bg-slate-50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Estimated Shelf Life (Days) *</label>
+                    <input type="number" {...register('shelf_life', { valueAsNumber: true })} className="w-full form-input bg-slate-50" required />
+                  </div>
+                </div>
+              </div>
+
+              {/* Supply Chain Services */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">7. Optional Logistics Assistance</h4>
+                
+                <p className="text-sm text-slate-600 mb-3">
+                  Matching, Quality Checks, and AI Negotiation are included by default. Do you need help with finding buyers or physical logistics?
+                </p>
+
+                <label className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200 cursor-pointer mb-4">
+                  <input type="checkbox" {...register('req_full_logistics')} className="w-5 h-5 text-blue-600 rounded" />
+                  <div>
+                    <p className="font-bold text-blue-900">Full Logistics Assistance</p>
+                    <p className="text-sm text-blue-700">Let AI handle finding buyers, booking transport, matching warehouses, and processors.</p>
+                  </div>
+                </label>
+                
+                {!formData.req_full_logistics && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                    <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer hover:bg-slate-100 transition">
+                      <input type="checkbox" {...register('req_buyer_match')} className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" /> 
+                      <span className="font-medium text-slate-700">Buyer Agent</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer hover:bg-slate-100 transition">
+                      <input type="checkbox" {...register('req_transport')} className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" /> 
+                      <span className="font-medium text-slate-700">Transport Agent</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer hover:bg-slate-100 transition">
+                      <input type="checkbox" {...register('req_warehouse')} className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" /> 
+                      <span className="font-medium text-slate-700">Warehouse Matching</span>
+                    </label>
+                    <label className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border text-sm cursor-pointer hover:bg-slate-100 transition">
+                      <input type="checkbox" {...register('req_processor')} className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" /> 
+                      <span className="font-medium text-slate-700">Processor Matching</span>
+                    </label>
+                  </div>
+                )}
+              </div>
 
             </form>
           </FormProvider>
@@ -441,31 +407,21 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
         <div className="p-5 border-t border-slate-100 flex justify-between bg-slate-50 sticky bottom-0 z-10">
           <button 
             type="button" 
-            onClick={handlePrev} 
-            disabled={currentStep === 1 || isSubmitting}
+            onClick={onClose} 
+            disabled={isSubmitting}
             className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl transition disabled:opacity-30 flex items-center gap-2 shadow-sm"
           >
-            <ChevronLeft size={18} /> Back
+            Cancel
           </button>
           
-          {currentStep < totalSteps ? (
-            <button 
-              type="button" 
-              onClick={handleNext}
-              className="px-8 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition shadow-md flex items-center gap-2"
-            >
-              Next Step <ChevronRight size={18} />
-            </button>
-          ) : (
-            <button 
-              type="submit" 
-              form="listing-wizard-form"
-              disabled={isSubmitting} 
-              className="px-8 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md"
-            >
-              {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Publishing...</> : 'Publish Listing'}
-            </button>
-          )}
+          <button 
+            type="submit" 
+            form="listing-form"
+            disabled={isSubmitting} 
+            className="px-8 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md"
+          >
+            {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Submitting...</> : 'Submit to AI Validator'}
+          </button>
         </div>
 
       </div>

@@ -66,3 +66,7 @@ prometheus-fastapi-instrumentator==6.1.0
 # ── Utilities ─────────────────────────────────────────────────────────────────
 tenacity==8.2.3
 ollama==0.3.3
+xgboost
+scikit-learn
+pandas
+numpy

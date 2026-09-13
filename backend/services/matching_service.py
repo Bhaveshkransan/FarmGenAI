@@ -99,37 +99,74 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
     Find and score all buyer requirements that match a given crop listing.
     Returns ranked list of matches.
     """
-    from backend.routes.buyer_requirement_routes import _requirements
+    buyers = await Database.list_buyers_async()
+    all_requirements = [r for r in buyers if r.get("kind") == "requirement" and r.get("status") == "ACTIVE"]
+    
+    # Also include simulated buyers / default profiles that might not explicitly have kind="requirement"
+    if not all_requirements:
+        all_requirements = [b for b in buyers if b.get("kind") != "offer"]
 
     results = []
-    all_requirements = [r for r in _requirements.values() if r.get("status") == "ACTIVE"]
-
     for req in all_requirements:
         # Crop must match (case-insensitive)
-        if req.get("crop", "").lower() != listing.get("crop", "").lower():
+        req_crop = req.get("crop", "")
+        list_crop = listing.get("crop", "")
+        if req_crop and list_crop and req_crop.lower() != list_crop.lower():
             continue
 
         buyer_user = await UserRepository.get_by_id(req.get("user_id", "")) or {}
         score = await _score_match(listing, req, buyer_user)
         dist = await _get_distance_km(listing.get("location", ""), req.get("location", ""))
+        
+        # Calculate derived offer details similar to negotiation_service
+        req_qty = float(req.get("quantity") or req.get("max_quantity") or listing.get("quantity", 0))
+        offered_qty = min(float(listing.get("quantity", 0)), req_qty)
+        budget = float(req.get("budget", 0))
+        target_price = float(req.get("target_price") or req.get("max_price") or listing.get("min_price", 0) * 1.2)
+        budget_limited_price = budget / max(offered_qty, 1)
+        
+        strategy = str(req.get("strategy", "")).lower()
+        min_price = float(listing.get("min_price", 0))
+        market_price = float(listing.get("market_price", min_price + 1))
+        
+        if "restaurant" in strategy or "premium" in strategy:
+            opening_bid = min(target_price * 0.85, budget_limited_price)
+        else:
+            opening_bid = min(target_price * 0.75, budget_limited_price, (market_price + 3) * 0.75)
+            
+        offer_price = round(max(1.0, opening_bid), 2)
+        is_viable = offer_price >= min_price
+
+        # Strategic Labelling
+        label = "Market Option"
+        if is_viable:
+            if score > 75: label = "👑 Best Profit"
+            elif dist == 0: label = "⚡ Fast Handshake"
+            elif "restaurant" in strategy: label = "💎 Premium Match"
+            elif score > 50: label = "🎯 Strategic Fit"
 
         results.append({
-            "requirement_id": req["requirement_id"],
-            "buyer_id": req.get("user_id"),
-            "buyer_name": req.get("buyer_name", "Unknown Buyer"),
-            "crop": req.get("crop"),
-            "quantity": req.get("quantity"),
-            "target_price": req.get("target_price"),
+            "requirement_id": req.get("requirement_id") or req.get("id"),
+            "buyer_id": req.get("user_id") or req.get("id"),
+            "buyer_name": req.get("buyer_name") or req.get("name", "Unknown Buyer"),
+            "crop": req.get("crop") or list_crop,
+            "quantity": req_qty,
+            "target_price": target_price,
             "max_price": req.get("max_price"),
-            "budget": req.get("budget"),
-            "location": req.get("location"),
+            "budget": budget,
+            "location": req.get("location", "Market"),
+            "strategy": label,
+            "offered_price": offer_price,
+            "offered_quantity": round(offered_qty, 2),
+            "status": "VIABLE" if is_viable else "BELOW_MIN_PRICE",
             "distance_km": dist,
             "compatibility_score": score,
+            "score": score, # Alias for compatibility
             "match_grade": "A" if score >= 70 else "B" if score >= 45 else "C",
             "notes": req.get("notes", ""),
         })
 
-    results.sort(key=lambda x: x["compatibility_score"], reverse=True)
+    results.sort(key=lambda item: (item["status"] == "VIABLE", item["compatibility_score"], item["offered_price"]), reverse=True)
     return results
 
 

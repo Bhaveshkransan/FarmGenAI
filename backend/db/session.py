@@ -44,18 +44,16 @@ def is_postgres_running(url: str) -> bool:
         return False
     async def _test():
         try:
-            temp_engine = create_async_engine(url, echo=False)
+            from sqlalchemy.pool import NullPool
+            temp_engine = create_async_engine(url, echo=False, poolclass=NullPool)
             async with temp_engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
             await temp_engine.dispose()
             return True
         except Exception:
             return False
-    try:
-        loop = asyncio.get_running_loop()
-        return True
-    except RuntimeError:
-        return asyncio.run(_test())
+    # Always use a fresh thread to avoid event loop conflicts
+    return _run_async(_test())
 
 db_url = settings.DATABASE_URL
 if os.getenv("TESTING") == "1" or not is_postgres_running(db_url):

@@ -181,13 +181,20 @@ class NegotiationService:
             )
 
     async def _build_farmer(self, payload: dict):
+        storage_info = payload.get("storage_info") or {}
+        processing_info = payload.get("processing_info") or {}
+        
         return FarmerAgent(
             name=payload.get("farmer_name", "FarmerAgent"),
             crop=payload["crop"],
             quantity=float(payload["quantity"]),
             min_price=float(payload["min_price"]),
             shelf_life=int(payload.get("shelf_life", 3)),
-            location=payload.get("location")
+            location=payload.get("location"),
+            min_sale_quantity=float(payload.get("min_sale_quantity", 100)),
+            initial_price=float(payload.get("expected_price", float(payload["min_price"]) * 1.2)),
+            has_storage_option=payload.get("storage_available", bool(storage_info.get("available", True) if storage_info else False)),
+            has_processor_option=payload.get("processing_available", bool(processing_info.get("available", True) if processing_info else False)),
         )
 
     async def _build_buyer(self, buyer_profile: dict):
@@ -237,97 +244,19 @@ class NegotiationService:
 
     async def _generate_market_offers(self, payload: dict):
         await self.ensure_default_buyers()
-
-        quantity = max(float(payload["quantity"]), 1)
-        min_price = float(payload["min_price"])
-        market_price = float(payload.get("market_price", min_price + 1))
-        location = payload.get("location", "Unknown")
-
-        # ── Fetch Farmer Strategic Context ───────────────────
-        user_id = payload.get("user_id")
-        user = await UserRepository.get_by_id(user_id) or {}
-        # Preferences stored during Phase A onboarding
-        farmer_prefs = user.get("preferences", {})
-        buyer_pref = str(farmer_prefs.get("buyer_preference", "any")).lower()
-
-        offers = []
-        # Use in-memory buyers (seeded by ensure_default_buyers) which have 'name', 'budget', 'target_price' etc.
-        buyer_profiles = list(self.db_repo.buyers.values())
-        # Fallback: if in-memory is empty, query DB
-        if not buyer_profiles:
-            db_buyers = await self.db_repo.list_buyers_async()
-            # Normalize DB rows to match in-memory schema
-            buyer_profiles = [
-                {
-                    "id": b.get("id"),
-                    "name": b.get("buyer_name") or b.get("name") or "Unknown Buyer",
-                    "budget": float(b.get("max_price") or b.get("budget") or min_price * quantity * 1.5),
-                    "max_quantity": float(b.get("quantity") or quantity),
-                    "target_price": float(b.get("max_price") or b.get("target_price") or min_price * 1.2),
-                    "location": b.get("location", "Market"),
-                    "strategy": b.get("strategy", "standard"),
-                }
-                for b in db_buyers
-            ]
-        for profile in buyer_profiles:
-            strategy = profile.get("strategy", "").lower()
-            if profile.get("kind") == "offer":
-                continue
-
-            offered_qty = min(quantity, float(profile.get("max_quantity", quantity)))
-            if offered_qty <= 0:
-                continue
-
-            budget_limited_price = float(profile.get("budget", 0)) / offered_qty
-            
-            if "restaurant" in strategy or "premium" in strategy:
-                # Premium buyers start slightly higher but still below target
-                opening_bid = min(float(profile.get("target_price", min_price)) * 0.85, budget_limited_price)
-            else:
-                opening_bid = min(float(profile.get("target_price", min_price)) * 0.75, budget_limited_price, (market_price + 3) * 0.75)
-                
-            offer_price = round(max(1.0, opening_bid), 2)
-            distance_penalty = 0 if profile.get("location") == location else 0.2
-            
-            # User Preference Boost (Stakeholder Requirement C4)
-            pref_boost = 15.0 if (buyer_pref in strategy and buyer_pref != "any") else 0.0
-            
-            # Verification Integrity Boost (Test I2)
-            is_verified = bool(profile.get("verified", False))
-            verification_weight = 20.0 if is_verified else -10.0
-            
-            is_viable = offer_price >= min_price
-            
-            # Weighted Scoring Engine (Personalized for Phase C4 + Phase I)
-            if "restaurant" in strategy:
-                score = round((offer_price - distance_penalty) * 150 + pref_boost + verification_weight + min(offered_qty, quantity) / 50, 2)
-            else:
-                score = round((offer_price - distance_penalty) * 100 + pref_boost + verification_weight + min(offered_qty, quantity) / 10, 2)
-
-            # Strategic Labelling (Test E4)
-            label = "Market Option"
-            if is_viable:
-                if score > 150: label = "👑 Best Profit"
-                elif distance_penalty == 0: label = "⚡ Fast Handshake"
-                elif "restaurant" in strategy: label = "💎 Premium Match"
-                elif pref_boost > 0: label = "🎯 Strategic Fit"
-
-            offers.append(
-                {
-                    "buyer_id": profile.get("id") or profile.get("buyer_id") or profile.get("user_id", "unknown"),
-                    "buyer_name": profile.get("name") or profile.get("buyer_name") or profile.get("company", "Unknown Buyer"),
-                    "location": profile.get("location", "Market"),
-                    "strategy": label,
-                    "offered_price": offer_price,
-                    "offered_quantity": round(offered_qty, 2),
-                    "budget": float(profile.get("budget", 0)),
-                    "target_price": float(profile.get("target_price", min_price)),
-                    "status": "VIABLE" if is_viable else "BELOW_MIN_PRICE",
-                    "score": score,
-                }
-            )
-
-        offers.sort(key=lambda item: (item["status"] == "VIABLE", item["score"], item["offered_price"]), reverse=True)
+        from backend.services.matching_service import match_listing_to_buyers
+        
+        # Prepare the listing payload to match what match_listing_to_buyers expects
+        listing = {
+            "user_id": payload.get("user_id"),
+            "crop": payload["crop"],
+            "quantity": payload["quantity"],
+            "min_price": payload["min_price"],
+            "market_price": payload.get("market_price", float(payload["min_price"]) + 1),
+            "location": payload.get("location", "Unknown")
+        }
+        
+        offers = await match_listing_to_buyers(listing)
         return offers
 
     async def start_negotiation(
