@@ -37,7 +37,7 @@ export default function FarmerDashboard() {
   const [mandiData, setMandiData] = useState<MarketData | null>(null);
   const [mandiLoading, setMandiLoading] = useState(false);
   const [mandiError, setMandiError] = useState<string | null>(null);
-  const [selectedCrop, setSelectedCrop] = useState('Tomato');
+  const [selectedCrop, setSelectedCrop] = useState('Soybean');
   const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'found' | 'error'>('idle');
 
   const { data: listings, isLoading, isError, refetch } = useQuery({
@@ -132,7 +132,7 @@ export default function FarmerDashboard() {
               onChange={e => setSelectedCrop(e.target.value)}
               className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none"
             >
-              {['Tomato', 'Onion', 'Potato', 'Wheat', 'Rice', 'Maize', 'Sugarcane'].map(c => (
+              {['Sugarcane', 'Soybean', 'Cotton', 'Jowar', 'Onion', 'Bajra', 'Rice'].map(c => (
                 <option key={c}>{c}</option>
               ))}
             </select>
@@ -292,17 +292,17 @@ export default function FarmerDashboard() {
                             onClick={async () => {
                               try {
                                 const payload = {
+                                  user_id: user?.id,
+                                  farmer_name: user?.name || "Unknown Farmer",
                                   crop: listing.crop,
                                   quantity: listing.quantity || listing.qty || 100,
                                   min_price: listing.min_price || listing.price || 10,
-                                  expected_price: listing.expected_price || (listing.min_price || 10) * 1.2,
-                                  min_sale_quantity: listing.min_sale_quantity || 100,
                                   shelf_life: listing.shelf_life || 7,
                                   location: listing.location || 'Nashik',
-                                  storage_info: listing.storage_info || {},
-                                  processing_info: listing.processing_info || {}
+                                  quality: listing.grade || 'A',
+                                  language: 'English'
                                 };
-                                const res = await api.post('/negotiation/', payload);
+                                const res = await api.post('/negotiations/', payload);
                                 if (res.data?.negotiation_id) navigate(`/negotiations/${res.data.negotiation_id}`);
                                 else navigate(`/negotiations/${listing.id}`);
                               } catch (e) {

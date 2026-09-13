@@ -91,25 +91,25 @@
   {
     "negotiation_id": "neg_a4d9525c",
     "timestamp": "2026-07-19T16:14:50.274269",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 1147.0,
     "district": "Pune",
-    "mandi_reference_price": 28.45,
-    "farmer_initial_offer": 35.9,
-    "buyer_initial_offer": 23.09,
+    "mandi_reference_price": 71.12,
+    "farmer_initial_offer": 89.75,
+    "buyer_initial_offer": 57.73,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade A from Pune. I am looking for ₹35.90/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Pune. I am looking for ₹35.90/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.45/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹23.09/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.45/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹23.09/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -133,7 +133,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -141,8 +141,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": null,
@@ -370,25 +370,25 @@
   {
     "negotiation_id": "neg_04593fb4",
     "timestamp": "2026-08-03T03:14:50.274269",
-    "crop": "Tomato",
-    "variety": "Vaishali",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 2375.0,
     "district": "Ahmednagar",
-    "mandi_reference_price": 22.6,
-    "farmer_initial_offer": 26.13,
-    "buyer_initial_offer": 17.88,
+    "mandi_reference_price": 36.55,
+    "farmer_initial_offer": 42.26,
+    "buyer_initial_offer": 28.92,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Vaishali), Grade B from Ahmednagar. I am looking for ₹26.13/kg. Take a look at the quality of this Vaishali harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Ahmednagar. I am looking for ₹26.13/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.60/kg, your rate is high. I can source similar quality Vaishali from another mandi at 20.60165022597451. Your rate is too high. I can offer ₹17.88/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.60/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 20.60165022597451. Your rate is too high. I can offer ₹17.88/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -673,25 +673,25 @@
   {
     "negotiation_id": "neg_c46c439c",
     "timestamp": "2026-07-12T03:14:50.275268",
-    "crop": "Wheat",
-    "variety": "Lokwan",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 1229.0,
     "district": "Nashik",
-    "mandi_reference_price": 30.88,
-    "farmer_initial_offer": 36.12,
-    "buyer_initial_offer": 24.6,
+    "mandi_reference_price": 77.2,
+    "farmer_initial_offer": 90.3,
+    "buyer_initial_offer": 61.5,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Lokwan), Grade A from Nashik. I am looking for ₹36.12/kg. Take a look at the quality of this Lokwan harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Nashik. I am looking for ₹36.12/kg. Take a look at the quality of this Maldandi harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹30.88/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹24.60/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹30.88/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹24.60/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -727,7 +727,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 29.48 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 29.48 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -739,7 +739,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -747,8 +747,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 29.48,
@@ -769,7 +769,7 @@
       "farmer": "Aggressive",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 1229.0kg of Wheat (Lokwan) at ₹29.48/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 1229.0kg of Jowar (Maldandi) at ₹29.48/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_16f83016",
@@ -863,25 +863,25 @@
   {
     "negotiation_id": "neg_340c20be",
     "timestamp": "2026-07-18T20:14:50.275268",
-    "crop": "Wheat",
-    "variety": "Sihore",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 1301.0,
     "district": "Pune",
-    "mandi_reference_price": 27.52,
-    "farmer_initial_offer": 34.86,
-    "buyer_initial_offer": 22.31,
+    "mandi_reference_price": 68.8,
+    "farmer_initial_offer": 87.15,
+    "buyer_initial_offer": 55.77,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Sihore), Grade A from Pune. I am looking for ₹34.86/kg. Take a look at the quality of this Sihore harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Pune. I am looking for ₹34.86/kg. Take a look at the quality of this Maldandi harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.52/kg, your rate is high. I can source similar quality Sihore from another mandi at 25.516766176442406. Your rate is too high. I can offer ₹22.31/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.52/kg, your rate is high. I can source similar quality Maldandi from another mandi at 25.516766176442406. Your rate is too high. I can offer ₹22.31/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -917,7 +917,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. Let's finalize at 27.88. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. Let's finalize at 27.88. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -929,7 +929,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -937,8 +937,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 27.88,
@@ -959,7 +959,7 @@
       "farmer": "Balanced",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 1301.0kg of Wheat (Sihore) at ₹27.88/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 1301.0kg of Jowar (Maldandi) at ₹27.88/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_07ac879c",
@@ -1255,25 +1255,25 @@
   {
     "negotiation_id": "neg_23e043fa",
     "timestamp": "2026-06-23T13:14:50.275268",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 2971.0,
     "district": "Nagpur",
-    "mandi_reference_price": 33.14,
-    "farmer_initial_offer": 42.62,
-    "buyer_initial_offer": 27.39,
+    "mandi_reference_price": 82.85,
+    "farmer_initial_offer": 106.55,
+    "buyer_initial_offer": 68.47,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade A from Nagpur. I am looking for ₹42.62/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Nagpur. I am looking for ₹42.62/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹33.14/kg, your rate is high. I can source similar quality GW-496 from another mandi at 31.137502859148213. Your rate is too high. I can offer ₹27.39/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹33.14/kg, your rate is high. I can source similar quality Maldandi from another mandi at 31.137502859148213. Your rate is too high. I can offer ₹27.39/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -1297,7 +1297,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 33.20 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 33.20 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -1309,7 +1309,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -1317,8 +1317,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 33.2,
@@ -1339,7 +1339,7 @@
       "farmer": "Cooperative",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 2971.0kg of Wheat (GW-496) at ₹33.20/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 2971.0kg of Jowar (Maldandi) at ₹33.20/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_b9a54855",
@@ -1938,25 +1938,25 @@
   {
     "negotiation_id": "neg_3e65cc4d",
     "timestamp": "2026-08-04T15:14:50.276266",
-    "crop": "Wheat",
-    "variety": "Sihore",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 2381.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 30.38,
-    "farmer_initial_offer": 38.46,
-    "buyer_initial_offer": 25.75,
+    "mandi_reference_price": 75.95,
+    "farmer_initial_offer": 96.15,
+    "buyer_initial_offer": 64.38,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Sihore), Grade A from Jalgaon. I am looking for ₹38.46/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Jalgaon. I am looking for ₹38.46/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹30.38/kg, your rate is high. I can source similar quality Sihore from another mandi at 28.375838466947297. Your rate is too high. I can offer ₹25.75/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹30.38/kg, your rate is high. I can source similar quality Maldandi from another mandi at 28.375838466947297. Your rate is too high. I can offer ₹25.75/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -2004,7 +2004,7 @@
       {
         "round": 5,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 30.84 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 30.84 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -2016,7 +2016,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -2024,8 +2024,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 30.84,
@@ -2046,24 +2046,24 @@
       "farmer": "Aggressive",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 2381.0kg of Wheat (Sihore) at ₹30.84/kg after 5 rounds."
+    "outcome_summary": "Successful deal closed for 2381.0kg of Jowar (Maldandi) at ₹30.84/kg after 5 rounds."
   },
   {
     "negotiation_id": "neg_cb984187",
     "timestamp": "2026-06-22T01:14:50.276266",
-    "crop": "Tomato",
-    "variety": "Vaishali",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 1071.0,
     "district": "Nagpur",
-    "mandi_reference_price": 26.7,
-    "farmer_initial_offer": 32.89,
-    "buyer_initial_offer": 22.01,
+    "mandi_reference_price": 43.18,
+    "farmer_initial_offer": 53.19,
+    "buyer_initial_offer": 35.6,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Vaishali), Grade A from Nagpur. I am looking for ₹32.89/kg. I cannot go lower because my Tomato (Vaishali) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Nagpur. I am looking for ₹32.89/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
@@ -2093,7 +2093,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can raise my bid to 26.08 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can raise my bid to 26.08 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -2135,30 +2135,30 @@
       "farmer": "Cooperative",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 1071.0kg of Tomato (Vaishali) at ₹26.08/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 1071.0kg of Bajra (HHB-67 Improved) at ₹26.08/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_5f8a1a74",
     "timestamp": "2026-07-14T15:14:50.276266",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 1352.0,
     "district": "Latur",
-    "mandi_reference_price": 20.57,
-    "farmer_initial_offer": 25.79,
-    "buyer_initial_offer": 17.38,
+    "mandi_reference_price": 33.27,
+    "farmer_initial_offer": 41.71,
+    "buyer_initial_offer": 28.11,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade B from Latur. I am looking for ₹25.79/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Latur. I am looking for ₹25.79/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹20.57/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹17.38/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹20.57/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹17.38/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -2182,7 +2182,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can raise my bid to 20.58 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can raise my bid to 20.58 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -2224,30 +2224,30 @@
       "farmer": "Cooperative",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 1352.0kg of Tomato (Abhilash) at ₹20.58/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 1352.0kg of Bajra (HHB-67 Improved) at ₹20.58/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_f9a239c7",
     "timestamp": "2026-07-22T14:14:50.276266",
-    "crop": "Tomato",
-    "variety": "Vaishali",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 1254.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 20.28,
-    "farmer_initial_offer": 23.75,
-    "buyer_initial_offer": 17.01,
+    "mandi_reference_price": 32.8,
+    "farmer_initial_offer": 38.41,
+    "buyer_initial_offer": 27.51,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Vaishali), Grade B from Jalgaon. I am looking for ₹23.75/kg. Take a look at the quality of this Vaishali harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Jalgaon. I am looking for ₹23.75/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹20.28/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹17.01/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹20.28/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹17.01/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Competitive strategy."
       },
       {
@@ -2283,7 +2283,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. Let's finalize at 19.74. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. Let's finalize at 19.74. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -2325,7 +2325,7 @@
       "farmer": "Balanced",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 1254.0kg of Tomato (Vaishali) at ₹19.74/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 1254.0kg of Bajra (HHB-67 Improved) at ₹19.74/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_754b5a4b",
@@ -2609,25 +2609,25 @@
   {
     "negotiation_id": "neg_dd3348c9",
     "timestamp": "2026-08-04T03:14:50.276266",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 4139.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 22.38,
-    "farmer_initial_offer": 28.93,
-    "buyer_initial_offer": 17.32,
+    "mandi_reference_price": 36.19,
+    "farmer_initial_offer": 46.79,
+    "buyer_initial_offer": 28.01,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade A from Jalgaon. I am looking for ₹28.93/kg. I cannot go lower because my Tomato (Arka Rakshak) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Jalgaon. I am looking for ₹28.93/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.38/kg, your rate is high. I can source similar quality Arka Rakshak from another mandi at 20.380591304828823. Your rate is too high. I can offer ₹17.32/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.38/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 20.380591304828823. Your rate is too high. I can offer ₹17.32/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -2663,7 +2663,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. Let's finalize at 22.10. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. Let's finalize at 22.10. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -2705,30 +2705,30 @@
       "farmer": "Cooperative",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 4139.0kg of Tomato (Arka Rakshak) at ₹22.10/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 4139.0kg of Bajra (HHB-67 Improved) at ₹22.10/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_d3c1e915",
     "timestamp": "2026-07-01T23:14:50.276266",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 1384.0,
     "district": "Pune",
-    "mandi_reference_price": 26.47,
-    "farmer_initial_offer": 31.25,
-    "buyer_initial_offer": 20.38,
+    "mandi_reference_price": 66.17,
+    "farmer_initial_offer": 78.12,
+    "buyer_initial_offer": 50.95,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade B from Pune. I am looking for ₹31.25/kg. Take a look at the quality of this GW-496 harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Pune. I am looking for ₹31.25/kg. Take a look at the quality of this Maldandi harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹26.47/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹20.38/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹26.47/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹20.38/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -2764,7 +2764,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -2772,8 +2772,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": null,
@@ -3256,19 +3256,19 @@
   {
     "negotiation_id": "neg_b4146bf3",
     "timestamp": "2026-07-15T18:14:50.276266",
-    "crop": "Wheat",
-    "variety": "Lokwan",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 1441.0,
     "district": "Nashik",
-    "mandi_reference_price": 28.18,
-    "farmer_initial_offer": 36.06,
-    "buyer_initial_offer": 21.61,
+    "mandi_reference_price": 70.45,
+    "farmer_initial_offer": 90.15,
+    "buyer_initial_offer": 54.02,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Lokwan), Grade B from Nashik. I am looking for ₹36.06/kg. I cannot go lower because my Wheat (Lokwan) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Nashik. I am looking for ₹36.06/kg. I cannot go lower because my Jowar (Maldandi) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
@@ -3298,7 +3298,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can raise my bid to 27.33 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can raise my bid to 27.33 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -3310,7 +3310,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -3318,8 +3318,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 27.33,
@@ -3340,7 +3340,7 @@
       "farmer": "Aggressive",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 1441.0kg of Wheat (Lokwan) at ₹27.33/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 1441.0kg of Jowar (Maldandi) at ₹27.33/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_5e6685d7",
@@ -4016,19 +4016,19 @@
   {
     "negotiation_id": "neg_321b9be0",
     "timestamp": "2026-07-11T23:14:50.277772",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 3194.0,
     "district": "Latur",
-    "mandi_reference_price": 21.49,
-    "farmer_initial_offer": 25.56,
-    "buyer_initial_offer": 18.03,
+    "mandi_reference_price": 34.76,
+    "farmer_initial_offer": 41.34,
+    "buyer_initial_offer": 29.16,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade B from Latur. I am looking for ₹25.56/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Latur. I am looking for ₹25.56/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
@@ -4319,25 +4319,25 @@
   {
     "negotiation_id": "neg_5a342a52",
     "timestamp": "2026-08-05T16:14:50.277772",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 4124.0,
     "district": "Nashik",
-    "mandi_reference_price": 22.77,
-    "farmer_initial_offer": 28.97,
-    "buyer_initial_offer": 18.15,
+    "mandi_reference_price": 36.83,
+    "farmer_initial_offer": 46.85,
+    "buyer_initial_offer": 29.35,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade B from Nashik. I am looking for ₹28.97/kg. Take a look at the quality of this Abhilash harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Nashik. I am looking for ₹28.97/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.77/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹18.15/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.77/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹18.15/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -4385,7 +4385,7 @@
       {
         "round": 5,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. Let's finalize at 22.83. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. Let's finalize at 22.83. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -4427,7 +4427,7 @@
       "farmer": "Cooperative",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 4124.0kg of Tomato (Abhilash) at ₹22.83/kg after 5 rounds."
+    "outcome_summary": "Successful deal closed for 4124.0kg of Bajra (HHB-67 Improved) at ₹22.83/kg after 5 rounds."
   },
   {
     "negotiation_id": "neg_390efd1f",
@@ -4646,25 +4646,25 @@
   {
     "negotiation_id": "neg_609058e7",
     "timestamp": "2026-07-24T13:14:50.277772",
-    "crop": "Tomato",
-    "variety": "Vaishali",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 2682.0,
     "district": "Nagpur",
-    "mandi_reference_price": 21.36,
-    "farmer_initial_offer": 25.85,
-    "buyer_initial_offer": 17.39,
+    "mandi_reference_price": 34.54,
+    "farmer_initial_offer": 41.81,
+    "buyer_initial_offer": 28.12,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Vaishali), Grade B from Nagpur. I am looking for ₹25.85/kg. I cannot go lower because my Tomato (Vaishali) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Nagpur. I am looking for ₹25.85/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹21.36/kg, your rate is high. I can source similar quality Vaishali from another mandi at 19.361054372465563. Your rate is too high. I can offer ₹17.39/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹21.36/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 19.361054372465563. Your rate is too high. I can offer ₹17.39/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -4688,7 +4688,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. Let's finalize at 20.86. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. Let's finalize at 20.86. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -4730,7 +4730,7 @@
       "farmer": "Cooperative",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 2682.0kg of Tomato (Vaishali) at ₹20.86/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 2682.0kg of Bajra (HHB-67 Improved) at ₹20.86/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_9bda0685",
@@ -4836,25 +4836,25 @@
   {
     "negotiation_id": "neg_e71d7ec6",
     "timestamp": "2026-06-24T06:14:50.277772",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 1714.0,
     "district": "Pune",
-    "mandi_reference_price": 19.93,
-    "farmer_initial_offer": 25.22,
-    "buyer_initial_offer": 15.13,
+    "mandi_reference_price": 32.23,
+    "farmer_initial_offer": 40.79,
+    "buyer_initial_offer": 24.47,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade B from Pune. I am looking for ₹25.22/kg. I cannot go lower because my Tomato (Abhilash) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Pune. I am looking for ₹25.22/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹19.93/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹15.13/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹19.93/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹15.13/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -5115,19 +5115,19 @@
   {
     "negotiation_id": "neg_87bfb337",
     "timestamp": "2026-08-03T07:14:50.278780",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 559.0,
     "district": "Pune",
-    "mandi_reference_price": 22.95,
-    "farmer_initial_offer": 29.75,
-    "buyer_initial_offer": 17.92,
+    "mandi_reference_price": 37.12,
+    "farmer_initial_offer": 48.11,
+    "buyer_initial_offer": 28.98,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade B from Pune. I am looking for ₹29.75/kg. I cannot go lower because my Tomato (Arka Rakshak) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Pune. I am looking for ₹29.75/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
@@ -5169,7 +5169,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. Let's finalize at 23.02. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. Let's finalize at 23.02. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -5211,7 +5211,7 @@
       "farmer": "Balanced",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 559.0kg of Tomato (Arka Rakshak) at ₹23.02/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 559.0kg of Bajra (HHB-67 Improved) at ₹23.02/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_ae8ae416",
@@ -5430,25 +5430,25 @@
   {
     "negotiation_id": "neg_a0dfcba8",
     "timestamp": "2026-07-04T14:14:50.278780",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 1570.0,
     "district": "Latur",
-    "mandi_reference_price": 22.47,
-    "farmer_initial_offer": 26.98,
-    "buyer_initial_offer": 16.89,
+    "mandi_reference_price": 36.34,
+    "farmer_initial_offer": 43.63,
+    "buyer_initial_offer": 27.32,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade B from Latur. I am looking for ₹26.98/kg. I cannot go lower because my Tomato (Arka Rakshak) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Latur. I am looking for ₹26.98/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.47/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹16.89/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.47/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹16.89/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -5496,7 +5496,7 @@
       {
         "round": 5,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can raise my bid to 20.74 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can raise my bid to 20.74 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -5538,7 +5538,7 @@
       "farmer": "Balanced",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 1570.0kg of Tomato (Arka Rakshak) at ₹20.74/kg after 5 rounds."
+    "outcome_summary": "Successful deal closed for 1570.0kg of Bajra (HHB-67 Improved) at ₹20.74/kg after 5 rounds."
   },
   {
     "negotiation_id": "neg_6e2d9b3f",
@@ -5733,25 +5733,25 @@
   {
     "negotiation_id": "neg_22b4166f",
     "timestamp": "2026-07-18T20:14:50.278780",
-    "crop": "Wheat",
-    "variety": "Lokwan",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 1145.0,
     "district": "Latur",
-    "mandi_reference_price": 27.25,
-    "farmer_initial_offer": 31.77,
-    "buyer_initial_offer": 20.72,
+    "mandi_reference_price": 68.12,
+    "farmer_initial_offer": 79.42,
+    "buyer_initial_offer": 51.8,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Lokwan), Grade B from Latur. I am looking for ₹31.77/kg. Take a look at the quality of this Lokwan harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Latur. I am looking for ₹31.77/kg. Take a look at the quality of this Maldandi harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.25/kg, your rate is high. I can source similar quality Lokwan from another mandi at 25.25059144073018. Your rate is too high. I can offer ₹20.72/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.25/kg, your rate is high. I can source similar quality Maldandi from another mandi at 25.25059144073018. Your rate is too high. I can offer ₹20.72/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Competitive strategy."
       },
       {
@@ -5775,7 +5775,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 25.21 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 25.21 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -5787,7 +5787,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -5795,8 +5795,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 25.21,
@@ -5817,7 +5817,7 @@
       "farmer": "Aggressive",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 1145.0kg of Wheat (Lokwan) at ₹25.21/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 1145.0kg of Jowar (Maldandi) at ₹25.21/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_fff49297",
@@ -6392,25 +6392,25 @@
   {
     "negotiation_id": "neg_4653255f",
     "timestamp": "2026-07-03T02:14:50.279779",
-    "crop": "Wheat",
-    "variety": "Lokwan",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 4201.0,
     "district": "Nashik",
-    "mandi_reference_price": 29.36,
-    "farmer_initial_offer": 37.39,
-    "buyer_initial_offer": 22.55,
+    "mandi_reference_price": 73.4,
+    "farmer_initial_offer": 93.47,
+    "buyer_initial_offer": 56.38,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Lokwan), Grade A from Nashik. I am looking for ₹37.39/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Nashik. I am looking for ₹37.39/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹29.36/kg, your rate is high. I can source similar quality Lokwan from another mandi at 27.362863809159002. Your rate is too high. I can offer ₹22.55/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹29.36/kg, your rate is high. I can source similar quality Maldandi from another mandi at 27.362863809159002. Your rate is too high. I can offer ₹22.55/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Competitive strategy."
       },
       {
@@ -6434,7 +6434,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. Let's finalize at 28.30. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. Let's finalize at 28.30. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -6446,7 +6446,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -6454,8 +6454,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 28.3,
@@ -6476,7 +6476,7 @@
       "farmer": "Aggressive",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 4201.0kg of Wheat (Lokwan) at ₹28.30/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 4201.0kg of Jowar (Maldandi) at ₹28.30/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_1bea32a7",
@@ -6707,25 +6707,25 @@
   {
     "negotiation_id": "neg_2019310e",
     "timestamp": "2026-07-08T00:14:50.279779",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 3125.0,
     "district": "Ahmednagar",
-    "mandi_reference_price": 29.9,
-    "farmer_initial_offer": 34.91,
-    "buyer_initial_offer": 24.08,
+    "mandi_reference_price": 74.75,
+    "farmer_initial_offer": 87.27,
+    "buyer_initial_offer": 60.2,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade A from Ahmednagar. I am looking for ₹34.91/kg. I cannot go lower because my Wheat (GW-496) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Ahmednagar. I am looking for ₹34.91/kg. I cannot go lower because my Jowar (Maldandi) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹29.90/kg, your rate is high. I can source similar quality GW-496 from another mandi at 27.90318522096159. Your rate is too high. I can offer ₹24.08/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹29.90/kg, your rate is high. I can source similar quality Maldandi from another mandi at 27.90318522096159. Your rate is too high. I can offer ₹24.08/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -6773,7 +6773,7 @@
       {
         "round": 5,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can raise my bid to 28.95 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can raise my bid to 28.95 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -6785,7 +6785,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -6793,8 +6793,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 28.95,
@@ -6815,24 +6815,24 @@
       "farmer": "Balanced",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 3125.0kg of Wheat (GW-496) at ₹28.95/kg after 5 rounds."
+    "outcome_summary": "Successful deal closed for 3125.0kg of Jowar (Maldandi) at ₹28.95/kg after 5 rounds."
   },
   {
     "negotiation_id": "neg_23cd5605",
     "timestamp": "2026-07-15T17:14:50.279779",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 1240.0,
     "district": "Latur",
-    "mandi_reference_price": 25.44,
-    "farmer_initial_offer": 30.85,
-    "buyer_initial_offer": 19.95,
+    "mandi_reference_price": 41.14,
+    "farmer_initial_offer": 49.89,
+    "buyer_initial_offer": 32.26,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade A from Latur. I am looking for ₹30.85/kg. Take a look at the quality of this Abhilash harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Latur. I am looking for ₹30.85/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
@@ -6998,25 +6998,25 @@
   {
     "negotiation_id": "neg_3f145389",
     "timestamp": "2026-07-02T16:14:50.279779",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 1888.0,
     "district": "Pune",
-    "mandi_reference_price": 27.35,
-    "farmer_initial_offer": 35.31,
-    "buyer_initial_offer": 21.0,
+    "mandi_reference_price": 68.38,
+    "farmer_initial_offer": 88.28,
+    "buyer_initial_offer": 52.5,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade A from Pune. I am looking for ₹35.31/kg. I cannot go lower because my Wheat (GW-496) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Pune. I am looking for ₹35.31/kg. I cannot go lower because my Jowar (Maldandi) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.35/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹21.00/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.35/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹21.00/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -7064,7 +7064,7 @@
       {
         "round": 5,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can raise my bid to 26.73 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can raise my bid to 26.73 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -7076,7 +7076,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -7084,8 +7084,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 26.73,
@@ -7106,7 +7106,7 @@
       "farmer": "Balanced",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 1888.0kg of Wheat (GW-496) at ₹26.73/kg after 5 rounds."
+    "outcome_summary": "Successful deal closed for 1888.0kg of Jowar (Maldandi) at ₹26.73/kg after 5 rounds."
   },
   {
     "negotiation_id": "neg_f91770bb",
@@ -7390,25 +7390,25 @@
   {
     "negotiation_id": "neg_0be10406",
     "timestamp": "2026-07-02T06:14:50.280797",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 4345.0,
     "district": "Pune",
-    "mandi_reference_price": 22.81,
-    "farmer_initial_offer": 26.24,
-    "buyer_initial_offer": 17.82,
+    "mandi_reference_price": 36.89,
+    "farmer_initial_offer": 42.44,
+    "buyer_initial_offer": 28.82,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade A from Pune. I am looking for ₹26.24/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Pune. I am looking for ₹26.24/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.81/kg, your rate is high. I can source similar quality Arka Rakshak from another mandi at 20.80845988720379. Your rate is too high. I can offer ₹17.82/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹22.81/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 20.80845988720379. Your rate is too high. I can offer ₹17.82/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -7444,7 +7444,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can raise my bid to 21.24 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can raise my bid to 21.24 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -7486,7 +7486,7 @@
       "farmer": "Aggressive",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 4345.0kg of Tomato (Arka Rakshak) at ₹21.24/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 4345.0kg of Bajra (HHB-67 Improved) at ₹21.24/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_9a9282f0",
@@ -7592,25 +7592,25 @@
   {
     "negotiation_id": "neg_19fcea2a",
     "timestamp": "2026-07-07T16:14:50.280797",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 2733.0,
     "district": "Nashik",
-    "mandi_reference_price": 25.64,
-    "farmer_initial_offer": 31.13,
-    "buyer_initial_offer": 20.2,
+    "mandi_reference_price": 41.47,
+    "farmer_initial_offer": 50.35,
+    "buyer_initial_offer": 32.67,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade A from Nashik. I am looking for ₹31.13/kg. I cannot go lower because my Tomato (Arka Rakshak) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Nashik. I am looking for ₹31.13/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹25.64/kg, your rate is high. I can source similar quality Arka Rakshak from another mandi at 23.64310528973316. Your rate is too high. I can offer ₹20.20/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹25.64/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 23.64310528973316. Your rate is too high. I can offer ₹20.20/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -7646,7 +7646,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can raise my bid to 24.48 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can raise my bid to 24.48 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -7688,7 +7688,7 @@
       "farmer": "Cooperative",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 2733.0kg of Tomato (Arka Rakshak) at ₹24.48/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 2733.0kg of Bajra (HHB-67 Improved) at ₹24.48/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_c3ec9d75",
@@ -8186,25 +8186,25 @@
   {
     "negotiation_id": "neg_fbf3f63f",
     "timestamp": "2026-06-27T15:14:50.280797",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 3764.0,
     "district": "Nashik",
-    "mandi_reference_price": 28.15,
-    "farmer_initial_offer": 34.46,
-    "buyer_initial_offer": 21.32,
+    "mandi_reference_price": 70.38,
+    "farmer_initial_offer": 86.15,
+    "buyer_initial_offer": 53.3,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade B from Nashik. I am looking for ₹34.46/kg. I cannot go lower because my Wheat (GW-496) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Nashik. I am looking for ₹34.46/kg. I cannot go lower because my Jowar (Maldandi) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.15/kg, your rate is high. I can source similar quality GW-496 from another mandi at 26.14512470013289. Your rate is too high. I can offer ₹21.32/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.15/kg, your rate is high. I can source similar quality Maldandi from another mandi at 26.14512470013289. Your rate is too high. I can offer ₹21.32/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Competitive strategy."
       },
       {
@@ -8240,7 +8240,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -8248,8 +8248,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": null,
@@ -8643,19 +8643,19 @@
   {
     "negotiation_id": "neg_419d3ea1",
     "timestamp": "2026-08-04T06:14:50.280797",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 1122.0,
     "district": "Latur",
-    "mandi_reference_price": 32.99,
-    "farmer_initial_offer": 38.31,
-    "buyer_initial_offer": 27.27,
+    "mandi_reference_price": 82.48,
+    "farmer_initial_offer": 95.78,
+    "buyer_initial_offer": 68.17,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade A from Latur. I am looking for ₹38.31/kg. Take a look at the quality of this GW-496 harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Latur. I am looking for ₹38.31/kg. Take a look at the quality of this Maldandi harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
@@ -8697,7 +8697,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can raise my bid to 32.06 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can raise my bid to 32.06 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -8709,7 +8709,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -8717,8 +8717,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 32.06,
@@ -8739,7 +8739,7 @@
       "farmer": "Aggressive",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 1122.0kg of Wheat (GW-496) at ₹32.06/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 1122.0kg of Jowar (Maldandi) at ₹32.06/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_cec5fa32",
@@ -8946,25 +8946,25 @@
   {
     "negotiation_id": "neg_a51530bd",
     "timestamp": "2026-07-03T11:14:50.281797",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 2543.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 23.44,
-    "farmer_initial_offer": 29.11,
-    "buyer_initial_offer": 18.34,
+    "mandi_reference_price": 37.91,
+    "farmer_initial_offer": 47.08,
+    "buyer_initial_offer": 29.66,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade A from Jalgaon. I am looking for ₹29.11/kg. I cannot go lower because my Tomato (Abhilash) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Jalgaon. I am looking for ₹29.11/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹23.44/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹18.34/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹23.44/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹18.34/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -9000,7 +9000,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can raise my bid to 22.39 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can raise my bid to 22.39 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -9042,24 +9042,24 @@
       "farmer": "Cooperative",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 2543.0kg of Tomato (Abhilash) at ₹22.39/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 2543.0kg of Bajra (HHB-67 Improved) at ₹22.39/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_fba6d95d",
     "timestamp": "2026-07-27T03:14:50.281797",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 905.0,
     "district": "Nashik",
-    "mandi_reference_price": 26.36,
-    "farmer_initial_offer": 32.32,
-    "buyer_initial_offer": 21.96,
+    "mandi_reference_price": 42.63,
+    "farmer_initial_offer": 52.27,
+    "buyer_initial_offer": 35.52,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade A from Nashik. I am looking for ₹32.32/kg. Take a look at the quality of this Abhilash harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Nashik. I am looking for ₹32.32/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
@@ -9124,19 +9124,19 @@
   {
     "negotiation_id": "neg_3999457a",
     "timestamp": "2026-07-23T06:14:50.281797",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 3776.0,
     "district": "Nashik",
-    "mandi_reference_price": 24.34,
-    "farmer_initial_offer": 28.99,
-    "buyer_initial_offer": 20.05,
+    "mandi_reference_price": 39.36,
+    "farmer_initial_offer": 46.88,
+    "buyer_initial_offer": 32.43,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade A from Nashik. I am looking for ₹28.99/kg. I cannot go lower because my Tomato (Abhilash) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Nashik. I am looking for ₹28.99/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
@@ -9178,7 +9178,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can raise my bid to 23.67 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can raise my bid to 23.67 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -9220,7 +9220,7 @@
       "farmer": "Cooperative",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 3776.0kg of Tomato (Abhilash) at ₹23.67/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 3776.0kg of Bajra (HHB-67 Improved) at ₹23.67/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_6101cee8",
@@ -9415,25 +9415,25 @@
   {
     "negotiation_id": "neg_e9f2c584",
     "timestamp": "2026-08-04T01:14:50.281797",
-    "crop": "Wheat",
-    "variety": "Sihore",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 4173.0,
     "district": "Nagpur",
-    "mandi_reference_price": 27.04,
-    "farmer_initial_offer": 35.01,
-    "buyer_initial_offer": 21.85,
+    "mandi_reference_price": 67.6,
+    "farmer_initial_offer": 87.52,
+    "buyer_initial_offer": 54.62,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Sihore), Grade B from Nagpur. I am looking for ₹35.01/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Nagpur. I am looking for ₹35.01/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.04/kg, your rate is high. I can source similar quality Sihore from another mandi at 25.044710373515358. Your rate is too high. I can offer ₹21.85/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.04/kg, your rate is high. I can source similar quality Maldandi from another mandi at 25.044710373515358. Your rate is too high. I can offer ₹21.85/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Competitive strategy."
       },
       {
@@ -9481,7 +9481,7 @@
       {
         "round": 5,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 27.34 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 27.34 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -9493,7 +9493,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -9501,8 +9501,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 27.34,
@@ -9523,30 +9523,30 @@
       "farmer": "Balanced",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 4173.0kg of Wheat (Sihore) at ₹27.34/kg after 5 rounds."
+    "outcome_summary": "Successful deal closed for 4173.0kg of Jowar (Maldandi) at ₹27.34/kg after 5 rounds."
   },
   {
     "negotiation_id": "neg_5513dc21",
     "timestamp": "2026-07-25T12:14:50.281797",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 527.0,
     "district": "Nashik",
-    "mandi_reference_price": 24.31,
-    "farmer_initial_offer": 30.5,
-    "buyer_initial_offer": 18.98,
+    "mandi_reference_price": 39.32,
+    "farmer_initial_offer": 49.33,
+    "buyer_initial_offer": 30.7,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade A from Nashik. I am looking for ₹30.50/kg. Take a look at the quality of this Abhilash harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Nashik. I am looking for ₹30.50/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹24.31/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹18.98/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹24.31/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹18.98/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -10098,19 +10098,19 @@
   {
     "negotiation_id": "neg_e87a26a2",
     "timestamp": "2026-06-21T23:14:50.281797",
-    "crop": "Tomato",
-    "variety": "Abhilash",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 935.0,
     "district": "Latur",
-    "mandi_reference_price": 22.53,
-    "farmer_initial_offer": 26.59,
-    "buyer_initial_offer": 17.89,
+    "mandi_reference_price": 36.44,
+    "farmer_initial_offer": 43.0,
+    "buyer_initial_offer": 28.93,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Abhilash), Grade B from Latur. I am looking for ₹26.59/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Latur. I am looking for ₹26.59/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
@@ -10579,25 +10579,25 @@
   {
     "negotiation_id": "neg_d6929f0c",
     "timestamp": "2026-07-10T23:14:50.282830",
-    "crop": "Wheat",
-    "variety": "Lokwan",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 876.0,
     "district": "Pune",
-    "mandi_reference_price": 27.85,
-    "farmer_initial_offer": 33.59,
-    "buyer_initial_offer": 23.55,
+    "mandi_reference_price": 69.62,
+    "farmer_initial_offer": 83.98,
+    "buyer_initial_offer": 58.88,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Lokwan), Grade A from Pune. I am looking for ₹33.59/kg. I cannot go lower because my Wheat (Lokwan) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Pune. I am looking for ₹33.59/kg. I cannot go lower because my Jowar (Maldandi) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.85/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹23.55/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹27.85/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹23.55/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -10633,7 +10633,7 @@
       {
         "round": 4,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 27.55 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 27.55 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -10645,7 +10645,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -10653,8 +10653,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 27.55,
@@ -10675,24 +10675,24 @@
       "farmer": "Balanced",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 876.0kg of Wheat (Lokwan) at ₹27.55/kg after 4 rounds."
+    "outcome_summary": "Successful deal closed for 876.0kg of Jowar (Maldandi) at ₹27.55/kg after 4 rounds."
   },
   {
     "negotiation_id": "neg_be25a4ef",
     "timestamp": "2026-07-03T06:14:50.282830",
-    "crop": "Wheat",
-    "variety": "Sihore",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 3413.0,
     "district": "Nashik",
-    "mandi_reference_price": 23.62,
-    "farmer_initial_offer": 29.71,
-    "buyer_initial_offer": 19.91,
+    "mandi_reference_price": 59.05,
+    "farmer_initial_offer": 74.28,
+    "buyer_initial_offer": 49.77,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Sihore), Grade B from Nashik. I am looking for ₹29.71/kg. Take a look at the quality of this Sihore harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Nashik. I am looking for ₹29.71/kg. Take a look at the quality of this Maldandi harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
@@ -10722,7 +10722,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can raise my bid to 23.71 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can raise my bid to 23.71 per kg to help you cover costs, but that is my limit. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -10734,7 +10734,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -10742,8 +10742,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 23.71,
@@ -10764,30 +10764,30 @@
       "farmer": "Cooperative",
       "buyer": "Cost-Minimizer"
     },
-    "outcome_summary": "Successful deal closed for 3413.0kg of Wheat (Sihore) at ₹23.71/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 3413.0kg of Jowar (Maldandi) at ₹23.71/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_18ac104b",
     "timestamp": "2026-07-03T10:14:50.282830",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 2755.0,
     "district": "Latur",
-    "mandi_reference_price": 23.49,
-    "farmer_initial_offer": 27.71,
-    "buyer_initial_offer": 19.26,
+    "mandi_reference_price": 37.99,
+    "farmer_initial_offer": 44.81,
+    "buyer_initial_offer": 31.15,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade A from Latur. I am looking for ₹27.71/kg. Take a look at the quality of this Arka Rakshak harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Latur. I am looking for ₹27.71/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹23.49/kg, your rate is high. I can source similar quality Arka Rakshak from another mandi at 21.486747110419586. Your rate is too high. I can offer ₹19.26/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹23.49/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 21.486747110419586. Your rate is too high. I can offer ₹19.26/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -10811,7 +10811,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. Let's finalize at 22.44. This is a very fair price given today's market arrivals. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. Let's finalize at 22.44. This is a very fair price given today's market arrivals. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -10853,7 +10853,7 @@
       "farmer": "Aggressive",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 2755.0kg of Tomato (Arka Rakshak) at ₹22.44/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 2755.0kg of Bajra (HHB-67 Improved) at ₹22.44/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_dcb9dc1b",
@@ -10935,25 +10935,25 @@
   {
     "negotiation_id": "neg_74ff6b75",
     "timestamp": "2026-07-22T06:14:50.282830",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 4887.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 24.08,
-    "farmer_initial_offer": 30.23,
-    "buyer_initial_offer": 19.93,
+    "mandi_reference_price": 60.2,
+    "farmer_initial_offer": 75.58,
+    "buyer_initial_offer": 49.83,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade B from Jalgaon. I am looking for ₹30.23/kg. Take a look at the quality of this GW-496 harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Jalgaon. I am looking for ₹30.23/kg. Take a look at the quality of this Maldandi harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹24.08/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹19.93/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹24.08/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹19.93/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -10977,7 +10977,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -10985,8 +10985,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": null,
@@ -11291,25 +11291,25 @@
   {
     "negotiation_id": "neg_a140ad3e",
     "timestamp": "2026-06-28T18:14:50.282830",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 4801.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 23.71,
-    "farmer_initial_offer": 29.53,
-    "buyer_initial_offer": 18.03,
+    "mandi_reference_price": 38.35,
+    "farmer_initial_offer": 47.76,
+    "buyer_initial_offer": 29.16,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade A from Jalgaon. I am looking for ₹29.53/kg. I cannot go lower because my Tomato (Arka Rakshak) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Jalgaon. I am looking for ₹29.53/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹23.71/kg, your rate is high. I can source similar quality Arka Rakshak from another mandi at 21.712243335872078. Your rate is too high. I can offer ₹18.03/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹23.71/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 21.712243335872078. Your rate is too high. I can offer ₹18.03/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {
@@ -11594,19 +11594,19 @@
   {
     "negotiation_id": "neg_7ddca2a0",
     "timestamp": "2026-06-26T19:14:50.283839",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 1121.0,
     "district": "Satara",
-    "mandi_reference_price": 21.53,
-    "farmer_initial_offer": 25.21,
-    "buyer_initial_offer": 16.84,
+    "mandi_reference_price": 34.82,
+    "farmer_initial_offer": 40.77,
+    "buyer_initial_offer": 27.23,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade B from Satara. I am looking for ₹25.21/kg. Take a look at the quality of this Arka Rakshak harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Satara. I am looking for ₹25.21/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
@@ -11636,7 +11636,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can offer 20.06 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can offer 20.06 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -11678,7 +11678,7 @@
       "farmer": "Cooperative",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 1121.0kg of Tomato (Arka Rakshak) at ₹20.06/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 1121.0kg of Bajra (HHB-67 Improved) at ₹20.06/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_6b99cad8",
@@ -12871,19 +12871,19 @@
   {
     "negotiation_id": "neg_44ac3bac",
     "timestamp": "2026-06-24T02:14:50.284836",
-    "crop": "Wheat",
-    "variety": "Sihore",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 2864.0,
     "district": "Nashik",
-    "mandi_reference_price": 31.26,
-    "farmer_initial_offer": 36.47,
-    "buyer_initial_offer": 25.01,
+    "mandi_reference_price": 78.15,
+    "farmer_initial_offer": 91.17,
+    "buyer_initial_offer": 62.53,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Sihore), Grade A from Nashik. I am looking for ₹36.47/kg. I cannot go lower because my Wheat (Sihore) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Nashik. I am looking for ₹36.47/kg. I cannot go lower because my Jowar (Maldandi) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
@@ -12913,7 +12913,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 29.50 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 29.50 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -12925,7 +12925,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -12933,8 +12933,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 29.5,
@@ -12955,7 +12955,7 @@
       "farmer": "Aggressive",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 2864.0kg of Wheat (Sihore) at ₹29.50/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 2864.0kg of Jowar (Maldandi) at ₹29.50/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_95f0cd84",
@@ -13073,25 +13073,25 @@
   {
     "negotiation_id": "neg_64171ef6",
     "timestamp": "2026-07-17T14:14:50.284836",
-    "crop": "Wheat",
-    "variety": "GW-496",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "A",
     "quantity": 1230.0,
     "district": "Pune",
-    "mandi_reference_price": 28.94,
-    "farmer_initial_offer": 34.99,
-    "buyer_initial_offer": 24.0,
+    "mandi_reference_price": 72.35,
+    "farmer_initial_offer": 87.48,
+    "buyer_initial_offer": 60.0,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (GW-496), Grade A from Pune. I am looking for ₹34.99/kg. I cannot go lower because my Wheat (GW-496) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade A from Pune. I am looking for ₹34.99/kg. I cannot go lower because my Jowar (Maldandi) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.94/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹24.00/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.94/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹24.00/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Competitive strategy."
       },
       {
@@ -13115,7 +13115,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade A.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -13123,8 +13123,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": null,
@@ -13328,25 +13328,25 @@
   {
     "negotiation_id": "neg_8c73c3a0",
     "timestamp": "2026-07-20T03:14:50.284836",
-    "crop": "Wheat",
-    "variety": "Lokwan",
+    "crop": "Jowar",
+    "variety": "Maldandi",
     "grade": "B",
     "quantity": 608.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 28.02,
-    "farmer_initial_offer": 32.37,
-    "buyer_initial_offer": 23.63,
+    "mandi_reference_price": 70.05,
+    "farmer_initial_offer": 80.92,
+    "buyer_initial_offer": 59.07,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Wheat (Lokwan), Grade B from Jalgaon. I am looking for ₹32.37/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Jowar (Maldandi), Grade B from Jalgaon. I am looking for ₹32.37/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Balanced strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.02/kg, your rate is high. There is a huge arrival of Wheat from neighboring districts today. The market price is down. I can offer ₹23.63/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹28.02/kg, your rate is high. There is a huge arrival of Jowar from neighboring districts today. The market price is down. I can offer ₹23.63/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Competitive strategy."
       },
       {
@@ -13394,7 +13394,7 @@
       {
         "round": 5,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Wheat. I can offer 27.01 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Jowar. I can offer 27.01 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -13406,7 +13406,7 @@
     ],
     "reasoning_behind_each_counter_offer": {
       "farmer": "Protected by BATNA (Sell to FCI (Food Corporation of India) at MSP rate of ₹25.85/kg). Stood firm on quality grade B.",
-      "buyer": "Limited by logistics constraints. BATNA was to Buy premium MP wheat from roller mills at ₹26/kg."
+      "buyer": "Limited by logistics constraints. BATNA was to Buy Maldandi Jowar from Solapur APMC at ₹56/kg."
     },
     "BATNA": {
       "farmer": [
@@ -13414,8 +13414,8 @@
         "Store in local warehouse for off-season sale"
       ],
       "buyer": [
-        "Buy premium MP wheat from roller mills at ₹26/kg",
-        "Source general wheat from Punjab bulk storage"
+        "Buy Maldandi Jowar from Solapur APMC at ₹56/kg",
+        "Source bulk Jowar from Solapur APMC storage"
       ]
     },
     "final_agreed_price": 27.01,
@@ -13436,7 +13436,7 @@
       "farmer": "Balanced",
       "buyer": "Competitive"
     },
-    "outcome_summary": "Successful deal closed for 608.0kg of Wheat (Lokwan) at ₹27.01/kg after 5 rounds."
+    "outcome_summary": "Successful deal closed for 608.0kg of Jowar (Maldandi) at ₹27.01/kg after 5 rounds."
   },
   {
     "negotiation_id": "neg_87f09711",
@@ -13631,19 +13631,19 @@
   {
     "negotiation_id": "neg_cdfb7ba0",
     "timestamp": "2026-07-29T23:14:50.284836",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 1280.0,
     "district": "Pune",
-    "mandi_reference_price": 25.82,
-    "farmer_initial_offer": 30.7,
-    "buyer_initial_offer": 20.54,
+    "mandi_reference_price": 41.76,
+    "farmer_initial_offer": 49.65,
+    "buyer_initial_offer": 33.22,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade A from Pune. I am looking for ₹30.70/kg. I cannot go lower because my Tomato (Arka Rakshak) is strictly Grade A. The sorting was done very carefully.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Pune. I am looking for ₹30.70/kg. I cannot go lower because my Bajra (HHB-67 Improved) is strictly Grade A. The sorting was done very carefully.",
         "reasoning": "Initial listing based on premium quality and Aggressive strategy."
       },
       {
@@ -13898,25 +13898,25 @@
   {
     "negotiation_id": "neg_ca1b47fd",
     "timestamp": "2026-07-13T14:14:50.284836",
-    "crop": "Tomato",
-    "variety": "Vaishali",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "B",
     "quantity": 3519.0,
     "district": "Satara",
-    "mandi_reference_price": 20.05,
-    "farmer_initial_offer": 23.54,
-    "buyer_initial_offer": 16.6,
+    "mandi_reference_price": 32.43,
+    "farmer_initial_offer": 38.07,
+    "buyer_initial_offer": 26.85,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Vaishali), Grade B from Satara. I am looking for ₹23.54/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade B from Satara. I am looking for ₹23.54/kg. This batch has excellent moisture content and size uniformity. It deserves a premium.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹20.05/kg, your rate is high. There is a huge arrival of Tomato from neighboring districts today. The market price is down. I can offer ₹16.60/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹20.05/kg, your rate is high. There is a huge arrival of Bajra from neighboring districts today. The market price is down. I can offer ₹16.60/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Collaborative strategy."
       },
       {
@@ -13940,7 +13940,7 @@
       {
         "round": 3,
         "speaker": "Buyer",
-        "text": "Alright, you have high quality Tomato. I can offer 19.55 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
+        "text": "Alright, you have high quality Bajra. I can offer 19.55 as my final counter-offer. I hope you can work with this. Let's shake hands on this.",
         "reasoning": "Agreed to compromise to secure high-quality stock."
       },
       {
@@ -13982,30 +13982,30 @@
       "farmer": "Cooperative",
       "buyer": "Collaborative"
     },
-    "outcome_summary": "Successful deal closed for 3519.0kg of Tomato (Vaishali) at ₹19.55/kg after 3 rounds."
+    "outcome_summary": "Successful deal closed for 3519.0kg of Bajra (HHB-67 Improved) at ₹19.55/kg after 3 rounds."
   },
   {
     "negotiation_id": "neg_6cdb201f",
     "timestamp": "2026-07-11T12:14:50.284836",
-    "crop": "Tomato",
-    "variety": "Arka Rakshak",
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
     "grade": "A",
     "quantity": 2636.0,
     "district": "Jalgaon",
-    "mandi_reference_price": 26.99,
-    "farmer_initial_offer": 32.54,
-    "buyer_initial_offer": 21.53,
+    "mandi_reference_price": 43.65,
+    "farmer_initial_offer": 52.63,
+    "buyer_initial_offer": 34.82,
     "complete_negotiation_conversation": [
       {
         "round": 1,
         "speaker": "Farmer",
-        "text": "Hello. I am listing my Tomato (Arka Rakshak), Grade A from Jalgaon. I am looking for ₹32.54/kg. Take a look at the quality of this Arka Rakshak harvest. You won't find this grade in the local market easily.",
+        "text": "Hello. I am listing my Bajra (HHB-67 Improved), Grade A from Jalgaon. I am looking for ₹32.54/kg. Take a look at the quality of this HHB-67 Improved harvest. You won't find this grade in the local market easily.",
         "reasoning": "Initial listing based on premium quality and Cooperative strategy."
       },
       {
         "round": 1,
         "speaker": "Buyer",
-        "text": "Thanks for the listing. Looking at today's mandi price of ₹26.99/kg, your rate is high. I can source similar quality Arka Rakshak from another mandi at 24.988781619735423. Your rate is too high. I can offer ₹21.53/kg.",
+        "text": "Thanks for the listing. Looking at today's mandi price of ₹26.99/kg, your rate is high. I can source similar quality HHB-67 Improved from another mandi at 24.988781619735423. Your rate is too high. I can offer ₹21.53/kg.",
         "reasoning": "Initial bid set lower to test farmer's margins based on Cost-Minimizer strategy."
       },
       {

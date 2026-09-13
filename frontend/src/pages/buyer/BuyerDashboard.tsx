@@ -17,9 +17,9 @@ const budgetData = [
 ];
 
 const mockOffers = [
-  { id: '1', farmer: 'Ramesh Patil', crop: 'Onions', qty: '500 kg', price: '₹18/kg', status: 'Pending' },
-  { id: '2', farmer: 'Suresh Kumar', crop: 'Tomatoes', qty: '1000 kg', price: '₹22/kg', status: 'Accepted' },
-  { id: '3', farmer: 'Anand Rao', crop: 'Wheat', qty: '5 MT', price: '₹2800/qtl', status: 'Negotiating' },
+  { id: '1', farmer: 'Ramesh Patil', crop: 'Onion', qty: '500 kg', price: '₹22/kg', status: 'Pending' },
+  { id: '2', farmer: 'Suresh Kumar', crop: 'Soybean', qty: '1000 kg', price: '₹68/kg', status: 'Accepted' },
+  { id: '3', farmer: 'Anand Rao', crop: 'Cotton', qty: '5 MT', price: '₹65/kg', status: 'Negotiating' },
 ];
 
 export default function BuyerDashboard() {

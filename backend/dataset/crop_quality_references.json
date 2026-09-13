@@ -20,26 +20,6 @@
     "common_defects_allowed": "Minor mechanical damage or skin peeling permitted (< 5% by count)."
   },
   {
-    "crop": "Tomato",
-    "variety": "Vaishali",
-    "grade": "A",
-    "min_size_mm": 60.0,
-    "max_moisture_pct": 90.0,
-    "color_standards": "Uniform red or pinkish breaker stage",
-    "skin_firmness": "Highly firm, glossy skin with no softening",
-    "common_defects_allowed": "None. Free from sunscald, cracks, or insect punctures."
-  },
-  {
-    "crop": "Tomato",
-    "variety": "Vaishali",
-    "grade": "B",
-    "min_size_mm": 45.0,
-    "max_moisture_pct": 92.0,
-    "color_standards": "Slightly uneven color (green shoulder permitted)",
-    "skin_firmness": "Medium firm, yields slightly to gentle thumb pressure",
-    "common_defects_allowed": "Minor skin blemishes or healing growth cracks allowed (< 10% surface area)."
-  },
-  {
     "crop": "Cotton",
     "variety": "Bt Cotton",
     "grade": "A",
@@ -80,26 +60,6 @@
     "common_defects_allowed": "Split, cracked, or insect-damaged seeds (< 5.0% by weight)."
   },
   {
-    "crop": "Wheat",
-    "variety": "Lokwan",
-    "grade": "A",
-    "min_size_mm": 7.0,
-    "max_moisture_pct": 11.5,
-    "color_standards": "Amber gold, uniform bold grain luster",
-    "skin_firmness": "Hard, vitreous endosperm, clean crease",
-    "common_defects_allowed": "Foreign organic matter (< 0.75% by weight), no shrivelled grains."
-  },
-  {
-    "crop": "Wheat",
-    "variety": "Lokwan",
-    "grade": "B",
-    "min_size_mm": 6.0,
-    "max_moisture_pct": 13.0,
-    "color_standards": "Light golden or slightly dull grain",
-    "skin_firmness": "Medium hard grain texture",
-    "common_defects_allowed": "Foreign matter (< 1.5%), shrivelled or broken grains (< 3.0% by weight)."
-  },
-  {
     "crop": "Rice",
     "variety": "Indrayani",
     "grade": "A",
@@ -138,5 +98,45 @@
     "color_standards": "Pale green or slightly dry external sheath",
     "skin_firmness": "Medium thickness (Brix content 15% - 17%)",
     "common_defects_allowed": "Stalk borer entry points or wind damage cracks (< 3.0% count)."
+  },
+  {
+    "crop": "Jowar",
+    "variety": "SPH-1634 (Hybrid)",
+    "grade": "A",
+    "min_size_mm": 4.0,
+    "max_moisture_pct": 12.0,
+    "color_standards": "Cream-white to light tan, bold and uniform grain",
+    "skin_firmness": "Hard, vitreous endosperm, clean pericarp",
+    "common_defects_allowed": "Foreign matter (< 1.0%), insect damage (< 2.0% by weight)."
+  },
+  {
+    "crop": "Jowar",
+    "variety": "SPH-1634 (Hybrid)",
+    "grade": "B",
+    "min_size_mm": 3.0,
+    "max_moisture_pct": 14.0,
+    "color_standards": "Light tan to slightly brownish grain",
+    "skin_firmness": "Medium hardness",
+    "common_defects_allowed": "Foreign matter (< 2.0%), shrunken or broken grain (< 5.0% by weight)."
+  },
+  {
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
+    "grade": "A",
+    "min_size_mm": 2.0,
+    "max_moisture_pct": 12.0,
+    "color_standards": "Uniform grey-white to light tan, bold spherical grains",
+    "skin_firmness": "Hard, lustrous, free from mold",
+    "common_defects_allowed": "Foreign matter (< 1.0%), broken grain (< 2.0% by weight)."
+  },
+  {
+    "crop": "Bajra",
+    "variety": "HHB-67 Improved",
+    "grade": "B",
+    "min_size_mm": 1.5,
+    "max_moisture_pct": 14.0,
+    "color_standards": "Slightly dull or uneven grain coloring",
+    "skin_firmness": "Medium hardness, no off-smell",
+    "common_defects_allowed": "Foreign matter (< 2.0%), shrunken grain (< 5.0% by weight)."
   }
 ]

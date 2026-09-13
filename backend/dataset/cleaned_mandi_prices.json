@@ -20,17 +20,7 @@
         "arrival_mt": 99.2
     },
     {
-        "crop": "Maize",
-        "crop_full_name": "Maize",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 2814.54,
-        "price_per_kg": 28.1454,
-        "arrival_mt": 26.3
-    },
-    {
-        "crop": "Paddy",
+        "crop": "Rice",
         "crop_full_name": "Paddy(Common)",
         "date": "2026-08-04",
         "state": "Maharashtra",
@@ -38,56 +28,6 @@
         "price_per_quintal": 3470.93,
         "price_per_kg": 34.7093,
         "arrival_mt": 356.3
-    },
-    {
-        "crop": "Ragi",
-        "crop_full_name": "Ragi(Finger Millet)",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 5500.0,
-        "price_per_kg": 55.0,
-        "arrival_mt": 0.3
-    },
-    {
-        "crop": "Wheat",
-        "crop_full_name": "Wheat",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 3191.9,
-        "price_per_kg": 31.919,
-        "arrival_mt": 1758.3
-    },
-    {
-        "crop": "Groundnut",
-        "crop_full_name": "Groundnut",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 7677.01,
-        "price_per_kg": 76.7701,
-        "arrival_mt": 252.8
-    },
-    {
-        "crop": "Mustard",
-        "crop_full_name": "Mustard",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 7245.08,
-        "price_per_kg": 72.4508,
-        "arrival_mt": 7.1
-    },
-    {
-        "crop": "Sesamum",
-        "crop_full_name": "Sesamum(Sesame,Gingelly,Til)",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 12451.24,
-        "price_per_kg": 124.5124,
-        "arrival_mt": 10.1
     },
     {
         "crop": "Soybean",
@@ -100,53 +40,33 @@
         "arrival_mt": 1197.6
     },
     {
-        "crop": "Bengal Gram",
-        "crop_full_name": "Bengal Gram(Gram)(Whole)",
+        "crop": "Cotton",
+        "crop_full_name": "Cotton",
         "date": "2026-08-04",
         "state": "Maharashtra",
         "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 6237.72,
-        "price_per_kg": 62.3772,
-        "arrival_mt": 894.7
+        "price_per_quintal": 6500.0,
+        "price_per_kg": 65.0,
+        "arrival_mt": 900.0
     },
     {
-        "crop": "Black Gram",
-        "crop_full_name": "Black Gram(Urd Beans)(Whole)",
+        "crop": "Onion",
+        "crop_full_name": "Onion",
         "date": "2026-08-04",
         "state": "Maharashtra",
         "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 8926.32,
-        "price_per_kg": 89.2632,
-        "arrival_mt": 1.9
+        "price_per_quintal": 2200.0,
+        "price_per_kg": 22.0,
+        "arrival_mt": 3500.0
     },
     {
-        "crop": "Green Gram",
-        "crop_full_name": "Green Gram(Moong)(Whole)",
+        "crop": "Sugarcane",
+        "crop_full_name": "Sugarcane",
         "date": "2026-08-04",
         "state": "Maharashtra",
         "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 10980.02,
-        "price_per_kg": 109.8002,
-        "arrival_mt": 56.8
-    },
-    {
-        "crop": "Lentil",
-        "crop_full_name": "Lentil(Masur)(Whole)",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 7737.18,
-        "price_per_kg": 77.37180000000001,
-        "arrival_mt": 39.4
-    },
-    {
-        "crop": "Red gram/Arhar/Tur",
-        "crop_full_name": "Red gram/Arhar/Tur(whole)",
-        "date": "2026-08-04",
-        "state": "Maharashtra",
-        "mandi_name": "Regional Avg (Maharashtra)",
-        "price_per_quintal": 8082.94,
-        "price_per_kg": 80.82939999999999,
-        "arrival_mt": 325.6
+        "price_per_quintal": 375.0,
+        "price_per_kg": 3.75,
+        "arrival_mt": 8500.0
     }
 ]

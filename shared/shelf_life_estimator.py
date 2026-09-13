@@ -2,15 +2,13 @@
 
 
 CROP_DEFAULT_SHELF_LIFE = {
-    "Tomato":    4,
-    "Onion":     14,
-    "Spinach":   2,
-    "Capsicum":  5,
-    "Cabbage":   6,
-    "Wheat":     180,
-    "Rice":      180,
-    "Sugarcane": 7,
-    "Maize":     30,
+    "Sugarcane": 2,    # Must be crushed within 24-48 hrs of harvest
+    "Soybean":   180,  # Dry godown
+    "Cotton":    365,  # Dry warehouse
+    "Jowar":     180,  # Dry grain storage
+    "Onion":     45,   # Aerated farm storage / APMC shed
+    "Bajra":     180,  # Dry grain storage
+    "Rice":      365,  # Milled / Paddy storage
 }
 
 

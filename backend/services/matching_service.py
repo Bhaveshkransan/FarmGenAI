@@ -121,18 +121,22 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
         # Calculate derived offer details similar to negotiation_service
         req_qty = float(req.get("quantity") or req.get("max_quantity") or listing.get("quantity", 0))
         offered_qty = min(float(listing.get("quantity", 0)), req_qty)
-        budget = float(req.get("budget", 0))
-        target_price = float(req.get("target_price") or req.get("max_price") or listing.get("min_price", 0) * 1.2)
+        min_price = float(listing.get("min_price", 0))
+        market_price = float(listing.get("market_price", min_price + 1))
+        target_price = float(req.get("target_price") or req.get("max_price") or (min_price * 1.05))
+
+        raw_budget = float(req.get("budget", 0))
+        budget = raw_budget if raw_budget > 0 else max(target_price * req_qty * 1.2, min_price * offered_qty * 1.1)
         budget_limited_price = budget / max(offered_qty, 1)
         
         strategy = str(req.get("strategy", "")).lower()
-        min_price = float(listing.get("min_price", 0))
-        market_price = float(listing.get("market_price", min_price + 1))
         
         if "restaurant" in strategy or "premium" in strategy:
-            opening_bid = min(target_price * 0.85, budget_limited_price)
+            opening_bid = min(target_price * 0.95, budget_limited_price)
         else:
-            opening_bid = min(target_price * 0.75, budget_limited_price, (market_price + 3) * 0.75)
+            # High-feasibility opening offer: between 88% to 98% of target/market, capped by budget
+            base_offer = max(target_price * 0.92, min_price if target_price >= min_price else target_price * 0.88)
+            opening_bid = min(target_price, budget_limited_price, max(base_offer, 1.0))
             
         offer_price = round(max(1.0, opening_bid), 2)
         is_viable = offer_price >= min_price
@@ -166,7 +170,7 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
             "notes": req.get("notes", ""),
         })
 
-    results.sort(key=lambda item: (item["status"] == "VIABLE", item["compatibility_score"], item["offered_price"]), reverse=True)
+    results.sort(key=lambda item: (item["status"] == "VIABLE", item["offered_price"], item["compatibility_score"]), reverse=True)
     return results
 
 

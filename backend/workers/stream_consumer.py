@@ -56,11 +56,11 @@ class StreamConsumer:
         
         initial_state = {
             "negotiation_id": payload.get("correlation_id", "neg_1"),
-            "crop": payload.get("data", {}).get("crop", "Tomato"),
-            "quantity": payload.get("data", {}).get("quantity", 500),
-            "min_price": payload.get("data", {}).get("min_price", 15.0),
-            "location": payload.get("data", {}).get("location", "Nashik"),
-            "spoilage_days": payload.get("data", {}).get("shelf_life", 10),
+            "crop": payload.get("data", {}).get("crop", "Soybean"),
+            "quantity": payload.get("data", {}).get("quantity", 1000),
+            "min_price": payload.get("data", {}).get("min_price", 70.0),
+            "location": payload.get("data", {}).get("location", "Latur"),
+            "spoilage_days": payload.get("data", {}).get("shelf_life", 180),
             "round": 0,
             "max_rounds": 6,
             "logs": [],

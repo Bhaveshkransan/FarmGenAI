@@ -70,23 +70,23 @@ class Database:
         buyer_id = p.get("id") or Database.generate_id("buyer")
         p["id"] = buyer_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_buyer = await session.get(DBBuyer, buyer_id)
-                if not db_buyer:
-                    db_buyer = DBBuyer(id=buyer_id)
-                    session.add(db_buyer)
-                
-                db_buyer.user_id = p.get("user_id")
-                db_buyer.buyer_name = p.get("buyer_name")
-                db_buyer.crop = p.get("crop")
-                db_buyer.min_price = p.get("min_price")
-                db_buyer.max_price = p.get("max_price")
-                db_buyer.quantity = p.get("quantity")
-                db_buyer.location = p.get("location")
-                db_buyer.urgency = p.get("urgency")
-                db_buyer.neg_mode = p.get("neg_mode")
-                db_buyer.strategy = p.get("strategy")
-                db_buyer.status = p.get("status")
+            db_buyer = await session.get(DBBuyer, buyer_id)
+            if not db_buyer:
+                db_buyer = DBBuyer(id=buyer_id)
+                session.add(db_buyer)
+            
+            db_buyer.user_id = p.get("user_id")
+            db_buyer.buyer_name = p.get("buyer_name") or p.get("name")
+            db_buyer.crop = p.get("crop")
+            db_buyer.min_price = p.get("min_price") or p.get("target_price")
+            db_buyer.max_price = p.get("max_price") or p.get("target_price")
+            db_buyer.quantity = p.get("quantity") or p.get("max_quantity")
+            db_buyer.location = p.get("location", "Maharashtra")
+            db_buyer.urgency = p.get("urgency", "MEDIUM")
+            db_buyer.neg_mode = p.get("neg_mode", "BALANCED")
+            db_buyer.strategy = p.get("strategy", "Standard procurement")
+            db_buyer.status = p.get("status", "ACTIVE")
+            await session.commit()
         Database.buyers[buyer_id] = p
         return p
     @classmethod

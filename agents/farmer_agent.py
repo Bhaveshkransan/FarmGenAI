@@ -36,7 +36,7 @@ class FarmerAgent(BaseAgent):
         if initial_price is not None:
             self.current_price = initial_price
         else:
-            self.current_price = min_price + random.randint(8, 12)
+            self.current_price = min_price + random.randint(2, 4)
 
         self.shelf_life = shelf_life
         self.min_sale_quantity = min_sale_quantity
@@ -46,8 +46,10 @@ class FarmerAgent(BaseAgent):
         self.has_processor_option = has_processor_option
 
     def evaluate_offer(self, offer, context=None):
-        """Unified with respond_to_offer logic for deterministic checks"""
-        return self.respond_to_offer(offer, context, force_deterministic=True)["type"]
+        target = getattr(self, "current_price", self.min_price)
+        if offer.get("price", 0) >= target * 0.98:
+            return "ACCEPT"
+        return "COUNTER"
 
     def make_offer(self, context=None):
         message = self.log_action(
@@ -138,6 +140,14 @@ class FarmerAgent(BaseAgent):
             reason = llm_decision.get("reason", "")
             
             # Hallucination Protection (Level 13: Hard Business Rules)
+            # If LLM rejects prematurely in early rounds, counter at floor instead of giving up
+            max_r = (context or {}).get("max_rounds", 5)
+            curr_r = (context or {}).get("round", 1)
+            if decision == "REJECT" and curr_r < max_r and self.shelf_life > 1:
+                decision = "COUNTER"
+                counter_price = max(self.min_price, self.current_price)
+                reason = f"Floor defense: countered at ₹{counter_price}/kg instead of walking away in round {curr_r}."
+
             if decision == "ACCEPT":
                 # Only accept below min_price if extreme spoilage AND no processor
                 if price < self.min_price:
@@ -218,8 +228,5 @@ class FarmerAgent(BaseAgent):
         if self.has_processor_option and price < self.min_price * 0.8:
             return {"decision": "REJECT", "counter_price": None, "reason": "Offer is far below minimum. I will consider processing."}
 
-        # Last resort: Counter at minimum if not desperately low
-        if price >= self.min_price * 0.9:
-            return {"decision": "COUNTER", "counter_price": self.min_price, "reason": "My absolute minimum price is higher."}
-
-        return {"decision": "REJECT", "counter_price": None, "reason": "Offer is below my sustainable minimum."}
+        # Last resort: Counter at minimum price to protect floor
+        return {"decision": "COUNTER", "counter_price": self.min_price, "reason": "Offer is below minimum. Standing firm at my floor price."}

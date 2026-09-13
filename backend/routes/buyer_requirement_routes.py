@@ -16,12 +16,12 @@ router = APIRouter(tags=["Buyer Requirements"])
 
 
 class BuyerRequirementCreate(BaseModel):
-    crop: str = Field(..., example="Wheat")
+    crop: str = Field(..., example="Cotton")
     quantity: float = Field(..., gt=0, example=1000.0)
-    target_price: float = Field(..., gt=0, example=22.0)
-    max_price: float = Field(None, example=26.0)
-    location: str = Field(..., example="Pune")
-    budget: float = Field(..., gt=0, example=30000.0)
+    target_price: float = Field(..., gt=0, example=65.0)
+    max_price: float = Field(None, example=72.0)
+    location: str = Field(..., example="Amravati")
+    budget: float = Field(..., gt=0, example=75000.0)
     delivery_days: int = Field(7, ge=1, example=7)
     quality_grade: str = Field("A", example="A")
     notes: str = Field("", example="Prefer certified organic")

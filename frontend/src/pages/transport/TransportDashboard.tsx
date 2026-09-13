@@ -14,7 +14,7 @@ const routeData = [
 
 const mockDeliveries = [
   { id: '1', route: 'Nashik -> Mumbai', load: '10 MT Onions', eta: '4 hrs', status: 'In Transit' },
-  { id: '2', route: 'Pune -> Surat', load: '5 MT Tomatoes', eta: 'Pending Dispatch', status: 'Scheduled' },
+  { id: '2', route: 'Latur -> Pune', load: '5 MT Soybean', eta: 'Pending Dispatch', status: 'Scheduled' },
 ];
 
 export default function TransportDashboard() {

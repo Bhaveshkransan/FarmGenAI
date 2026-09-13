@@ -544,7 +544,25 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
     current_round = state.get("round", 0)
 
     farmer_ask = state.get("latest_farmer_ask", round(state["min_price"] * 1.2, 2))
-    buyer_agents = state.get("buyer_agent_objs", [])
+    buyer_agents = list(state.get("buyer_agent_objs") or [])
+
+    if not buyer_agents:
+        active = state.get("active_buyers") or state.get("buyers_list") or ([state["buyer_profile"]] if state.get("buyer_profile") else [])
+        if active:
+            from agents.buyer_agent import BuyerAgent
+            for b in active:
+                if isinstance(b, BuyerAgent):
+                    buyer_agents.append(b)
+                elif isinstance(b, dict):
+                    agent = BuyerAgent(
+                        name=b.get("name", "Buyer"),
+                        budget=float(b.get("budget", 50000.0)),
+                        max_quantity=float(b.get("max_quantity", state.get("quantity", 1000.0))),
+                        target_price=float(b.get("target_price", state.get("market_price", 25.0))),
+                        location=b.get("location", state.get("location"))
+                    )
+                    agent.id = b.get("id", f"buyer_{agent.name}")
+                    buyer_agents.append(agent)
     
     logs.append(f"🤝 [Buyers Pool] Round {current_round}: Evaluating Farmer ask of ₹{farmer_ask}/kg")
     
@@ -683,11 +701,18 @@ async def validator_node(state: NegotiationState) -> Dict[str, Any]:
     raw = llm_client.generate(prompt, max_tokens=150, temperature=0.2)
     decision = await _parse_json_response(raw)
     
-    valid = decision.get("valid", True) if decision else (deal_price * quantity <= budget and deal_price >= state["min_price"])
-    reason = decision.get("reason", "Validation fallback.") if decision else "Validation fallback."
-    message = decision.get("message", "Validation successful.") if decision else "Validation successful."
+    # Deterministic ground truth enforcement (Floor & Budget protection)
+    is_price_valid = deal_price >= state["min_price"]
+    is_budget_valid = (deal_price * quantity) <= (budget * 1.01)
+    
+    if is_price_valid and is_budget_valid:
+        valid = True
+        message = decision.get("message", "Validation successful.") if (decision and decision.get("valid")) else "Mathematical constraints satisfied (price >= min_price and cost <= budget)."
+    else:
+        valid = False
+        message = f"Constraint violation: deal_price ₹{deal_price} (min ₹{state['min_price']}) or total cost ₹{deal_price * quantity} exceeds budget ₹{budget}."
 
-    logs.append(f"⚖️ [Validator][LLM] Valid={valid}. {message}")
+    logs.append(f"⚖️ [Validator] Valid={valid}. {message}")
 
     if valid:
         deal = {

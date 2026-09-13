@@ -186,15 +186,17 @@ class RAGService:
         """Helper to build a composite metadata filter dictionary compatible with ChromaDB / LangChain."""
         conditions = []
         if crop:
-            normalized_crop = crop.strip()
-            if normalized_crop.lower() in ["soybean", "soyabean"]:
+            import sys
+            sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+            from shared.crop_master import get_crop_by_name
+            canonical = get_crop_by_name(crop)
+            if canonical:
                 if collection_name == "reflection_memory":
-                    normalized_crop = "Soybean"
+                    conditions.append({"crop": canonical["ml_mapping"]})
                 else:
-                    normalized_crop = "Soyabean"
+                    conditions.append({"crop": canonical["rag_mapping"]})
             else:
-                normalized_crop = normalized_crop.capitalize()
-            conditions.append({"crop": normalized_crop})
+                logger.warning(f"RAG query received invalid crop: {crop}. Proceeding without crop filter.")
         if district:
             conditions.append({"district": district.strip().capitalize()})
         if date:

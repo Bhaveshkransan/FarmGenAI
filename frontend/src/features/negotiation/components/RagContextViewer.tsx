@@ -8,23 +8,23 @@ export default function RagContextViewer({ isOpen, onClose }) {
   const contexts = [
     {
       collection: 'agmarknet_prices',
-      source: 'Maharashtra/Nashik/Tomatoes',
+      source: 'Maharashtra/Nashik/Onion',
       similarity: 0.94,
-      content: 'Modal price for Grade A Tomatoes in Nashik APMC is ₹2100/quintal (₹21/kg) as of 2026-08-07.',
+      content: 'Modal price for Grade A Onion in Nashik APMC is ₹2200/quintal (₹22/kg) as of 2026-08-07.',
       url: '#'
     },
     {
       collection: 'government_schemes',
       source: 'PM-AASHA Directive 2026',
       similarity: 0.88,
-      content: 'Minimum Support Price (MSP) regulations strictly prohibit buying below ₹18/kg for registered perishable commodities in designated zones.',
+      content: 'Price Stabilization Fund (PSF) buffer procurement guidelines active for perishable produce in designated APMC zones.',
       url: '#'
     },
     {
       collection: 'weather_alerts',
       source: 'IMD Pune',
       similarity: 0.82,
-      content: 'Heavy rainfall expected in Nashik region in 48 hours. Spoilage risk for harvested tomatoes increases by 40%.',
+      content: 'Heavy rainfall expected in Nashik region in 48 hours. Spoilage risk for harvested onion increases by 40%.',
       url: '#'
     }
   ];

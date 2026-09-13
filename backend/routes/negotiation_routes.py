@@ -7,6 +7,15 @@ from ..schemas.negotiation_model import StartNegotiationRequest
 
 router = APIRouter()
 
+@router.get("/debug")
+async def debug():
+    from agents.farmer_agent import FarmerAgent
+    import inspect
+    return {
+        "file": inspect.getfile(FarmerAgent),
+        "signature": str(inspect.signature(FarmerAgent.__init__))
+    }
+
 @router.post("/")
 async def start_negotiation(
     request: StartNegotiationRequest,
@@ -15,6 +24,8 @@ async def start_negotiation(
     try:
         return await service_start_negotiation(request.model_dump(), scenario="direct-sale", db=db)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise AppException(message=str(e), error_code="NEGOTIATION_START_FAILED")
 
 @router.get("/{negotiation_id}")

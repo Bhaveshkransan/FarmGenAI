@@ -9,9 +9,10 @@ MIN_DEAL_CONVERGENCE_GAP = 2  # ₹/kg — price gap at which a deal is forced
 MARKET_PRICE_MIN = 10
 MARket_PRICE_MAX = 35
 
-# Crop categories
-PERISHABLE_CROPS = ["Tomato", "Onion", "Spinach", "Cabbage", "Capsicum"]
-STABLE_CROPS = ["Wheat", "Rice", "Sugarcane", "Maize"]
+# Crop categories — 7 Maharashtra MVP canonical crops
+PERISHABLE_CROPS = ["Onion", "Sugarcane"]
+STABLE_CROPS = ["Soybean", "Cotton", "Jowar", "Bajra", "Rice"]
+MAHARASHTRA_CROPS = ["Sugarcane", "Soybean", "Cotton", "Jowar", "Onion", "Bajra", "Rice"]
 
 # Escalation thresholds
 WAREHOUSE_MIN_CAPACITY = 100  # kg

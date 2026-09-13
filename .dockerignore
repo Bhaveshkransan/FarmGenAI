@@ -15,3 +15,7 @@ backend/dataset/mock_historical_prices.json
 # Scripts not needed in container
 scripts/
 tests/
+
+backend/venv/
+backend/models/
+backend/dataset/mock_historical_prices.json

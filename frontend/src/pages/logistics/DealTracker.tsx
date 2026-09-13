@@ -19,10 +19,10 @@ export default function DealTracker() {
     id: id,
     farmer: 'Ramesh Patil',
     buyer: 'AgroFresh Enterprises',
-    crop: 'Tomatoes',
+    crop: 'Soybean',
     quantity: 500,
-    price: 22,
-    amount: 11000
+    price: 68,
+    amount: 34000
   };
 
   // State Machine logic matching the Redis Events
