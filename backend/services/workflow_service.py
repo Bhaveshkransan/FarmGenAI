@@ -17,7 +17,10 @@ Business rules per SRS:
 """
 
 import logging
+import uuid
+import datetime
 from typing import Dict, List
+from backend.repositories.database_repo import Database
 
 logger = logging.getLogger("WorkflowService")
 
@@ -125,20 +128,33 @@ async def plan_workflow(listing: Dict, market_price: float = None) -> Dict:
 
     best = max(viable, key=lambda x: x["net_revenue"])
 
-    return {
+    result = {
+        "plan_id": str(uuid.uuid4()),
+        "listing_id": listing.get("id"),
+        "user_id": listing.get("user_id"),
         "crop": crop,
         "quantity": quantity,
         "location": location,
         "spoilage_urgency": urgency,
+        "urgency": urgency,
         "spoilage_days": spoilage_days,
         "market_price": round(market_price, 2),
         "min_price": min_price,
         "options": options,
         "recommended": best,
+        "recommendation": best,
         "recommendation_reason": await _build_reason(best, urgency, min_price, market_price),
+        "created_at": datetime.datetime.utcnow().isoformat()
     }
 
+    # Persist the plan to database
+    try:
+        from backend.repositories.database_repo import Database
+        await Database.upsert_workflow_plan_async(result["plan_id"], result)
+    except Exception as e:
+        logger.error(f"Failed to persist workflow plan: {e}")
 
+    return result
 async def _build_reason(option: Dict, urgency: str, min_price: float, market_price: float) -> str:
     opt_type = option["type"]
     net = option["net_revenue"]

@@ -158,6 +158,26 @@ class DBHistory(Base):
     compost_strategy: Mapped[str] = mapped_column(nullable=True)
     compost_reward: Mapped[float] = mapped_column(nullable=True)
 
+class DBAuthLog(Base):
+    __tablename__ = "auth_logs"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(nullable=True)
+    action: Mapped[str] = mapped_column(nullable=True)
+    ip_address: Mapped[str] = mapped_column(nullable=True)
+    timestamp: Mapped[str] = mapped_column(nullable=True)
+
+class DBWorkflowPlan(Base):
+    __tablename__ = "workflow_plans"
+    plan_id: Mapped[str] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(nullable=True, index=True)
+    listing_id: Mapped[str] = mapped_column(nullable=True, index=True)
+    crop: Mapped[str] = mapped_column(nullable=True)
+    quantity: Mapped[float] = mapped_column(nullable=True)
+    urgency: Mapped[str] = mapped_column(nullable=True)
+    recommendation: Mapped[str] = mapped_column(nullable=True)
+    options: Mapped[list] = mapped_column(type_=JSON, nullable=True)
+    created_at: Mapped[str] = mapped_column(nullable=True)
+
 class DBMspPrice(Base):
     __tablename__ = "msp_prices"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

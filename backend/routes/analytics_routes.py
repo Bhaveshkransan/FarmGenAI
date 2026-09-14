@@ -12,10 +12,16 @@ from database.db import Database
 router = APIRouter(tags=["Analytics"])
 
 
+from backend.db.models.schema import DBNegotiation, DBUser
+from backend.db.session import AsyncSessionLocal
+from sqlalchemy import select
+
 @router.get("/stats")
 async def platform_stats(current_user: dict = Depends(get_current_user)):
     """Return aggregated platform statistics for the dashboard."""
-    all_negs = list(Database.negotiations.values())
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(select(DBNegotiation))
+        all_negs = [row.__dict__ for row in res.scalars().all()]
 
     total = len(all_negs)
     deals = [n for n in all_negs if n.get("status") == "DEAL"]
@@ -65,8 +71,10 @@ async def negotiation_history(
 @router.get("/leaderboard")
 async def trust_leaderboard(current_user: dict = Depends(get_current_user)):
     """Return top-10 users ranked by trust score."""
-    all_users = [await UserRepository.get_by_id(uid) for uid in Database.users.keys()]
-    all_users = [u for u in all_users if u]
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(select(DBUser))
+        all_users = [row.__dict__ for row in res.scalars().all()]
+        
     ranked = sorted(all_users, key=lambda u: u.get("trust_score", 0), reverse=True)[:10]
     return {
         "success": True,

@@ -44,10 +44,16 @@ export function useWebSocket(url) {
         }
       };
 
-      ws.current.onclose = () => {
+      ws.current.onclose = (event) => {
         setIsConnected(false);
         if (pingInterval.current) clearInterval(pingInterval.current);
         
+        // Don't retry on Policy Violation (1008) or unauthorized (401/403 mappings if any)
+        if (event.code === 1008 || event.code === 1011) {
+          console.error(`WebSocket closed with code ${event.code}. Halting reconnect loop.`);
+          return;
+        }
+
         // Exponential backoff reconnect
         if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
           const timeout = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000);

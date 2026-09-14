@@ -40,10 +40,36 @@ export default function FarmerDashboard() {
   const [selectedCrop, setSelectedCrop] = useState('Soybean');
   const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'found' | 'error'>('idle');
 
+  const [listingsFilterCrop, setListingsFilterCrop] = useState('');
+  const [listingsSearch, setListingsSearch] = useState('');
+
   const { data: listings, isLoading, isError, refetch } = useQuery({
     queryKey: ['farmer_listings'],
     queryFn: async () => {
       const res = await api.get('/listings/me');
+      return res.data?.data || [];
+    }
+  });
+
+  const filteredListings = listings?.filter((l: any) => {
+    if (listingsFilterCrop && l.crop !== listingsFilterCrop) return false;
+    if (listingsSearch && !l.crop.toLowerCase().includes(listingsSearch.toLowerCase())) return false;
+    return true;
+  });
+
+  const { data: negotiations, isLoading: negLoading } = useQuery({
+    queryKey: ['farmer_negotiations'],
+    queryFn: async () => {
+      const res = await api.get('/negotiations/');
+      return res.data?.data || [];
+    }
+  });
+
+
+  const { data: workflows, isLoading: workflowsLoading } = useQuery({
+    queryKey: ['farmer_workflows'],
+    queryFn: async () => {
+      const res = await api.get('/workflows/');
       return res.data?.data || [];
     }
   });
@@ -241,16 +267,41 @@ export default function FarmerDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Listings Table */}
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+        {/* Left Column: Tables */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+        
+          {/* Listings Table */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center">
             <h2 className="font-bold text-lg text-slate-800">Your Active Listings</h2>
-            <button
-              id="new-listing-btn"
-              onClick={() => setIsFormOpen(true)}
-              className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg flex items-center gap-2"
-            >
-              <Plus size={16} /> New Listing
-            </button>
+            <div className="flex items-center gap-3">
+              <input 
+                type="text" 
+                placeholder="Search..." 
+                value={listingsSearch}
+                onChange={e => setListingsSearch(e.target.value)}
+                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              />
+              <select 
+                value={listingsFilterCrop} 
+                onChange={e => setListingsFilterCrop(e.target.value)}
+                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              >
+                <option value="">All Crops</option>
+                <option value="Onion">Onion</option>
+                <option value="Tomato">Tomato</option>
+                <option value="Cotton">Cotton</option>
+                <option value="Soybean">Soybean</option>
+                <option value="Sugarcane">Sugarcane</option>
+              </select>
+              <button
+                id="new-listing-btn"
+                onClick={() => setIsFormOpen(true)}
+                className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg flex items-center gap-2"
+              >
+                <Plus size={16} /> New Listing
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -269,10 +320,10 @@ export default function FarmerDashboard() {
                   <tr><td colSpan={5} className="p-8 text-center text-slate-400">Loading listings from database...</td></tr>
                 ) : isError ? (
                   <tr><td colSpan={5} className="p-8 text-center text-red-400">Failed to fetch listings. Backend may be offline.</td></tr>
-                ) : !listings || listings.length === 0 ? (
+                ) : !filteredListings || filteredListings.length === 0 ? (
                   <tr><td colSpan={5} className="p-8 text-center text-slate-400">No active listings found.</td></tr>
                 ) : (
-                  listings.map((listing: any) => (
+                  filteredListings.map((listing: any) => (
                     <tr key={listing.id} className="hover:bg-slate-50/50 transition">
                       <td className="px-5 py-4 font-medium text-slate-800">{listing.crop}</td>
                       <td className="px-5 py-4 text-slate-600">{listing.quantity || listing.qty} kg</td>
@@ -325,6 +376,100 @@ export default function FarmerDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* Negotiations Table */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+            <h2 className="font-bold text-lg text-slate-800">Your Active Negotiations</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Crop</th>
+                  <th className="px-5 py-3 font-medium">Volume</th>
+                  <th className="px-5 py-3 font-medium">Latest Price</th>
+                  <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {negLoading ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">Loading negotiations...</td></tr>
+                ) : !negotiations || negotiations.length === 0 ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No active negotiations found.</td></tr>
+                ) : (
+                  negotiations.map((neg: any) => (
+                    <tr key={neg.negotiation_id} className="hover:bg-slate-50/50 transition">
+                      <td className="px-5 py-4 font-medium text-slate-800">{neg.crop}</td>
+                      <td className="px-5 py-4 text-slate-600">{neg.quantity} kg</td>
+                      <td className="px-5 py-4 font-medium text-emerald-600">₹{neg.final_price || neg.market_price || neg.min_price || 0}/kg</td>
+                      <td className="px-5 py-4">
+                        <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+                          neg.status === 'DEAL' ? 'bg-emerald-100 text-emerald-700' :
+                          neg.status === 'NO_DEAL' ? 'bg-red-100 text-red-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {neg.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <button onClick={() => navigate(`/negotiations/${neg.negotiation_id}`)} className="text-blue-600 font-medium hover:underline">
+                          View Room
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Workflow Plans Table */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-indigo-50/30">
+            <h2 className="font-bold text-lg text-slate-800">AI Workflow Plans</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-5 py-3 font-medium">Crop</th>
+                  <th className="px-5 py-3 font-medium">Volume</th>
+                  <th className="px-5 py-3 font-medium">Urgency</th>
+                  <th className="px-5 py-3 font-medium">Recommended Path</th>
+                  <th className="px-5 py-3 font-medium">Net Revenue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {workflowsLoading ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">Loading AI plans...</td></tr>
+                ) : !workflows || workflows.length === 0 ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No workflow plans generated yet.</td></tr>
+                ) : (
+                  workflows.map((plan: any) => (
+                    <tr key={plan.plan_id} className="hover:bg-slate-50/50 transition">
+                      <td className="px-5 py-4 font-medium text-slate-800">{plan.crop}</td>
+                      <td className="px-5 py-4 text-slate-600">{plan.quantity} kg</td>
+                      <td className="px-5 py-4 font-medium text-amber-600">{plan.urgency}</td>
+                      <td className="px-5 py-4">
+                        <span className="px-2.5 py-1 text-xs rounded-full font-medium bg-indigo-100 text-indigo-700">
+                          {plan.recommendation?.label || 'Direct Sale'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 font-bold text-emerald-600">
+                        ₹{plan.recommendation?.net_revenue || 0}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         </div>
 
         {/* Live Feed Sidebar */}

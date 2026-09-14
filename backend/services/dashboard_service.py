@@ -4,13 +4,16 @@ backend/services/dashboard_service.py
 Dashboard Statistics Service — FR-13: Analytics & Dashboard
 
 Aggregates real-time platform metrics for admin and user dashboards.
+All data is sourced from PostgreSQL via SQLAlchemy — no in-memory dicts.
 """
 
 from backend.repositories.user_repository import UserRepository
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
-from database.db import Database
+from backend.db.session import AsyncSessionLocal
+from backend.db.models.schema import DBNegotiation, DBUser, DBHistory
+from sqlalchemy import select, func
 
 logger = logging.getLogger("DashboardService")
 
@@ -18,30 +21,35 @@ logger = logging.getLogger("DashboardService")
 async def get_platform_summary() -> Dict[str, Any]:
     """
     Aggregate-level platform statistics (admin view).
+    Reads directly from PostgreSQL — accurate after any server restart.
     """
-    all_negs = list(Database.negotiations.values())
-    all_users = list(Database.users.values())
+    async with AsyncSessionLocal() as session:
+        # ── Fetch all negotiations ─────────────────────────
+        res = await session.execute(select(DBNegotiation))
+        all_negs = [r.__dict__ for r in res.scalars().all()]
+
+        # ── Fetch all users ────────────────────────────────
+        res_u = await session.execute(select(DBUser))
+        all_users = [u.__dict__ for u in res_u.scalars().all()]
 
     total_negs = len(all_negs)
     deals = [n for n in all_negs if n.get("status") == "DEAL"]
     storage_escalations = [n for n in all_negs if "STORAGE" in str(n.get("status", ""))]
     processing_escalations = [n for n in all_negs if "PROCESSING" in str(n.get("status", ""))]
     compost_escalations = [n for n in all_negs if "COMPOST" in str(n.get("status", ""))]
-    failed = [n for n in all_negs if n.get("status") in ("FAILED", "REJECT", "CANCELLED")]
+    failed = [n for n in all_negs if n.get("status") in ("FAILED", "REJECT", "CANCELLED", "NO_DEAL")]
 
     # Price analytics
-    prices = [float(n.get("final_price", 0)) for n in deals if n.get("final_price")]
+    prices = [float(n.get("final_price") or 0) for n in deals if n.get("final_price")]
     avg_price = round(sum(prices) / len(prices), 2) if prices else 0.0
     max_price = round(max(prices), 2) if prices else 0.0
     min_deal_price = round(min(prices), 2) if prices else 0.0
 
-    # Quantity
-    quantities = [float(n.get("quantity", 0)) for n in deals if n.get("quantity")]
+    # Quantity & GMV
+    quantities = [float(n.get("quantity") or 0) for n in deals if n.get("quantity")]
     total_volume_kg = round(sum(quantities), 2)
-
-    # GMV (Gross Merchandise Value)
     gmv_values = [
-        float(n.get("final_price", 0)) * float(n.get("quantity", 0))
+        float(n.get("final_price") or 0) * float(n.get("quantity") or 0)
         for n in deals
         if n.get("final_price") and n.get("quantity")
     ]
@@ -56,13 +64,13 @@ async def get_platform_summary() -> Dict[str, Any]:
     # Crop distribution
     crop_counts: Dict[str, int] = {}
     for n in all_negs:
-        crop = n.get("crop", "Unknown")
+        crop = n.get("crop", "Unknown") or "Unknown"
         crop_counts[crop] = crop_counts.get(crop, 0) + 1
 
-    # Location distribution
+    # Location distribution (from negotiations, since users don't always have location)
     location_counts: Dict[str, int] = {}
-    for n in all_negs:
-        loc = n.get("location", "Unknown")
+    for u in all_users:
+        loc = u.get("location", "Unknown") or "Unknown"
         location_counts[loc] = location_counts.get(loc, 0) + 1
 
     return {
@@ -99,23 +107,38 @@ async def get_platform_summary() -> Dict[str, Any]:
 
 
 async def get_farmer_dashboard(user_id: str) -> Dict[str, Any]:
-    """Per-farmer dashboard view."""
-    all_negs = list(Database.negotiations.values())
-    my_negs = [n for n in all_negs if n.get("user_id") == user_id]
+    """Per-farmer dashboard view — queries PostgreSQL directly."""
+    async with AsyncSessionLocal() as session:
+        res = await session.execute(
+            select(DBNegotiation).where(DBNegotiation.user_id == user_id)
+        )
+        my_negs = [n.__dict__ for n in res.scalars().all()]
+
+        res_h = await session.execute(
+            select(DBHistory).where(DBHistory.user_id == user_id).order_by(DBHistory.id.desc()).limit(5)
+        )
+        recent_rows = res_h.scalars().all()
 
     deals = [n for n in my_negs if n.get("status") == "DEAL"]
-    prices = [float(n.get("final_price", 0)) for n in deals if n.get("final_price")]
+    prices = [float(n.get("final_price") or 0) for n in deals if n.get("final_price")]
     avg_price = round(sum(prices) / len(prices), 2) if prices else 0.0
-
-    # Earnings
     earnings_values = [
-        float(n.get("final_price", 0)) * float(n.get("quantity", 0))
+        float(n.get("final_price") or 0) * float(n.get("quantity") or 0)
         for n in deals if n.get("final_price") and n.get("quantity")
     ]
     total_earnings = round(sum(earnings_values), 2)
 
-    history = await Database.get_history_async(user_id)
-    recent_activity = history[:5]
+    recent_activity = [
+        {
+            "negotiation_id": r.negotiation_id,
+            "crop": r.crop,
+            "quantity": r.quantity,
+            "status": r.status,
+            "final_price": r.final_price,
+            "summary": r.summary,
+        }
+        for r in recent_rows
+    ]
 
     user = await UserRepository.get_by_id(user_id) or {}
 
@@ -129,8 +152,8 @@ async def get_farmer_dashboard(user_id: str) -> Dict[str, Any]:
         "negotiations": {
             "total": len(my_negs),
             "successful": len(deals),
-            "pending": len([n for n in my_negs if n.get("status") in ("RUNNING", "ACTIVE")]),
-            "failed": len([n for n in my_negs if n.get("status") in ("FAILED", "REJECT")]),
+            "pending": len([n for n in my_negs if n.get("status") in ("RUNNING", "ACTIVE", "IN_PROGRESS")]),
+            "failed": len([n for n in my_negs if n.get("status") in ("FAILED", "REJECT", "NO_DEAL")]),
         },
         "earnings": {
             "total": total_earnings,
@@ -141,13 +164,29 @@ async def get_farmer_dashboard(user_id: str) -> Dict[str, Any]:
 
 
 async def get_buyer_dashboard(user_id: str) -> Dict[str, Any]:
-    """Per-buyer dashboard view."""
-    history = await Database.get_history_async(user_id)
+    """Per-buyer dashboard view — queries PostgreSQL directly."""
+    async with AsyncSessionLocal() as session:
+        res_h = await session.execute(
+            select(DBHistory).where(DBHistory.user_id == user_id).order_by(DBHistory.id.desc())
+        )
+        history_rows = res_h.scalars().all()
+
+    history = [
+        {
+            "negotiation_id": r.negotiation_id,
+            "crop": r.crop,
+            "quantity": r.quantity,
+            "status": r.status,
+            "final_price": r.final_price,
+            "summary": r.summary,
+        }
+        for r in history_rows
+    ]
     deal_history = [h for h in history if h.get("status") == "DEAL"]
 
-    purchased_kg = sum(float(h.get("quantity", 0)) for h in deal_history)
+    purchased_kg = sum(float(h.get("quantity") or 0) for h in deal_history)
     spent = sum(
-        float(h.get("final_price", 0)) * float(h.get("quantity", 0))
+        float(h.get("final_price") or 0) * float(h.get("quantity") or 0)
         for h in deal_history
         if h.get("final_price") and h.get("quantity")
     )
@@ -167,4 +206,3 @@ async def get_buyer_dashboard(user_id: str) -> Dict[str, Any]:
         },
         "recent_activity": history[:5],
     }
-

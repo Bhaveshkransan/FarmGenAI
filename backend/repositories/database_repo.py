@@ -695,3 +695,337 @@ class Database:
         except Exception:
             return []
 
+    # ── New methods: query DB instead of in-memory dicts ─────────────
+
+    @classmethod
+    async def list_buyers_async(cls) -> list:
+        """Return all buyer requirements from PostgreSQL."""
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(DBBuyer))
+            rows = res.scalars().all()
+        results = []
+        for r in rows:
+            results.append({
+                "id": r.id,
+                "user_id": r.user_id,
+                "buyer_name": r.buyer_name,
+                "name": r.buyer_name,
+                "crop": r.crop,
+                "min_price": r.min_price,
+                "max_price": r.max_price,
+                "target_price": r.max_price,
+                "quantity": r.quantity,
+                "max_quantity": r.quantity,
+                "location": r.location,
+                "urgency": r.urgency,
+                "neg_mode": r.neg_mode,
+                "strategy": r.strategy,
+                "status": r.status or "ACTIVE",
+                "kind": "requirement",
+            })
+        # Sync in-memory dict
+        Database.buyers = {r["id"]: r for r in results}
+        return results
+
+    @classmethod
+    async def get_buyer_requirements_async(cls, crop: str = None) -> list:
+        """Return buyer requirements, optionally filtered by crop."""
+        all_buyers = await cls.list_buyers_async()
+        if crop:
+            return [b for b in all_buyers if (b.get("crop") or "").lower() == crop.lower()]
+        return all_buyers
+
+    @classmethod
+    async def get_all_negotiations_async(
+        cls,
+        user_id: str = None,
+        status: str = None,
+        limit: int = 100
+    ) -> list:
+        """
+        Return negotiations from PostgreSQL with optional filters.
+        Fixes: list_negotiations() always returning empty dict after restart.
+        """
+        async with AsyncSessionLocal() as session:
+            query = select(DBNegotiation)
+            if user_id:
+                query = query.where(DBNegotiation.user_id == user_id)
+            if status:
+                query = query.where(DBNegotiation.status == status)
+            query = query.limit(limit)
+            res = await session.execute(query)
+            rows = res.scalars().all()
+
+        results = []
+        for r in rows:
+            results.append({
+                "negotiation_id": r.negotiation_id,
+                "crop": r.crop,
+                "quantity": r.quantity,
+                "farmer_id": r.farmer_id,
+                "buyer_id": r.buyer_id,
+                "user_id": r.user_id,
+                "farmer_name": r.farmer_name,
+                "status": r.status,
+                "current_round": r.current_round,
+                "summary": r.summary,
+                "final_price": r.final_price,
+                "market_price": r.market_price,
+                "min_price": r.min_price,
+                "transport_plan": r.transport_plan,
+                "peer_node": r.peer_node,
+                "logs": r.logs or [],
+                "market_offers": r.market_offers or [],
+                "selected_buyer": r.selected_buyer or {},
+                "signatures": r.signatures or {},
+            })
+        # Sync in-memory cache
+        for neg in results:
+            Database.negotiations[neg["negotiation_id"]] = neg
+        return results
+    @classmethod
+    def get_market_mappings(cls, district: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBMarketMapping).where(DBMarketMapping.district.ilike(district))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{"district": r.district, "market_name": r.market_name, "state": r.state} for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+    def get_crop_quality_reference(cls, crop: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBCropQualityReference).where(DBCropQualityReference.crop.ilike(crop))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "crop": r.crop,
+                    "variety": r.variety,
+                    "grade": r.grade,
+                    "min_size_mm": r.min_size_mm,
+                    "max_moisture_pct": r.max_moisture_pct,
+                    "color_standards": r.color_standards,
+                    "skin_firmness": r.skin_firmness,
+                    "common_defects_allowed": r.common_defects_allowed
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+    def get_seasonal_calendar(cls) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBSeasonalCalendar)
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "season_id": r.season_id,
+                    "event_name": r.event_name,
+                    "month_range": r.month_range,
+                    "affected_crops": r.affected_crops,
+                    "price_impact_trend": r.price_impact_trend,
+                    "market_behavior_description": r.market_behavior_description
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+    def get_trust_score(cls, user_id: str) -> dict | None:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBTrustScore).where(DBTrustScore.user_id == user_id)
+                res = await session.execute(stmt)
+                r = res.scalars().first()
+                if not r:
+                    return None
+                return {
+                    "user_id": r.user_id,
+                    "trust_score_final": r.trust_score_final
+                }
+        try:
+            return _run_async(_get())
+        except Exception:
+            return None
+    @classmethod
+
+    def get_warehouse_list(cls, district: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBWarehouse).where(DBWarehouse.district.ilike(district))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "warehouse_id": r.warehouse_id,
+                    "name": r.name,
+                    "district": r.district,
+                    "location": r.location,
+                    "type": r.type,
+                    "capacity_mt": r.capacity_mt,
+                    "available_capacity_mt": r.available_capacity_mt,
+                    "price_per_mt_per_day": r.price_per_mt_per_day,
+                    "rating": r.rating,
+                    "contact_number": r.contact_number
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+
+    def get_transporter_list(cls, current_location: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBTransporter).where(DBTransporter.current_location.ilike(current_location))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "transporter_id": r.transporter_id,
+                    "provider_name": r.provider_name,
+                    "vehicle_type": r.vehicle_type,
+                    "capacity_mt": r.capacity_mt,
+                    "rate_per_km": r.rate_per_km,
+                    "base_fare": r.base_fare,
+                    "rating": r.rating,
+                    "contact_number": r.contact_number,
+                    "current_location": r.current_location
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+
+    # ── New methods: query DB instead of in-memory dicts ─────────────
+
+    @classmethod
+    async def list_buyers_async(cls) -> list:
+        """Return all buyer requirements from PostgreSQL."""
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(DBBuyer))
+            rows = res.scalars().all()
+        results = []
+        for r in rows:
+            results.append({
+                "id": r.id,
+                "user_id": r.user_id,
+                "buyer_name": r.buyer_name,
+                "name": r.buyer_name,
+                "crop": r.crop,
+                "min_price": r.min_price,
+                "max_price": r.max_price,
+                "target_price": r.max_price,
+                "quantity": r.quantity,
+                "max_quantity": r.quantity,
+                "location": r.location,
+                "urgency": r.urgency,
+                "neg_mode": r.neg_mode,
+                "strategy": r.strategy,
+                "status": r.status or "ACTIVE",
+                "kind": "requirement",
+            })
+        # Sync in-memory dict
+        Database.buyers = {r["id"]: r for r in results}
+        return results
+
+    @classmethod
+    async def get_buyer_requirements_async(cls, crop: str = None) -> list:
+        """Return buyer requirements, optionally filtered by crop."""
+        all_buyers = await cls.list_buyers_async()
+        if crop:
+            return [b for b in all_buyers if (b.get("crop") or "").lower() == crop.lower()]
+        return all_buyers
+
+    @classmethod
+    async def get_all_negotiations_async(
+        cls,
+        user_id: str = None,
+        status: str = None,
+        limit: int = 100
+    ) -> list:
+        """
+        Return negotiations from PostgreSQL with optional filters.
+        Fixes: list_negotiations() always returning empty dict after restart.
+        """
+        async with AsyncSessionLocal() as session:
+            query = select(DBNegotiation)
+            if user_id:
+                query = query.where(DBNegotiation.user_id == user_id)
+            if status:
+                query = query.where(DBNegotiation.status == status)
+            query = query.limit(limit)
+            res = await session.execute(query)
+            rows = res.scalars().all()
+
+        results = []
+        for r in rows:
+            results.append({
+                "negotiation_id": r.negotiation_id,
+                "crop": r.crop,
+                "quantity": r.quantity,
+                "farmer_id": r.farmer_id,
+                "buyer_id": r.buyer_id,
+                "user_id": r.user_id,
+                "farmer_name": r.farmer_name,
+                "status": r.status,
+                "current_round": r.current_round,
+                "summary": r.summary,
+                "final_price": r.final_price,
+                "market_price": r.market_price,
+                "min_price": r.min_price,
+                "transport_plan": r.transport_plan,
+                "peer_node": r.peer_node,
+                "logs": r.logs or [],
+                "market_offers": r.market_offers or [],
+                "selected_buyer": r.selected_buyer or {},
+                "signatures": r.signatures or {},
+            })
+        # Sync in-memory cache
+        for neg in results:
+            Database.negotiations[neg["negotiation_id"]] = neg
+        return results
+
+    @classmethod
+    async def upsert_workflow_plan_async(cls, plan_id: str, data: dict) -> dict:
+        async with AsyncSessionLocal() as session:
+            db_plan = await session.get(DBWorkflowPlan, plan_id)
+            if not db_plan:
+                db_plan = DBWorkflowPlan(plan_id=plan_id)
+                session.add(db_plan)
+            
+            db_plan.user_id = data.get("user_id")
+            db_plan.listing_id = data.get("listing_id")
+            db_plan.crop = data.get("crop")
+            db_plan.quantity = data.get("quantity")
+            db_plan.urgency = data.get("urgency")
+            db_plan.recommendation = data.get("recommendation")
+            db_plan.options = data.get("options")
+            db_plan.created_at = data.get("created_at")
+            await session.commit()
+        return data
+
+    @classmethod
+    async def get_workflow_plans_async(cls, user_id: str = None) -> list:
+        async with AsyncSessionLocal() as session:
+            query = select(DBWorkflowPlan)
+            if user_id:
+                query = query.where(DBWorkflowPlan.user_id == user_id)
+            query = query.order_by(DBWorkflowPlan.created_at.desc())
+            res = await session.execute(query)
+            rows = res.scalars().all()
+            
+            return [{
+                "plan_id": r.plan_id,
+                "user_id": r.user_id,
+                "listing_id": r.listing_id,
+                "crop": r.crop,
+                "quantity": r.quantity,
+                "urgency": r.urgency,
+                "recommendation": r.recommendation,
+                "options": r.options,
+                "created_at": r.created_at
+            } for r in rows]

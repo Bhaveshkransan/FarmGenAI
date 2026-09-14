@@ -1,11 +1,35 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.api.v1.dependencies import get_db
 from backend.core.exceptions import AppException, NotFoundException
 from backend.services.negotiation_service import NegotiationService, start_negotiation as service_start_negotiation
 from ..schemas.negotiation_model import StartNegotiationRequest
+from backend.core.security import get_current_user
+from database.db import Database
 
 router = APIRouter()
+
+@router.get("/")
+async def list_negotiations(
+    status: str = Query(None, description="Filter by status e.g. DEAL, NO_DEAL, IN_PROGRESS"),
+    limit: int = Query(50, description="Max results"),
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all negotiations for the current user from PostgreSQL."""
+    try:
+        user_id = current_user.get("sub")
+        role = current_user.get("role", "")
+        # Admin sees all; farmer/buyer sees their own
+        filter_user = None if role == "admin" else user_id
+        results = await Database.get_all_negotiations_async(
+            user_id=filter_user,
+            status=status,
+            limit=limit
+        )
+        return {"success": True, "data": results, "count": len(results)}
+    except Exception as e:
+        raise AppException(message=str(e), error_code="NEGOTIATIONS_FETCH_FAILED")
 
 @router.get("/debug")
 async def debug():
