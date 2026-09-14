@@ -151,11 +151,16 @@ class BuyerAgent(BaseAgent):
     # Utility Function: Multi-Attribute Preference Scoring
     # -------------------------------------------------------------------------
     def calculate_utility(
-        self, price: float, quantity: float, shelf_life: int | None = None
+        self,
+        price: float,
+        quantity: float,
+        shelf_life: int | None = None,
+        quality_grade: str | None = None,
     ) -> float:
         """
         Calculates multi-attribute utility score in range [0.0, 1.0].
         Utility = w_price * PriceUtility + w_qty * QuantityUtility + w_fresh * FreshnessUtility
+        Optionally modulated by quality grade (Grade A vs B vs C) based on buyer persona.
         """
         if price > self.reservation_price or price <= 0:
             return 0.0
@@ -182,19 +187,69 @@ class BuyerAgent(BaseAgent):
         w_p = self.weights.get("price", 0.60)
         w_q = self.weights.get("quantity", 0.25)
         w_f = self.weights.get("freshness", 0.15)
-        return round(w_p * u_price + w_q * u_qty + w_f * u_fresh, 4)
+        base_utility = w_p * u_price + w_q * u_qty + w_f * u_fresh
+
+        # Quality grade modulation if provided
+        if quality_grade is not None:
+            q_str = str(quality_grade).strip().upper()
+            if "A" in q_str or "FAQ" in q_str or "1" in q_str:
+                u_qual = 1.0
+            elif "B" in q_str or "2" in q_str:
+                # Retail supermarkets & kitchens penalize Grade B; processors accept it
+                u_qual = 0.60 if self.persona in ["retail_supermarket", "restaurant_kitchen"] else 0.90
+            elif "C" in q_str or "3" in q_str:
+                # Food processors accept Grade C for pulp/crush; retail rejects it
+                u_qual = 0.75 if self.persona == "food_processor" else 0.25
+            else:
+                u_qual = 0.70
+            base_utility = base_utility * (0.60 + 0.40 * u_qual)
+
+        return round(min(1.0, max(0.0, base_utility)), 4)
 
     # -------------------------------------------------------------------------
-    # BATNA & Contract Generation
+    # BATNA, ZOPA & Contract Generation
     # -------------------------------------------------------------------------
-    def calculate_batna(self, market_price: float | None = None, transport_buffer: float = 1.50) -> float:
+    def calculate_batna(
+        self,
+        market_price: float | None = None,
+        transport_buffer: float = 1.50,
+        alternative_offers: list[dict] | None = None,
+    ) -> float:
         """
-        Calculates Best Alternative to a Negotiated Agreement (BATNA).
-        BATNA = min(reservation_price, market_price + transport_buffer)
+        Calculates BATNA (Best Alternative to a Negotiated Agreement).
+        - If alternative supplier quotes exist, true BATNA is the minimum alternative price.
+        - Otherwise, returns a clearly designated MARKET_REFERENCE_HEURISTIC:
+          min(reservation_price, market_price + transport_buffer)
         """
+        if alternative_offers:
+            valid_alt = [
+                float(o["price"]) for o in alternative_offers
+                if isinstance(o, dict) and o.get("price") and float(o["price"]) > 0
+            ]
+            if valid_alt:
+                return round(min(min(valid_alt), self.reservation_price), 2)
+
         if market_price is not None and market_price > 0:
             return round(min(self.reservation_price, market_price + transport_buffer), 2)
         return self.reservation_price
+
+    def get_batna_source_type(self, alternative_offers: list[dict] | None = None) -> str:
+        """Distinguishes true alternative quotes from market-reference heuristics."""
+        if alternative_offers and any(o.get("price") for o in alternative_offers):
+            return "TRUE_ALTERNATIVE_SUPPLIER"
+        return "MARKET_REFERENCE_HEURISTIC"
+
+    def check_zopa(self, seller_min_price: float | None) -> tuple[bool, str]:
+        """
+        Checks Zone of Possible Agreement (ZOPA):
+        Seller Minimum Price <= Buyer Reservation Ceiling (P_max)
+        """
+        if seller_min_price is None or seller_min_price <= 0:
+            return True, "ZOPA status unknown (seller minimum price confidential)."
+        if seller_min_price <= self.reservation_price:
+            surplus = round(self.reservation_price - seller_min_price, 2)
+            return True, f"ZOPA exists with positive surplus band of ₹{surplus}/kg."
+        return False, f"Negative ZOPA: seller minimum (₹{seller_min_price}/kg) > buyer reservation ceiling (₹{self.reservation_price}/kg)."
 
     def generate_purchase_order(
         self, price: float, quantity: float, seller_name: str = "Farmer", context: dict | None = None
@@ -315,11 +370,27 @@ class BuyerAgent(BaseAgent):
 
         # Quantity calculation within max capacity and budget
         affordable_qty = math.floor(self.budget / opening_price) if opening_price > 0 else 0
+        if affordable_qty <= 0:
+            return {
+                "type": "REJECT",
+                "price": 0.0,
+                "quantity": 0.0,
+                "message": self.log_action("REJECT: Insufficient budget to make an opening procurement bid."),
+                "error": "INSUFFICIENT_BUDGET"
+            }
         target_qty = self.max_quantity
         if context and "quantity" in context:
             target_qty = min(self.max_quantity, float(context["quantity"]))
 
-        offer_qty = max(1.0, min(target_qty, affordable_qty))
+        offer_qty = min(target_qty, affordable_qty)
+        if offer_qty <= 0:
+            return {
+                "type": "REJECT",
+                "price": 0.0,
+                "quantity": 0.0,
+                "message": self.log_action("REJECT: Calculated procurement quantity is zero."),
+                "error": "INSUFFICIENT_BUDGET"
+            }
 
         message = self.log_action(
             f"Initial procurement bid: ₹{opening_price}/kg for {offer_qty}kg"
@@ -595,9 +666,22 @@ class BuyerAgent(BaseAgent):
             self.current_bid = counter_price
 
             # Check quantity affordability at counter price
-            affordable_qty = math.floor(self.budget / counter_price)
+            affordable_qty = math.floor(self.budget / counter_price) if counter_price > 0 else 0
+            if affordable_qty <= 0:
+                return {
+                    "type": "REJECT",
+                    "price": price,
+                    "quantity": req_qty,
+                    "message": self.log_action("REJECTED: Insufficient budget to purchase even 1 unit at counter price."),
+                }
             counter_qty = min(req_qty, self.max_quantity, affordable_qty)
-            counter_qty = max(1.0, counter_qty)
+            if counter_qty <= 0:
+                return {
+                    "type": "REJECT",
+                    "price": price,
+                    "quantity": req_qty,
+                    "message": self.log_action("REJECTED: Affordable quantity is zero at counter price."),
+                }
 
             return {
                 "type": "COUNTER",
