@@ -29,6 +29,14 @@ from shared.crop_catalog import (
 )
 
 try:
+    from backend.services.buyer_pricing_service import get_buyer_pricing_service
+except Exception:
+    try:
+        from services.buyer_pricing_service import get_buyer_pricing_service
+    except Exception:
+        get_buyer_pricing_service = None
+
+try:
     llm_client = LLMClient()
 except Exception:
     llm_client = None
@@ -146,6 +154,8 @@ class BuyerAgent(BaseAgent):
         self.round_count = 0
         self.seller_offer_history: list[float] = []
         self.generated_contracts: list[dict] = []
+        self.pricing_service = get_buyer_pricing_service() if get_buyer_pricing_service else None
+        self.last_ml_prediction: dict | None = None
 
     # -------------------------------------------------------------------------
     # Utility Function: Multi-Attribute Preference Scoring
@@ -337,8 +347,56 @@ class BuyerAgent(BaseAgent):
         return "OK", ""
 
     # -------------------------------------------------------------------------
-    # Interface Methods (evaluate_offer, make_offer)
+    # Interface Methods (get_market_valuation, evaluate_offer, make_offer)
     # -------------------------------------------------------------------------
+    def get_market_valuation(
+        self,
+        crop: str | None = None,
+        location: str | None = None,
+        context: dict | None = None,
+    ) -> float:
+        """
+        Calculates next-period wholesale modal market valuation using the pre-trained ML model.
+        Returns the predicted next modal price (P_modal, t+1) to serve as the market anchor.
+        Falls back to context market_price or target_price if ML prediction is unavailable.
+        Strictly preserves all economic constraints.
+        """
+        target_crop = crop or getattr(self, "crop", None)
+        if target_crop:
+            norm_crop = normalize_crop_name(target_crop)
+        else:
+            norm_crop = None
+
+        if norm_crop and is_supported_buyer_crop(norm_crop) and self.pricing_service:
+            features = None
+            if context and isinstance(context.get("market_features"), dict):
+                features = context["market_features"]
+            elif context and "modal_price_kg" in context:
+                features = {
+                    col: context[col] for col in self.pricing_service.feature_cols
+                    if col in context
+                }
+
+            if features:
+                try:
+                    pred_res = self.pricing_service.predict_modal_price(
+                        norm_crop, features, location=location or self.location
+                    )
+                    self.last_ml_prediction = pred_res
+                    predicted_modal = pred_res["predicted_modal_price"]
+                    self.log_action(
+                        f"ML Valuation: Predicted next-period modal price for {norm_crop} is ₹{predicted_modal}/kg"
+                    )
+                    return float(predicted_modal)
+                except Exception as e:
+                    self.last_ml_prediction = None
+                    self.log_action(f"ML Valuation controlled fallback: {e}")
+
+        self.last_ml_prediction = None
+        if context and context.get("market_price") is not None:
+            return float(context["market_price"])
+        return self.target_price
+
     def evaluate_offer(self, offer: dict, context: dict | None = None) -> str:
         """
         Deterministic evaluation returning 'ACCEPT', 'REJECT', or 'COUNTER'.
@@ -348,11 +406,10 @@ class BuyerAgent(BaseAgent):
 
     def make_offer(self, context: dict | None = None) -> dict:
         """
-        Generates an initial or opening bid.
+        Generates an initial or opening bid informed by the ML market valuation anchor.
         """
-        market_price = (
-            context.get("market_price", self.target_price) if context else self.target_price
-        )
+        target_crop = (context.get("crop") if context else None) or self.crop
+        market_price = self.get_market_valuation(target_crop, self.location, context)
 
         # Opening bid strategy discount
         if self.strategy == "aggressive":
@@ -366,6 +423,7 @@ class BuyerAgent(BaseAgent):
 
         base = min(self.target_price, market_price)
         opening_price = round(max(1.0, base * discount), 2)
+        opening_price = min(opening_price, self.reservation_price)
         self.current_bid = opening_price
 
         # Quantity calculation within max capacity and budget
@@ -535,9 +593,8 @@ class BuyerAgent(BaseAgent):
 
         price = float(offer["price"])
         req_qty = float(offer["quantity"])
-        market_price = (
-            float(context.get("market_price", self.target_price)) if context else self.target_price
-        )
+        target_crop = offer.get("crop") or (context.get("crop") if context else None) or self.crop
+        market_price = self.get_market_valuation(target_crop, self.location, context)
         current_round = int(context.get("round", self.round_count)) if context else self.round_count
         max_rounds = int(context.get("max_rounds", 5)) if context else 5
 

@@ -380,7 +380,7 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
         offered_qty = min(state["quantity"], float(profile.get("max_quantity", state["quantity"])))
         budget_limited_price = float(profile.get("budget", 0)) / max(offered_qty, 1)
 
-        strategy = profile.get("strategy", "").lower()
+        strategy = (profile.get("strategy") or "").lower()
         if profile.get("offered_price"):
             opening_bid = min(float(profile["offered_price"]), budget_limited_price)
         elif "restaurant" in strategy or "premium" in strategy:
@@ -564,8 +564,41 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
     current_round = state.get("round", 0)
 
     farmer_ask = state.get("latest_farmer_ask", round(state["min_price"] * 1.2, 2))
-    buyer_agents = state.get("buyer_agent_objs", [])
+    buyer_agents = list(state.get("buyer_agent_objs") or [])
     
+    if not buyer_agents:
+        candidate_buyers = state.get("active_buyers") or []
+        if not candidate_buyers and state.get("buyer_profile"):
+            candidate_buyers = [state.get("buyer_profile")]
+        elif not candidate_buyers and state.get("selected_buyer"):
+            candidate_buyers = [state.get("selected_buyer")]
+
+        from agents.buyer_agent import BuyerAgent
+        from shared.crop_catalog import is_supported_buyer_crop
+
+        for b in candidate_buyers:
+            if not isinstance(b, dict):
+                continue
+            b_name = b.get("name") or b.get("buyer_name") or "Buyer"
+            b_budget = float(b.get("budget", 100000.0) or 100000.0)
+            b_qty = float(b.get("max_quantity", state.get("quantity", 100.0)) or state.get("quantity", 100.0))
+            b_target = float(b.get("target_price", state.get("min_price", 20.0)) or state.get("min_price", 20.0))
+            b_loc = b.get("location", state.get("location"))
+            b_strat = b.get("strategy") or "balanced"
+            b_crop = state.get("crop") if is_supported_buyer_crop(state.get("crop")) else None
+
+            b_obj = BuyerAgent(
+                name=b_name,
+                budget=b_budget,
+                max_quantity=b_qty,
+                target_price=b_target,
+                location=b_loc,
+                strategy=b_strat,
+                crop=b_crop
+            )
+            b_obj.id = b.get("id", f"buyer_{b_name}")
+            buyer_agents.append(b_obj)
+
     logs.append(f"🤝 [Buyers Pool] Round {current_round}: Evaluating Farmer ask of ₹{farmer_ask}/kg")
     
     current_offers = []
@@ -577,8 +610,15 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
     for buyer in buyer_agents:
         buyer_name = buyer.name
         
-        offer_payload = {"price": farmer_ask, "quantity": state["quantity"]}
-        context_payload = {"market_price": state["market_price"], "round": current_round}
+        offer_payload = {"price": farmer_ask, "quantity": state["quantity"], "crop": state.get("crop")}
+        context_payload = {
+            "market_price": state["market_price"],
+            "round": current_round,
+            "crop": state.get("crop"),
+            "location": state.get("location"),
+        }
+        if state.get("market_features"):
+            context_payload["market_features"] = state["market_features"]
 
         response = buyer.respond_to_offer(offer_payload, context=context_payload)
 
@@ -646,6 +686,7 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
         "history": history,
         "current_offers": current_offers,
         "logs": logs,
+        "buyer_agent_objs": buyer_agents,
     }
 
 
@@ -730,9 +771,10 @@ async def validator_node(state: NegotiationState) -> Dict[str, Any]:
     logs.append(f"⚖️ [Validator][LLM] Valid={valid}. {message}")
 
     if valid:
+        buyer_p = state.get("buyer_profile") or state.get("selected_buyer") or {}
         deal = {
-            "buyer_name": state.get("buyer_profile", {}).get("name", "Buyer"),
-            "buyer_id": state.get("buyer_profile", {}).get("id", "Unknown"),
+            "buyer_name": buyer_p.get("name") or buyer_p.get("buyer_name") or "Buyer",
+            "buyer_id": buyer_p.get("id", "Unknown"),
             "price": deal_price,
             "quantity": quantity,
             "total_value": round(deal_price * quantity, 2),
