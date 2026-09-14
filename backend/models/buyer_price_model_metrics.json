@@ -1,0 +1,174 @@
+{
+  "pipeline_execution_time": "2026-09-14T20:36:43.357639+00:00",
+  "total_raw_ingested": 62429,
+  "total_rejected_non_7_crop": 48112,
+  "total_rejected_invalid_price": 24,
+  "total_duplicates_resolved": 215,
+  "total_clean_records": 14078,
+  "total_feature_rows": 13179,
+  "train_samples": 9225,
+  "val_samples": 1977,
+  "test_samples": 1977,
+  "train_dates": "2014-09 to 2016-03",
+  "val_dates": "2016-03 to 2016-07",
+  "test_dates": "2016-07 to 2016-10",
+  "metrics": {
+    "persistence": {
+      "mae": 1.7258,
+      "rmse": 2.893,
+      "mape": 10.45
+    },
+    "moving_average_3": {
+      "mae": 2.3949,
+      "rmse": 3.4868,
+      "mape": 18.83
+    },
+    "ridge": {
+      "mae": 2.1812,
+      "rmse": 3.1904,
+      "mape": 16.82
+    },
+    "hist_gradient_boosting": {
+      "mae": 2.5847,
+      "rmse": 3.6964,
+      "mape": 26.76
+    }
+  },
+  "per_crop_test_metrics": {
+    "Bajra": {
+      "samples": 334,
+      "hgb_mae": 1.6386,
+      "persistence_mae": 1.3605,
+      "mape": 11.53
+    },
+    "Cotton": {
+      "samples": 27,
+      "hgb_mae": 2.9202,
+      "persistence_mae": 2.4978,
+      "mape": 6.1
+    },
+    "Jowar": {
+      "samples": 578,
+      "hgb_mae": 1.3909,
+      "persistence_mae": 1.2893,
+      "mape": 8.39
+    },
+    "Onion": {
+      "samples": 296,
+      "hgb_mae": 3.3217,
+      "persistence_mae": 1.3283,
+      "mape": 114.28
+    },
+    "Rice": {
+      "samples": 205,
+      "hgb_mae": 1.7683,
+      "persistence_mae": 1.406,
+      "mape": 7.46
+    },
+    "Soybean": {
+      "samples": 535,
+      "hgb_mae": 4.3478,
+      "persistence_mae": 2.7337,
+      "mape": 15.85
+    },
+    "Sugarcane": {
+      "samples": 2,
+      "hgb_mae": 4.0556,
+      "persistence_mae": 0.5,
+      "mape": 103.01
+    }
+  },
+  "crop_statistical_profiles": {
+    "Sugarcane": {
+      "raw_records": 13,
+      "valid_records": 13,
+      "rejected_records": 0,
+      "unique_apmcs": 3,
+      "earliest_date": "2014-10",
+      "latest_date": "2016-11",
+      "min_modal_kg": 3.5,
+      "max_modal_kg": 30.0,
+      "mean_modal_kg": 6.96,
+      "median_modal_kg": 4.25,
+      "std_modal_kg": 6.9078
+    },
+    "Soybean": {
+      "raw_records": 3727,
+      "valid_records": 3726,
+      "rejected_records": 1,
+      "unique_apmcs": 227,
+      "earliest_date": "2014-09",
+      "latest_date": "2016-11",
+      "min_modal_kg": 1.0,
+      "max_modal_kg": 78.2,
+      "mean_modal_kg": 33.1945,
+      "median_modal_kg": 33.31,
+      "std_modal_kg": 3.6868
+    },
+    "Cotton": {
+      "raw_records": 1063,
+      "valid_records": 1063,
+      "rejected_records": 0,
+      "unique_apmcs": 122,
+      "earliest_date": "2014-09",
+      "latest_date": "2016-11",
+      "min_modal_kg": 0.5,
+      "max_modal_kg": 55.91,
+      "mean_modal_kg": 42.0328,
+      "median_modal_kg": 41.19,
+      "std_modal_kg": 4.0795
+    },
+    "Jowar": {
+      "raw_records": 3716,
+      "valid_records": 3710,
+      "rejected_records": 6,
+      "unique_apmcs": 219,
+      "earliest_date": "2014-09",
+      "latest_date": "2016-11",
+      "min_modal_kg": 0.01,
+      "max_modal_kg": 35.18,
+      "mean_modal_kg": 16.3092,
+      "median_modal_kg": 15.96,
+      "std_modal_kg": 3.591
+    },
+    "Onion": {
+      "raw_records": 1872,
+      "valid_records": 1867,
+      "rejected_records": 5,
+      "unique_apmcs": 96,
+      "earliest_date": "2014-09",
+      "latest_date": "2016-11",
+      "min_modal_kg": 0.07,
+      "max_modal_kg": 57.25,
+      "mean_modal_kg": 12.8692,
+      "median_modal_kg": 10.5,
+      "std_modal_kg": 8.9381
+    },
+    "Bajra": {
+      "raw_records": 2346,
+      "valid_records": 2336,
+      "rejected_records": 10,
+      "unique_apmcs": 138,
+      "earliest_date": "2014-09",
+      "latest_date": "2016-11",
+      "min_modal_kg": 0.01,
+      "max_modal_kg": 58.5,
+      "mean_modal_kg": 15.0796,
+      "median_modal_kg": 14.81,
+      "std_modal_kg": 2.5254
+    },
+    "Rice": {
+      "raw_records": 1580,
+      "valid_records": 1363,
+      "rejected_records": 217,
+      "unique_apmcs": 94,
+      "earliest_date": "2014-09",
+      "latest_date": "2016-11",
+      "min_modal_kg": 6.64,
+      "max_modal_kg": 79.07,
+      "mean_modal_kg": 22.0308,
+      "median_modal_kg": 19.0,
+      "std_modal_kg": 9.9603
+    }
+  }
+}
