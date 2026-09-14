@@ -8,13 +8,19 @@ export default function UserProfile() {
   const [successMsg, setSuccessMsg] = useState('');
   
   // Mock initial state based on user role
+  // Initial state based on user role and saved credentials
   const [formData, setFormData] = useState({
-    fullName: user?.name || '',
-    email: user?.name ? `${user.name.toLowerCase().replace(' ', '.')}@example.com` : '',
-    phone: '+91 98765 43210',
-    companyName: user?.role === 'buyer' ? 'AgriProcure Ltd.' : 'Green Farms',
-    location: 'Nashik, Maharashtra',
-    gstin: '27AABCU9603R1ZM'
+    fullName: user?.name || user?.full_name || '',
+    email: user?.email || (user?.name ? `${user.name.toLowerCase().replace(/\s+/g, '.')}@example.com` : ''),
+    phone: user?.phone || '+91 98765 43210',
+    companyName: user?.businessName || (user?.role === 'buyer' ? `${user?.name || 'Buyer'} Agro Procure Ltd.` : 'Green Farms Organic'),
+    location: user?.location || 'Pune, Maharashtra',
+    gstin: user?.gstin || '27AABCU9603R1ZM',
+    buyerPersona: user?.buyerPersona || 'food_processing',
+    fssaiLicense: user?.fssaiLicense || '11522020000123',
+    mandiLicense: user?.mandiLicense || 'MH-APMC-PUN-4091',
+    processingCapacity: user?.processingCapacity || '100 MT / month',
+    procurementWindow: user?.procurementWindow || 'Early Morning 4 AM - 7 AM'
   });
 
   const handleChange = (e) => {
@@ -24,12 +30,33 @@ export default function UserProfile() {
   const handleSubmit = (e) => {
     e.preventDefault();
     setIsSaving(true);
-    // Simulate API save
+
+    try {
+      const stored = localStorage.getItem('agri_user');
+      const currentUser = stored ? JSON.parse(stored) : (user || {});
+      const updatedUser = {
+        ...currentUser,
+        name: formData.fullName,
+        full_name: formData.fullName,
+        businessName: formData.companyName,
+        companyName: formData.companyName,
+        location: formData.location,
+        buyerPersona: formData.buyerPersona,
+        fssaiLicense: formData.fssaiLicense,
+        gstin: formData.gstin,
+        mandiLicense: formData.mandiLicense,
+        processingCapacity: formData.processingCapacity,
+        procurementWindow: formData.procurementWindow,
+        verificationStatus: (formData.fssaiLicense || formData.gstin) ? 'VERIFIED' : 'PENDING'
+      };
+      localStorage.setItem('agri_user', JSON.stringify(updatedUser));
+    } catch (err) {}
+
     setTimeout(() => {
       setIsSaving(false);
-      setSuccessMsg('Profile updated successfully!');
+      setSuccessMsg('Profile & Enterprise credentials updated successfully!');
       setTimeout(() => setSuccessMsg(''), 3000);
-    }, 1000);
+    }, 600);
   };
 
   return (
@@ -44,7 +71,16 @@ export default function UserProfile() {
           <h1 className="text-2xl font-bold text-slate-900">{formData.fullName}</h1>
           <p className="text-slate-500 flex items-center mt-1">
             <ShieldCheck className="w-4 h-4 mr-1 text-emerald-600" /> 
-            Verified {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'}
+            Verified {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Buyer'}
+            {user?.role === 'buyer' && (
+              <span className="ml-2 text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
+                {formData.buyerPersona === 'restaurant' ? '🍽️ Restaurant / Food Service' :
+                 formData.buyerPersona === 'wholesale_trader' ? '🏢 APMC Mandi Trader' :
+                 formData.buyerPersona === 'retail_supermarket' ? '🛒 Retail Grocery Chain' :
+                 formData.buyerPersona === 'institutional' ? '🏫 Institutional Canteen' :
+                 '🏭 Food Processing Unit'}
+              </span>
+            )}
           </p>
         </div>
       </div>
@@ -52,7 +88,7 @@ export default function UserProfile() {
       {/* Form */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-          <h2 className="text-lg font-bold text-slate-900">Personal & Business Information</h2>
+          <h2 className="text-lg font-bold text-slate-900">Personal & Business Credentials</h2>
           {successMsg && (
             <span className="text-sm font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
               {successMsg}
@@ -104,7 +140,7 @@ export default function UserProfile() {
 
             <div className="space-y-2">
               <label className="flex items-center text-sm font-medium text-slate-700">
-                <MapPin className="w-4 h-4 mr-2 text-slate-400" /> Location / Address
+                <MapPin className="w-4 h-4 mr-2 text-slate-400" /> Location / APMC Mandi (Maharashtra)
               </label>
               <input 
                 type="text" 
@@ -115,33 +151,144 @@ export default function UserProfile() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="flex items-center text-sm font-medium text-slate-700">
-                <Building className="w-4 h-4 mr-2 text-slate-400" /> Company / Farm Name
-              </label>
-              <input 
-                type="text" 
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" 
-              />
-            </div>
+            {/* BUYER PERSONA & BUSINESS SECTION */}
+            {user?.role === 'buyer' && (
+              <>
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-medium text-slate-700">
+                    <Building className="w-4 h-4 mr-2 text-slate-400" /> Buyer Persona / Category
+                  </label>
+                  <select
+                    name="buyerPersona"
+                    value={formData.buyerPersona}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 bg-white font-semibold text-slate-800"
+                  >
+                    <option value="food_processing">🏭 Food Processing Unit (Pulp, Flour, Sauces)</option>
+                    <option value="restaurant">🍽️ Restaurant / Cloud Kitchen / Hospitality Chain</option>
+                    <option value="wholesale_trader">🏢 Wholesale APMC Trader / Commission Agent</option>
+                    <option value="retail_supermarket">🛒 Supermarket / Retail Grocery Chain</option>
+                    <option value="institutional">🏫 Institutional Canteen / Bulk Catering</option>
+                  </select>
+                </div>
 
-            <div className="space-y-2">
-              <label className="flex items-center text-sm font-medium text-slate-700">
-                <ShieldCheck className="w-4 h-4 mr-2 text-slate-400" /> GSTIN / Tax ID
-              </label>
-              <input 
-                type="text" 
-                name="gstin"
-                value={formData.gstin}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 bg-slate-50"
-                readOnly 
-              />
-              <p className="text-xs text-slate-500">Contact admin to change tax identifier.</p>
-            </div>
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-medium text-slate-700">
+                    <Building className="w-4 h-4 mr-2 text-slate-400" /> Registered Business / Unit Name
+                  </label>
+                  <input 
+                    type="text" 
+                    name="companyName"
+                    value={formData.companyName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-medium text-slate-700">
+                    <ShieldCheck className="w-4 h-4 mr-2 text-slate-400" /> FSSAI License Number (14 Digits)
+                  </label>
+                  <input 
+                    type="text" 
+                    maxLength={14}
+                    name="fssaiLicense"
+                    value={formData.fssaiLicense}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 font-mono" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-medium text-slate-700">
+                    <ShieldCheck className="w-4 h-4 mr-2 text-slate-400" /> GSTIN Tax ID (15 Characters)
+                  </label>
+                  <input 
+                    type="text" 
+                    maxLength={15}
+                    name="gstin"
+                    value={formData.gstin}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 font-mono uppercase" 
+                  />
+                </div>
+
+                {formData.buyerPersona === 'food_processing' && (
+                  <div className="space-y-2">
+                    <label className="flex items-center text-sm font-medium text-slate-700">
+                      Processing Capacity
+                    </label>
+                    <input 
+                      type="text" 
+                      name="processingCapacity"
+                      value={formData.processingCapacity}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" 
+                    />
+                  </div>
+                )}
+
+                {formData.buyerPersona === 'restaurant' && (
+                  <div className="space-y-2">
+                    <label className="flex items-center text-sm font-medium text-slate-700">
+                      Delivery Procurement Window
+                    </label>
+                    <input 
+                      type="text" 
+                      name="procurementWindow"
+                      value={formData.procurementWindow}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" 
+                    />
+                  </div>
+                )}
+
+                {formData.buyerPersona === 'wholesale_trader' && (
+                  <div className="space-y-2">
+                    <label className="flex items-center text-sm font-medium text-slate-700">
+                      APMC Trader License Code
+                    </label>
+                    <input 
+                      type="text" 
+                      name="mandiLicense"
+                      value={formData.mandiLicense}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 font-mono" 
+                    />
+                  </div>
+                )}
+              </>
+            )}
+
+            {user?.role !== 'buyer' && (
+              <>
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-medium text-slate-700">
+                    <Building className="w-4 h-4 mr-2 text-slate-400" /> Farm / Enterprise Name
+                  </label>
+                  <input 
+                    type="text" 
+                    name="companyName"
+                    value={formData.companyName}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center text-sm font-medium text-slate-700">
+                    <ShieldCheck className="w-4 h-4 mr-2 text-slate-400" /> GSTIN / Mandi ID
+                  </label>
+                  <input 
+                    type="text" 
+                    name="gstin"
+                    value={formData.gstin}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 font-mono" 
+                  />
+                </div>
+              </>
+            )}
 
           </div>
 

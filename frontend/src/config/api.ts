@@ -3,9 +3,8 @@
  */
 
 export const API_CONFIG = {
-  // Use Vite env variables, fallback to local dev
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1',
-  WS_URL: import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/v1/ws',
+  BASE_URL: import.meta.env.VITE_API_URL || '/api/v1',
+  WS_URL: import.meta.env.VITE_WS_URL || '/api/v1/ws',
   TIMEOUT: 15000,
   RETRY_ATTEMPTS: 2
 };

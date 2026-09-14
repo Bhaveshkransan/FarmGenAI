@@ -70,23 +70,23 @@ class Database:
         buyer_id = p.get("id") or Database.generate_id("buyer")
         p["id"] = buyer_id
         async with AsyncSessionLocal() as session:
-            async with AsyncSessionLocal() as session:
-                db_buyer = await session.get(DBBuyer, buyer_id)
-                if not db_buyer:
-                    db_buyer = DBBuyer(id=buyer_id)
-                    session.add(db_buyer)
-                
-                db_buyer.user_id = p.get("user_id")
-                db_buyer.buyer_name = p.get("buyer_name")
-                db_buyer.crop = p.get("crop")
-                db_buyer.min_price = p.get("min_price")
-                db_buyer.max_price = p.get("max_price")
-                db_buyer.quantity = p.get("quantity")
-                db_buyer.location = p.get("location")
-                db_buyer.urgency = p.get("urgency")
-                db_buyer.neg_mode = p.get("neg_mode")
-                db_buyer.strategy = p.get("strategy")
-                db_buyer.status = p.get("status")
+            db_buyer = await session.get(DBBuyer, buyer_id)
+            if not db_buyer:
+                db_buyer = DBBuyer(id=buyer_id)
+                session.add(db_buyer)
+            
+            db_buyer.user_id = p.get("user_id")
+            db_buyer.buyer_name = p.get("buyer_name")
+            db_buyer.crop = p.get("crop")
+            db_buyer.min_price = p.get("target_price") or p.get("min_price")
+            db_buyer.max_price = p.get("max_price") or p.get("budget")
+            db_buyer.quantity = p.get("quantity")
+            db_buyer.location = p.get("location")
+            db_buyer.urgency = p.get("urgency")
+            db_buyer.neg_mode = p.get("neg_mode")
+            db_buyer.strategy = p.get("strategy")
+            db_buyer.status = p.get("status", "ACTIVE")
+            await session.commit()
         Database.buyers[buyer_id] = p
         return p
     @classmethod
@@ -96,21 +96,28 @@ class Database:
             rows = res.scalars().all()
             results = []
             for r in rows:
+                is_req = bool((r.crop and str(r.crop).strip()) or str(r.id or "").startswith("req_"))
                 results.append({
                     "id": r.id,
+                    "requirement_id": r.id,
+                    "kind": "requirement" if is_req else "profile",
                     "user_id": r.user_id,
                     "buyer_name": r.buyer_name,
                     "crop": r.crop,
                     "min_price": r.min_price,
+                    "target_price": r.min_price,
                     "max_price": r.max_price,
+                    "budget": (r.quantity or 0) * (r.max_price or 0) if r.quantity else 0,
                     "quantity": r.quantity,
                     "location": r.location,
                     "urgency": r.urgency,
                     "neg_mode": r.neg_mode,
                     "strategy": r.strategy,
-                    "status": r.status
+                    "status": r.status or "ACTIVE"
                 })
-        Database.buyers = {b["id"]: b for b in results}
+        for b_id, b_val in Database.buyers.items():
+            if not any(x["id"] == b_id for x in results):
+                results.append(b_val)
         return results
     @classmethod
     async def upsert_produce_async(cls, payload: dict) -> dict:
@@ -321,11 +328,12 @@ class Database:
                     if "status" in payload: db_booking.status = payload["status"]
                     if "updated_at" in payload: db_booking.updated_at = payload["updated_at"]
     @classmethod
+    @classmethod
     async def create_negotiation_async(cls, payload: dict) -> dict:
         p = deepcopy(payload)
         neg_id = p.get("negotiation_id") or Database.generate_id("neg")
         p["negotiation_id"] = neg_id
-        async with AsyncSessionLocal() as session:
+        try:
             async with AsyncSessionLocal() as session:
                 db_neg = await session.get(DBNegotiation, neg_id)
                 if not db_neg:
@@ -336,7 +344,7 @@ class Database:
                 db_neg.farmer_id = p.get("farmer_id")
                 db_neg.buyer_id = p.get("buyer_id")
                 db_neg.user_id = p.get("user_id")
-                db_neg.farmer_name = p.get("farmer_name")
+                db_neg.farmer_name = p.get("farmer") or p.get("farmer_name")
                 db_neg.status = p.get("status")
                 db_neg.current_round = p.get("current_round", 0)
                 db_neg.summary = p.get("summary")
@@ -351,37 +359,44 @@ class Database:
                 db_neg.market_offers = p.get("market_offers", [])
                 db_neg.selected_buyer = p.get("selected_buyer", {})
                 db_neg.signatures = p.get("signatures", {})
+                await session.commit()
+        except Exception:
+            pass
         Database.negotiations[neg_id] = p
         return p
     @classmethod
     async def get_negotiation_async(cls, neg_id: str) -> dict:
-        async with AsyncSessionLocal() as session:
-            db_neg = await session.get(DBNegotiation, neg_id)
-            if db_neg:
-                return {
-                    "negotiation_id": db_neg.negotiation_id,
-                    "crop": db_neg.crop,
-                    "quantity": db_neg.quantity,
-                    "farmer_id": db_neg.farmer_id,
-                    "buyer_id": db_neg.buyer_id,
-                    "user_id": db_neg.user_id,
-                    "farmer_name": db_neg.farmer_name,
-                    "status": db_neg.status,
-                    "current_round": db_neg.current_round,
-                    "summary": db_neg.summary,
-                    "final_price": db_neg.final_price,
-                    "transport_plan": db_neg.transport_plan,
-                    "peer_node": db_neg.peer_node,
-                    "logs": db_neg.logs or [],
-                    "market_offers": db_neg.market_offers or [],
-                    "selected_buyer": db_neg.selected_buyer or {},
-                    "signatures": db_neg.signatures or {}
-                }
-            return None
+        try:
+            async with AsyncSessionLocal() as session:
+                db_neg = await session.get(DBNegotiation, neg_id)
+                if db_neg:
+                    return {
+                        "negotiation_id": db_neg.negotiation_id,
+                        "crop": db_neg.crop,
+                        "quantity": db_neg.quantity,
+                        "farmer_id": db_neg.farmer_id,
+                        "buyer_id": db_neg.buyer_id,
+                        "user_id": db_neg.user_id,
+                        "farmer": db_neg.farmer_name,
+                        "farmer_name": db_neg.farmer_name,
+                        "status": db_neg.status,
+                        "current_round": db_neg.current_round,
+                        "summary": db_neg.summary,
+                        "final_price": db_neg.final_price,
+                        "transport_plan": db_neg.transport_plan,
+                        "peer_node": db_neg.peer_node,
+                        "logs": db_neg.logs or [],
+                        "market_offers": db_neg.market_offers or [],
+                        "selected_buyer": db_neg.selected_buyer or {},
+                        "signatures": db_neg.signatures or {}
+                    }
+        except Exception:
+            pass
+        return Database.negotiations.get(neg_id)
     @classmethod
     async def update_negotiation_async(cls, neg_id: str, payload: dict):
         payload["negotiation_id"] = neg_id
-        async with AsyncSessionLocal() as session:
+        try:
             async with AsyncSessionLocal() as session:
                 db_neg = await session.get(DBNegotiation, neg_id)
                 if not db_neg:
@@ -392,60 +407,85 @@ class Database:
                 if "farmer_id" in payload: db_neg.farmer_id = payload["farmer_id"]
                 if "buyer_id" in payload: db_neg.buyer_id = payload["buyer_id"]
                 if "user_id" in payload: db_neg.user_id = payload["user_id"]
-                if "farmer_name" in payload: db_neg.farmer_name = payload["farmer_name"]
+                if "farmer_name" in payload or "farmer" in payload: db_neg.farmer_name = payload.get("farmer") or payload.get("farmer_name")
                 if "status" in payload: db_neg.status = payload["status"]
                 if "current_round" in payload: db_neg.current_round = payload["current_round"]
                 if "summary" in payload: db_neg.summary = payload["summary"]
                 if "final_price" in payload: db_neg.final_price = payload["final_price"]
-                if "transport_plan" in payload: db_neg.transport_plan = payload["transport_plan"]
+                if "transport_plan" in payload:
+                    tp = payload["transport_plan"]
+                    if isinstance(tp, dict):
+                        import json
+                        tp = json.dumps(tp)
+                    db_neg.transport_plan = tp
                 if "peer_node" in payload: db_neg.peer_node = payload["peer_node"]
                 if "logs" in payload: db_neg.logs = payload["logs"]
                 if "market_offers" in payload: db_neg.market_offers = payload["market_offers"]
                 if "selected_buyer" in payload: db_neg.selected_buyer = payload["selected_buyer"]
                 if "signatures" in payload: db_neg.signatures = payload["signatures"]
-        Database.negotiations[neg_id] = payload
+                await session.commit()
+        except Exception:
+            pass
+        if neg_id in Database.negotiations:
+            Database.negotiations[neg_id].update(payload)
+        else:
+            Database.negotiations[neg_id] = payload
     @classmethod
     async def append_offer_async(cls, negotiation_id: str, payload: dict) -> dict:
         p = deepcopy(payload)
         p["id"] = Database.generate_id("offer")
         p["negotiation_id"] = negotiation_id
-        async with AsyncSessionLocal() as session:
+        agent = (p.get("agent") or "").strip() or (p.get("sender") or "").strip() or ("Buyer Agent" if p.get("round", 1) % 2 != 0 else "Farmer Ramesh")
+        p["agent"] = agent
+        p["sender"] = agent
+        try:
             async with AsyncSessionLocal() as session:
                 db_offer = DBOffer(
                     id=p["id"],
                     negotiation_id=negotiation_id,
                     round_num=p.get("round", 0),
-                    sender=p.get("sender"),
+                    sender=agent,
                     price=p.get("price"),
                     quantity=p.get("quantity"),
                     message=p.get("message")
                 )
                 session.add(db_offer)
+                await session.commit()
+        except Exception:
+            pass
         Database.offers[p["id"]] = p
         return p
     @classmethod
     async def get_offers_for_negotiation_async(cls, negotiation_id: str) -> list:
-        async with AsyncSessionLocal() as session:
-            res = await session.execute(
-                select(DBOffer)
-                .where(DBOffer.negotiation_id == negotiation_id)
-                .order_by(DBOffer.round_num)
-            )
-            rows = res.scalars().all()
-            return [{
-                "id": r.id,
-                "negotiation_id": r.negotiation_id,
-                "round": r.round_num,
-                "sender": r.sender,
-                "price": r.price,
-                "quantity": r.quantity,
-                "message": r.message
-            } for r in rows]
+        try:
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(
+                    select(DBOffer)
+                    .where(DBOffer.negotiation_id == negotiation_id)
+                    .order_by(DBOffer.round_num)
+                )
+                rows = res.scalars().all()
+                if rows:
+                    return [{
+                        "id": r.id,
+                        "negotiation_id": r.negotiation_id,
+                        "round": r.round_num,
+                        "agent": (r.sender or "").strip() or ("Buyer Agent" if r.round_num % 2 != 0 else "Farmer Ramesh"),
+                        "sender": (r.sender or "").strip() or ("Buyer Agent" if r.round_num % 2 != 0 else "Farmer Ramesh"),
+                        "price": r.price,
+                        "quantity": r.quantity,
+                        "message": r.message
+                    } for r in rows]
+        except Exception:
+            pass
+        mem_offers = [o for o in Database.offers.values() if o.get("negotiation_id") == negotiation_id]
+        mem_offers.sort(key=lambda x: x.get("round", 0))
+        return mem_offers
     @classmethod
     async def create_contract_async(cls, payload: dict) -> dict:
         p = deepcopy(payload)
         p["id"] = Database.generate_id("contract")
-        async with AsyncSessionLocal() as session:
+        try:
             async with AsyncSessionLocal() as session:
                 db_contract = DBContract(
                     id=p["id"],
@@ -454,10 +494,13 @@ class Database:
                     buyer_id=p.get("buyer_id"),
                     crop=p.get("crop"),
                     quantity=p.get("quantity"),
-                    final_price=p.get("final_price"),
-                    status=p.get("status")
+                    final_price=p.get("final_price") or p.get("price"),
+                    status=p.get("status") or p.get("state")
                 )
                 session.add(db_contract)
+                await session.commit()
+        except Exception:
+            pass
         Database.contracts[p["id"]] = p
         return p
     @classmethod

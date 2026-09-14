@@ -1,23 +1,29 @@
 import React, { useState } from 'react';
-import { FileSignature, Download, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react';
+import { FileSignature, Download, ShieldCheck, CheckCircle2, Loader2, ExternalLink, FileText } from 'lucide-react';
 import { formatCurrency } from '@/utils/formatters';
 import { api } from '@/services/api';
 import { useNotification } from '@/contexts/NotificationContext';
+import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
 
 export default function AgreementPreview({ dealData, onSignAndClose }) {
   const [isSigning, setIsSigning] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const { addNotification } = useNotification();
+
+  const rawId = dealData?.id || dealData?.negotiation_id || 'deal';
+  const cleanId = String(rawId).replace('neg_', '').toUpperCase();
+  const transactionId = `TXN-MH-2026-${cleanId}`;
 
   const handleSign = async () => {
     setIsSigning(true);
     try {
       const token = localStorage.getItem('agri_token');
       if (token !== 'mock_token') {
-        // Trigger smart contract / RL feedback update
-        await api.post(`/negotiations/${dealData.id}/accept`);
+        const targetId = dealData.id || dealData.negotiation_id;
+        await api.post(`/negotiations/${targetId}/accept`);
       }
       addNotification('success', 'Agreement cryptographically signed and stored.');
-      onSignAndClose();
+      setShowModal(true);
     } catch (err) {
       addNotification('error', 'Failed to sign agreement.');
     } finally {
@@ -26,80 +32,96 @@ export default function AgreementPreview({ dealData, onSignAndClose }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden sticky top-6 animate-in fade-in slide-in-from-right-4 duration-500">
-      
-      {/* Header */}
-      <div className="bg-emerald-600 p-5 text-white">
-        <div className="flex items-center gap-2 mb-1">
-          <ShieldCheck size={20} className="text-emerald-200" />
-          <h3 className="font-bold text-lg">Final Agreement Preview</h3>
+    <>
+      <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden sticky top-6 animate-in fade-in slide-in-from-right-4 duration-500">
+        
+        {/* Header */}
+        <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 p-4 text-white">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck size={18} className="text-emerald-200" />
+              <h3 className="font-bold text-base">Final Agreement</h3>
+            </div>
+            <span className="text-[10px] bg-emerald-800/80 px-2 py-0.5 rounded font-mono font-bold text-emerald-200 border border-emerald-500/30">
+              {transactionId}
+            </span>
+          </div>
+          <p className="text-emerald-100 text-xs">Maharashtra APMC Validated Smart Contract</p>
         </div>
-        <p className="text-emerald-100 text-sm">Smart Contract execution pending signature.</p>
-      </div>
-      
-      {/* Contract Body */}
-      <div className="p-6">
-        <div className="border border-slate-200 rounded-xl bg-slate-50 p-4 font-mono text-sm text-slate-700 space-y-4 shadow-inner">
-          <div className="text-center font-bold text-slate-800 pb-2 border-b border-slate-200 uppercase tracking-widest">
-            Term Sheet - {dealData.crop}
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-slate-400 text-xs uppercase mb-1">Seller</p>
-              <p className="font-bold">{dealData.farmer}</p>
+        
+        {/* Contract Body */}
+        <div className="p-4 space-y-3">
+          <div className="border border-slate-200 rounded-xl bg-slate-50 p-3 font-mono text-xs text-slate-700 space-y-2.5 shadow-inner">
+            <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+              <span className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                Term Sheet • {dealData.crop || 'Produce'}
+              </span>
+              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
+                Grade A
+              </span>
             </div>
-            <div>
-              <p className="text-slate-400 text-xs uppercase mb-1">Buyer</p>
-              <p className="font-bold">{dealData.buyer}</p>
+            
+            <div className="grid grid-cols-2 gap-2 text-[11px]">
+              <div>
+                <p className="text-slate-400 uppercase text-[9px]">Seller</p>
+                <p className="font-bold text-slate-800 truncate">{dealData.farmer || dealData.farmer_name || 'Farmer Agent'}</p>
+              </div>
+              <div>
+                <p className="text-slate-400 uppercase text-[9px]">Buyer</p>
+                <p className="font-bold text-slate-800 truncate">{dealData.buyer || dealData.buyer_name || 'Buyer Enterprise'}</p>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <p className="text-slate-400 text-xs uppercase mb-1">Commodity Terms</p>
-            <p>{dealData.quantity} kg of {dealData.crop} (Grade A)</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 bg-white p-3 rounded-lg border border-slate-200">
-            <div>
-              <p className="text-slate-400 text-xs uppercase mb-1">Final Price</p>
-              <p className="font-bold text-emerald-600">{formatCurrency(dealData.price)}/kg</p>
+            <div className="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center text-[11px]">
+              <div>
+                <p className="text-slate-400 text-[9px] uppercase">Final Price</p>
+                <p className="font-bold text-emerald-600 text-sm">{formatCurrency(dealData.price)}/kg</p>
+              </div>
+              <div className="text-right">
+                <p className="text-slate-400 text-[9px] uppercase">Total Value</p>
+                <p className="font-bold text-slate-800 text-sm">{formatCurrency(dealData.price * (dealData.quantity || 500))}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-slate-400 text-xs uppercase mb-1">Total Value</p>
-              <p className="font-bold text-slate-800">{formatCurrency(dealData.price * dealData.quantity)}</p>
-            </div>
-          </div>
 
-          <div>
-            <p className="text-slate-400 text-xs uppercase mb-1">Logistics</p>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Delivery Date: {dealData.deliveryDate}</li>
-              <li>Transport: Managed by Seller (Included)</li>
-              <li>Quality Dispute: 24hr Window</li>
-            </ul>
+            <div className="text-[10px] text-slate-500 space-y-0.5 pt-1 border-t border-slate-200">
+              <p>• Volume: {dealData.quantity || 500} kg • Delivery: {dealData.deliveryDate || 'Within 24-48h'}</p>
+              <p>• Transport: Multi-Modal APMC Freight Included</p>
+            </div>
           </div>
         </div>
+
+        {/* Footer Actions */}
+        <div className="p-3 border-t border-slate-100 bg-slate-50 flex flex-col gap-2">
+          <button 
+            onClick={() => setShowModal(true)}
+            className="w-full py-2.5 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-sm"
+          >
+            <FileText size={15} /> Open Validated Term Sheet
+          </button>
+          <button 
+            onClick={handleSign}
+            disabled={isSigning}
+            className="w-full py-2 flex items-center justify-center gap-1.5 text-slate-700 hover:bg-slate-200 bg-white border border-slate-200 font-bold text-xs rounded-xl transition"
+          >
+            {isSigning ? (
+              <><Loader2 size={14} className="animate-spin" /> Signing...</>
+            ) : (
+              <><FileSignature size={14} /> Execute & Validate</>
+            )}
+          </button>
+        </div>
+        
       </div>
 
-      {/* Footer Actions */}
-      <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-3">
-        <button 
-          onClick={handleSign}
-          disabled={isSigning}
-          className="w-full py-3 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow-sm disabled:opacity-50"
-        >
-          {isSigning ? (
-            <><Loader2 size={18} className="animate-spin" /> Cryptographically Signing...</>
-          ) : (
-            <><FileSignature size={18} /> Sign & Execute Contract</>
-          )}
-        </button>
-        <button className="w-full py-2 flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-200 bg-white border border-slate-200 font-bold rounded-xl transition">
-          <Download size={16} /> Download Draft PDF
-        </button>
-      </div>
-      
-    </div>
+      {/* Pop-up Transaction Validation Modal */}
+      <TransactionValidationModal
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false);
+          if (onSignAndClose) onSignAndClose();
+        }}
+        dealData={dealData}
+      />
+    </>
   );
 }

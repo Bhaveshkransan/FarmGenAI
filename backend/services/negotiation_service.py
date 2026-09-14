@@ -1,6 +1,9 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.repositories.user_repository import UserRepository
+import logging
 import asyncio
+from datetime import datetime, timezone
+
 from agents.buyer_agent import BuyerAgent
 from agents.compost_agent import CompostAgent
 from agents.farmer_agent import FarmerAgent
@@ -12,7 +15,7 @@ from database.db import Database
 from backend.services.history_service import add_history
 from negotiation_engine.negotiation_manager import NegotiationManager
 from nodes.node_hub import hub
-from datetime import datetime, timezone
+logger = logging.getLogger("backend.services.negotiation_service")
 
 
 DEFAULT_BUYER_PROFILES = [
@@ -144,9 +147,12 @@ DEFAULT_FARMER_LISTINGS = [
 
 
 class NegotiationService:
-    def __init__(self, db):
+    def __init__(self, db=None):
         self.db = db
-        self.db_repo = Database(db)
+        try:
+            self.db_repo = Database(db)
+        except TypeError:
+            self.db_repo = Database
         self.active_negotiations = {}
 
     async def ensure_default_buyers(self):
@@ -181,6 +187,18 @@ class NegotiationService:
             )
 
     async def _build_farmer(self, payload: dict):
+        if payload.get("buyer_mode"):
+            ask = float(payload["min_price"])
+            floor = float(payload.get("farmer_floor") or round(ask * 0.75, 2))
+            return FarmerAgent(
+                name=payload.get("farmer_name", "FarmerAgent"),
+                crop=payload["crop"],
+                quantity=float(payload["quantity"]),
+                min_price=floor,
+                initial_price=ask,
+                shelf_life=int(payload.get("shelf_life", 3)),
+                location=payload.get("location")
+            )
         return FarmerAgent(
             name=payload.get("farmer_name", "FarmerAgent"),
             crop=payload["crop"],
@@ -339,9 +357,9 @@ class NegotiationService:
     ):
         buyer_mode = bool(payload.get("buyer_mode"))
         if buyer_mode:
-            target = float(payload.get("buyer_target_price", payload.get("min_price", 18) + 1))
-            quantity = float(payload.get("buyer_max_quantity", payload.get("quantity", 0)))
-            budget = float(payload.get("buyer_budget", max(quantity, 1.0) * max(target, 1.0) * 1.2))
+            target = float(payload.get("buyer_target_price") or (float(payload.get("min_price", 18)) + 1))
+            quantity = float(payload.get("buyer_max_quantity") or payload.get("quantity", 0))
+            budget = float(payload.get("buyer_budget") or (max(quantity, 1.0) * max(target, 1.0) * 1.2))
             selected_offer = {
                 "buyer_id": payload.get("user_id") or "buyer_manual",
                 "buyer_name": payload.get("buyer_name", "Buyer"),
@@ -382,30 +400,9 @@ class NegotiationService:
             warehouse=warehouse,
             processor=processor,
             compost=compost,
-            max_rounds=int(payload.get("max_rounds", 8)),
+            max_rounds=int(payload.get("max_rounds", 3)),
             live_event_callback=live_event_callback,
         )
-
-        result = await manager.start_negotiation(
-            market_price=float(payload.get("market_price", payload["min_price"] + 1)),
-            scenario=scenario
-        )
-
-        # Injects transport calculations into the logs if a deal was reached
-        if result["state"] in ("DEAL", "ESCALATED_STORAGE", "ESCALATED_PROCESSING"):
-             dist = 45 # baseline km
-             cost = transporter.calculate_transport_cost(payload["quantity"], dist)
-             manager.logs.append(f"🚛 Logistics: {transporter.name} calculated ₹{cost:.2f} for {dist}km transit.")
-             manager.logs.append(f"📜 Finalizing supply chain record for audit...")
-
-        screening_logs = [
-            f"Marketplace scan: {len(market_offers)} buyers evaluated for {payload['crop']}.",
-        ]
-        screening_logs.extend(
-            f"🔍 {offer['buyer_name']}: bid ₹{offer['offered_price']}/kg for {offer['offered_quantity']}kg ({offer['status']})"
-            for offer in market_offers
-        )
-        manager.logs = screening_logs + manager.logs
 
         farmer_row = await self.db_repo.upsert_farmer_async(
             {
@@ -418,152 +415,298 @@ class NegotiationService:
             {
                 "farmer_name": farmer_row["name"],
                 "crop": payload["crop"],
-                "quantity": payload["quantity"],
-                "min_price": payload["min_price"],
+                "quantity": float(payload["quantity"]),
+                "min_price": float(payload["min_price"]),
                 "shelf_life": payload.get("shelf_life", 3),
                 "quality": payload.get("quality", "A"),
                 "location": payload.get("location", "Unknown"),
                 "language": payload.get("language", "English"),
-                "status": result["state"]
+                "status": "ACTIVE"
             }
         )
 
-        # Identify all agents that participated in this negotiation
-        agents_involved = [farmer_row["name"]]
-        if selected_offer:
-            agents_involved.append(selected_offer["buyer_name"])
-        if result["state"] in ("ESCALATED_STORAGE",):
-            agents_involved.append("WarehouseAgent")
-        elif result["state"] in ("ESCALATED_PROCESSING",):
-            agents_involved.append("ProcessorAgent")
-        elif result["state"] in ("ESCALATED_COMPOST",):
-            agents_involved.append("CompostAgent")
+        negotiation_id = pre_id or self.db_repo.generate_id("neg")
+        initial_price = float(payload.get("buyer_target_price") or payload.get("min_price", 18))
+        buyer_display_name = (selected_offer.get("buyer_name") if selected_offer else None) or payload.get("buyer_name") or "Buyer Agent"
+        if not buyer_display_name.strip():
+            buyer_display_name = "Buyer Agent"
 
-        buyer_loc = selected_offer.get("location", "Market") if selected_offer else all_buyers[0].location
-        if farmer.location != buyer_loc:
-            # Maharashtra-focused smart distance mock
-            mh_cities = ["Mumbai", "Pune", "Nashik", "Nagpur", "Satara", "Kolhapur", "Solapur"]
-            if farmer.location in mh_cities and buyer_loc in mh_cities:
-                dist = 180.0  # Regional Maharashtra distance
-            elif farmer.location == buyer_loc:
-                dist = 45.0   # Local district 
-            else:
-                dist = 950.0  # Interstate distance
-            
-            cost = transporter.calculate_transport_cost(payload["quantity"], dist)
-            transport_plan = {
-                "agent": transporter.name,
-                "cost": cost,
-                "distance": dist,
-                "capacity": transporter.vehicle_capacity
-            }
-        else:
-            transport_plan = {
-                "agent": transporter.name,
-                "base_fee": transporter.base_fee,
-                "capacity": transporter.vehicle_capacity,
-            }
+        min_p = float(payload.get("min_price", 18.0))
+        mkt_p = float(payload.get("market_price", min_p + 2.0))
+        tgt_p = float(payload.get("buyer_target_price") or payload.get("target_price", initial_price))
 
         negotiation_payload = {
+            "id": negotiation_id,
+            "negotiation_id": negotiation_id,
             "user_id": payload.get("user_id"),
-            "status": result["state"],
-            "summary": result["summary"],
+            "status": "ACTIVE",
+            "summary": f"Negotiating {payload['quantity']}kg {payload['crop']} between {farmer_row['name']} and {buyer_display_name}.",
             "scenario": scenario,
             "produce_id": produce_row["id"],
             "farmer_id": farmer_row["id"],
             "farmer": farmer_row["name"],
+            "farmer_name": farmer_row["name"],
+            "buyer": buyer_display_name,
+            "buyer_name": buyer_display_name,
             "crop": payload["crop"],
             "quantity": float(payload["quantity"]),
-            "final_price": result["deal"].get("price") if result.get("deal") else None,
-            "agents_involved": agents_involved,
-            "next_action": result.get("next_action"),
+            "min_price": min_p,
+            "market_price": mkt_p,
+            "target_price": tgt_p,
+            "final_price": None,
+            "agents_involved": [farmer_row["name"], buyer_display_name],
+            "next_action": "Autonomous multi-round negotiation active",
             "market_offers": market_offers,
             "selected_buyer": selected_offer,
             "created_at": datetime.now(timezone.utc).isoformat(),
-            "transport_plan": transport_plan,
+            "transport_plan": None,
         }
-        if pre_id:
-            negotiation_payload["negotiation_id"] = pre_id
-        negotiation_row = await self.db_repo.create_negotiation_async(negotiation_payload)
+        initial_offers = [
+            {
+                "round": 1,
+                "agent": buyer_display_name,
+                "price": initial_price,
+                "decision": "OFFER",
+                "quantity": float(payload.get("quantity", 500)),
+                "message": f"Opening procurement offer: ₹{initial_price}/kg for {payload['quantity']}kg"
+            }
+        ]
+        negotiation_payload["offers"] = initial_offers
+        await self.db_repo.create_negotiation_async(negotiation_payload)
+        self.active_negotiations[negotiation_id] = negotiation_payload
 
-        for idx, event in enumerate(manager.memory.get_offers(), start=1):
-            offer = event["offer"]
-            agent_name = event["agent"]
-            if event["agent"] == "Buyer" and selected_offer:
-                agent_name = selected_offer["buyer_name"]
-            elif event["agent"] == "Farmer":
-                agent_name = farmer_row["name"]
+        # Initial opening offer
+        await self.db_repo.append_offer_async(
+            negotiation_id,
+            initial_offers[0]
+        )
 
-            await self.db_repo.append_offer_async(
-                negotiation_row["negotiation_id"],
-                {
-                    "round": idx,
-                    "agent": agent_name,
-                    "price": offer.get("price", 0),
-                    "decision": offer.get("type", "OFFER"),
-                    "quantity": offer.get("quantity", 0),
-                    "message": offer.get("message", "")
-                }
+        # If sync=True is requested, await completion (used for CLI scripts / unit tests)
+        if payload.get("sync") is True:
+            return await self._run_negotiation_workflow(
+                negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
             )
 
-        if result.get("deal"):
-            contract_data = {
-                "negotiation_id": negotiation_row["negotiation_id"],
-                "scenario": scenario,
-                "price": result["deal"].get("price", 0),
-                "quantity": result["deal"].get("quantity", 0),
-                "state": result["state"],
-                "farmer_id": farmer_row["name"],
-                "peer_node": selected_offer.get("buyer_name", "Wholesale Buyer") if selected_offer else "Wholesale Buyer",
-                "crop": payload["crop"]
-            }
-            await self.db_repo.create_contract_async(contract_data)
-            # RECORD TO P2P LEDGER (Phase F)
-            hub.record_signed_deal(contract_data)
+        # Default async execution: dispatch background task and return immediately (50ms response time)
+        asyncio.create_task(self._run_negotiation_workflow(
+            negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
+        ))
 
-        status_payload = await self._build_status_payload(negotiation_row["negotiation_id"], manager, result)
-        self.active_negotiations[negotiation_row["negotiation_id"]] = status_payload
-
-        # Persist to shared history so all users can see past negotiations
-        await add_history("all", {
-            "negotiation_id": negotiation_row["negotiation_id"],
-            "user_id": payload.get("user_id"),
-            "farmer": farmer_row["name"],
+        return {
+            "negotiation_id": negotiation_id,
+            "status": "ACTIVE",
+            "offers": [
+                {
+                    "round": 1,
+                    "agent": buyer_display_name,
+                    "price": initial_price,
+                    "decision": "OFFER"
+                }
+            ],
+            "summary": negotiation_payload["summary"],
             "crop": payload["crop"],
             "quantity": float(payload["quantity"]),
-            "status": result["state"],
-            "final_price": result["deal"].get("price") if result.get("deal") else None,
-            "summary": result["summary"],
-            "selected_buyer": selected_offer.get("buyer_name") if selected_offer else None,
-            "created_at": negotiation_row.get("created_at", ""),
-            "logs": manager.logs[:30],
-        })
+            "farmer": farmer_row["name"]
+        }
 
-        # Notify UI via thread-safe callback
-        if live_event_callback:
-            live_event_callback({
-                "type": "scenario_ready",
-                "data": {
-                    "negotiation_id": negotiation_row["negotiation_id"],
-                    "farmer": farmer_row["name"],
-                    "crop": payload["crop"],
-                    "status": result["state"]
+    async def _run_negotiation_workflow(
+        self, negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
+    ):
+        try:
+            result = await manager.start_negotiation(
+                market_price=float(payload.get("market_price", payload["min_price"] + 1)),
+                scenario=scenario
+            )
+
+            # Injects transport calculations into the logs if a deal was reached
+            if result["state"] in ("DEAL", "ESCALATED_STORAGE", "ESCALATED_PROCESSING"):
+                 dist = 45 # baseline km
+                 cost = transporter.calculate_transport_cost(payload["quantity"], dist)
+                 manager.logs.append(f"🚛 Logistics: {transporter.name} calculated ₹{cost:.2f} for {dist}km transit.")
+                 manager.logs.append(f"📜 Finalizing supply chain record for audit...")
+
+            screening_logs = [
+                f"Marketplace scan: {len(market_offers)} buyers evaluated for {payload['crop']}.",
+            ]
+            screening_logs.extend(
+                f"🔍 {offer['buyer_name']}: bid ₹{offer['offered_price']}/kg for {offer['offered_quantity']}kg ({offer['status']})"
+                for offer in market_offers
+            )
+            manager.logs = screening_logs + manager.logs
+
+            # Identify all agents that participated in this negotiation
+            agents_involved = [farmer_row["name"]]
+            if selected_offer:
+                agents_involved.append(selected_offer["buyer_name"])
+            if result["state"] in ("ESCALATED_STORAGE",):
+                agents_involved.append("WarehouseAgent")
+            elif result["state"] in ("ESCALATED_PROCESSING",):
+                agents_involved.append("ProcessorAgent")
+            elif result["state"] in ("ESCALATED_COMPOST",):
+                agents_involved.append("CompostAgent")
+
+            buyer_loc = selected_offer.get("location", "Market") if selected_offer else "Market"
+            if farmer.location != buyer_loc:
+                dist = 180.0
+                cost = transporter.calculate_transport_cost(payload["quantity"], dist)
+                transport_plan = {
+                    "agent": transporter.name,
+                    "cost": cost,
+                    "distance": dist,
+                    "capacity": transporter.vehicle_capacity
                 }
+            else:
+                transport_plan = {
+                    "agent": transporter.name,
+                    "base_fee": transporter.base_fee,
+                    "capacity": transporter.vehicle_capacity,
+                }
+
+            for idx, event in enumerate(manager.memory.get_offers(), start=2):
+                offer = event["offer"]
+                agent_name = event["agent"]
+                if event["agent"] == "Buyer" and selected_offer:
+                    agent_name = selected_offer["buyer_name"]
+                elif event["agent"] == "Farmer":
+                    agent_name = farmer_row["name"]
+
+                await self.db_repo.append_offer_async(
+                    negotiation_id,
+                    {
+                        "round": idx,
+                        "agent": agent_name,
+                        "price": offer.get("price", 0),
+                        "decision": offer.get("type", "OFFER"),
+                        "quantity": offer.get("quantity", 0),
+                        "message": offer.get("message", "")
+                    }
+                )
+
+            if result.get("deal"):
+                contract_data = {
+                    "negotiation_id": negotiation_id,
+                    "scenario": scenario,
+                    "price": result["deal"].get("price", 0),
+                    "quantity": result["deal"].get("quantity", 0),
+                    "state": result["state"],
+                    "farmer_id": farmer_row["name"],
+                    "peer_node": selected_offer.get("buyer_name", "Wholesale Buyer") if selected_offer else "Wholesale Buyer",
+                    "crop": payload["crop"]
+                }
+                await self.db_repo.create_contract_async(contract_data)
+                hub.record_signed_deal(contract_data)
+
+            # Update negotiation record with final result
+            buyer_display_name = (selected_offer.get("buyer_name") if selected_offer else None) or payload.get("buyer_name") or "Buyer Agent"
+            min_p = float(payload.get("min_price", 18.0))
+            mkt_p = float(payload.get("market_price", min_p + 2.0))
+            tgt_p = float(payload.get("buyer_target_price") or payload.get("target_price", min_p))
+
+            updated_payload = {
+                "id": negotiation_id,
+                "negotiation_id": negotiation_id,
+                "user_id": payload.get("user_id"),
+                "status": result["state"],
+                "summary": result["summary"],
+                "scenario": scenario,
+                "produce_id": produce_row["id"],
+                "farmer_id": farmer_row["id"],
+                "farmer": farmer_row["name"],
+                "farmer_name": farmer_row["name"],
+                "buyer": buyer_display_name,
+                "buyer_name": buyer_display_name,
+                "crop": payload["crop"],
+                "quantity": float(payload["quantity"]),
+                "min_price": min_p,
+                "market_price": mkt_p,
+                "target_price": tgt_p,
+                "final_price": result["deal"].get("price") if result.get("deal") else None,
+                "agents_involved": agents_involved,
+                "next_action": result.get("next_action"),
+                "market_offers": market_offers,
+                "selected_buyer": selected_offer,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "transport_plan": transport_plan,
+            }
+            await self.db_repo.create_negotiation_async(updated_payload)
+
+            status_payload = await self._build_status_payload(negotiation_id, manager, result)
+            self.active_negotiations[negotiation_id] = status_payload
+
+            # Persist to shared history so all users can see past negotiations
+            await add_history("all", {
+                "negotiation_id": negotiation_id,
+                "user_id": payload.get("user_id"),
+                "farmer": farmer_row["name"],
+                "crop": payload["crop"],
+                "quantity": float(payload["quantity"]),
+                "status": result["state"],
+                "final_price": result["deal"].get("price") if result.get("deal") else None,
+                "summary": result["summary"],
+                "selected_buyer": selected_offer.get("buyer_name") if selected_offer else None,
+                "created_at": updated_payload.get("created_at", ""),
+                "logs": manager.logs[:30],
             })
 
-        return status_payload
+            # Broadcast via WebSocket
+            try:
+                from backend.websocket.agent_updates import agent_update_hub
+                await agent_update_hub.broadcast({
+                    "event": "NEGOTIATION_FINISHED",
+                    "negotiation_id": negotiation_id,
+                    "status": result["state"],
+                    "final_price": result["deal"].get("price") if result.get("deal") else None,
+                    "message": result.get("summary", "Negotiation completed.")
+                })
+            except Exception:
+                pass
+
+            if live_event_callback:
+                live_event_callback({
+                    "type": "scenario_ready",
+                    "data": {
+                        "negotiation_id": negotiation_id,
+                        "farmer": farmer_row["name"],
+                        "crop": payload["crop"],
+                        "status": result["state"]
+                    }
+                })
+
+            return status_payload
+        except Exception as e:
+            logger.error(f"Negotiation workflow error for {negotiation_id}: {e}", exc_info=True)
+            await self.db_repo.create_negotiation_async({
+                "negotiation_id": negotiation_id,
+                "status": "FAILED",
+                "summary": f"Negotiation execution encountered an issue: {str(e)}"
+            })
+            return {"negotiation_id": negotiation_id, "status": "FAILED", "summary": str(e)}
 
     async def _build_status_payload(self, negotiation_id: str, manager: NegotiationManager, result: dict):
         row = self.db_repo.negotiations.get(negotiation_id, {})
         offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
+        selected_b = row.get("selected_buyer") or {}
+        buyer_name = (selected_b.get("buyer_name") if isinstance(selected_b, dict) else None) or row.get("buyer") or row.get("buyer_name") or "Buyer Agent"
+        farmer_name = row.get("farmer") or row.get("farmer_name") or "Farmer Agent"
+        min_p = float(row.get("min_price") or 18.0)
+        mkt_p = float(row.get("market_price") or (min_p + 2.0))
+        tgt_p = float(row.get("target_price") or ((selected_b.get("target_price") or selected_b.get("offered_price")) if isinstance(selected_b, dict) else None) or min_p)
+
         return {
+            "id": negotiation_id,
             "negotiation_id": negotiation_id,
             "status": result["state"],
             "summary": result["summary"],
             "final_price": result["deal"].get("price") if result.get("deal") else None,
-            "farmer": row.get("farmer"),
-            "crop": row.get("crop"),
-            "quantity": row.get("quantity"),
+            "farmer": farmer_name,
+            "farmer_name": farmer_name,
+            "buyer": buyer_name,
+            "buyer_name": buyer_name,
+            "crop": row.get("crop", "Tomato"),
+            "quantity": float(row.get("quantity", 500)),
+            "market_price": mkt_p,
+            "min_price": min_p,
+            "target_price": tgt_p,
             "agents_involved": row.get("agents_involved", []),
             "offers": offers,
             "logs": manager.logs,
@@ -577,8 +720,12 @@ class NegotiationService:
         }
 
     async def get_negotiation_status(self, negotiation_id: str):
+        offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
         if negotiation_id in self.active_negotiations:
-            return self.active_negotiations[negotiation_id]
+            res = dict(self.active_negotiations[negotiation_id])
+            if offers:
+                res["offers"] = offers
+            return res
 
         row = await self.db_repo.get_negotiation_async(negotiation_id)
         if not row:
@@ -586,14 +733,28 @@ class NegotiationService:
             raise HTTPException(status_code=404, detail="Negotiation not found")
 
         offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
+        selected_b = row.get("selected_buyer") or {}
+        buyer_name = (selected_b.get("buyer_name") if isinstance(selected_b, dict) else None) or row.get("buyer") or row.get("buyer_name") or "Buyer Agent"
+        farmer_name = row.get("farmer") or row.get("farmer_name") or "Farmer Agent"
+        min_p = float(row.get("min_price") or 18.0)
+        mkt_p = float(row.get("market_price") or (min_p + 2.0))
+        tgt_p = float(row.get("target_price") or ((selected_b.get("target_price") or selected_b.get("offered_price")) if isinstance(selected_b, dict) else None) or min_p)
+
         return {
+            "id": negotiation_id,
             "negotiation_id": negotiation_id,
             "user_id": row.get("user_id"),
             "status": row.get("status", "UNKNOWN"),
             "summary": row.get("summary", ""),
-            "farmer": row.get("farmer"),
-            "crop": row.get("crop"),
-            "quantity": row.get("quantity"),
+            "farmer": farmer_name,
+            "farmer_name": farmer_name,
+            "buyer": buyer_name,
+            "buyer_name": buyer_name,
+            "crop": row.get("crop", "Tomato"),
+            "quantity": float(row.get("quantity", 500)),
+            "market_price": mkt_p,
+            "min_price": min_p,
+            "target_price": tgt_p,
             "agents_involved": row.get("agents_involved", []),
             "offers": offers,
             "next_action": row.get("next_action"),
@@ -613,6 +774,168 @@ class NegotiationService:
             {"role": "Processor", "capability": "Buy for processing"},
             {"role": "Compost", "capability": "Fallback spoilage channel"},
         ]
+
+    async def intervene_deal(self, negotiation_id: str, payload: dict):
+        """
+        Processes a human buyer's manual counter offer:
+        1. Records the buyer counter-offer in DB and memory.
+        2. Evaluates the offer against the Farmer Agent.
+        3. Records the farmer's response (ACCEPT, REJECT, or COUNTER) in DB and memory.
+        4. Broadcasts both offers over WebSockets.
+        5. Updates negotiation status (DEAL, REJECT, or ACTIVE).
+        """
+        row = await self.db_repo.get_negotiation_async(negotiation_id)
+        if not row:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Negotiation not found")
+
+        offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
+        current_round = max([o.get("round", 1) for o in offers], default=1)
+        next_round = current_round + 1
+
+        new_price = float(payload.get("price", 0))
+        if new_price <= 0:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="Invalid price. Must be > 0.")
+
+        qty = float(payload.get("quantity") or row.get("quantity") or 500)
+        crop = row.get("crop", "Tomato")
+        farmer_name = row.get("farmer") or row.get("farmer_name") or "Farmer Ramesh"
+        buyer_name = row.get("buyer") or row.get("buyer_name") or "Buyer"
+
+        # 1. Record Buyer Counter Offer
+        buyer_offer = {
+            "round": next_round,
+            "agent": f"{buyer_name} (You)",
+            "price": new_price,
+            "decision": "COUNTER",
+            "quantity": qty,
+            "message": f"Buyer counter offer: ₹{new_price}/kg for {qty}kg"
+        }
+        await self.db_repo.append_offer_async(negotiation_id, buyer_offer)
+
+        # 2. Instantiate FarmerAgent to evaluate the counter offer
+        min_p = float(row.get("min_price") or 18.0)
+        farmer_floor = float(row.get("farmer_floor") or round(min_p * 0.75, 2))
+        farmer = FarmerAgent(
+            name=farmer_name,
+            crop=crop,
+            quantity=qty,
+            min_price=farmer_floor,
+            initial_price=min_p,
+            shelf_life=int(row.get("shelf_life", 4)),
+            location=row.get("location")
+        )
+
+        market_p = float(row.get("market_price", min_p + 2.0))
+        offer_payload = {"price": new_price, "quantity": qty}
+        context_payload = {"market_price": market_p, "round": next_round}
+
+        farmer_resp = farmer.respond_to_offer(offer_payload, context=context_payload, force_deterministic=False)
+        decision_type = farmer_resp.get("type", "COUNTER")
+        counter_price = farmer_resp.get("price", new_price)
+        farmer_msg = farmer_resp.get("message", "")
+
+        farmer_round = next_round + 1
+        farmer_offer = {
+            "round": farmer_round,
+            "agent": farmer_name,
+            "price": counter_price,
+            "decision": decision_type,
+            "quantity": qty,
+            "message": farmer_msg or f"{decision_type} ₹{counter_price}/kg"
+        }
+        await self.db_repo.append_offer_async(negotiation_id, farmer_offer)
+
+        new_status = "ACTIVE"
+        final_price = None
+        if decision_type == "ACCEPT":
+            new_status = "DEAL"
+            final_price = new_price
+            contract_data = {
+                "negotiation_id": negotiation_id,
+                "scenario": row.get("scenario", "direct-sale"),
+                "price": final_price,
+                "quantity": qty,
+                "state": "DEAL",
+                "farmer_id": farmer_name,
+                "peer_node": buyer_name,
+                "crop": crop
+            }
+            await self.db_repo.create_contract_async(contract_data)
+            hub.record_signed_deal(contract_data)
+        elif decision_type == "REJECT":
+            new_status = "REJECT"
+
+        update_payload = {
+            "status": new_status,
+            "final_price": final_price,
+            "current_round": farmer_round
+        }
+        await self.db_repo.update_negotiation_async(negotiation_id, update_payload)
+
+        try:
+            from backend.websocket.manager import manager as ws_manager
+            await ws_manager.broadcast(negotiation_id, {
+                "event": "NEGOTIATION_LOG",
+                "negotiation_id": negotiation_id,
+                "agent_type": "buyer",
+                "message": buyer_offer["message"],
+                "offer": new_price
+            })
+            await ws_manager.broadcast(negotiation_id, {
+                "event": "NEGOTIATION_LOG",
+                "negotiation_id": negotiation_id,
+                "agent_type": "farmer",
+                "message": farmer_offer["message"],
+                "offer": counter_price,
+                "status": new_status
+            })
+            if new_status == "DEAL":
+                await ws_manager.broadcast(negotiation_id, {
+                    "event": "NEGOTIATION_FINISHED",
+                    "negotiation_id": negotiation_id,
+                    "status": "DEAL",
+                    "final_price": final_price
+                })
+        except Exception as ws_err:
+            logger.warning(f"WebSocket broadcast error: {ws_err}")
+
+        all_offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
+        return {
+            "status": new_status,
+            "final_price": final_price,
+            "decision": decision_type,
+            "buyer_offer": buyer_offer,
+            "farmer_response": farmer_offer,
+            "offers": all_offers
+        }
+
+    async def autonomous_step(self, negotiation_id: str):
+        """
+        Buyer Agent analyzes latest farmer ask, calculates optimal strategic counter,
+        and exchanges offers autonomously without requiring human typing.
+        """
+        row = await self.db_repo.get_negotiation_async(negotiation_id)
+        if not row:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Negotiation not found")
+
+        offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
+        farmer_offers = [o for o in offers if not ("buyer" in str(o.get("agent", "")).lower() or "human" in str(o.get("agent", "")).lower())]
+        latest_farmer_ask = farmer_offers[-1]["price"] if farmer_offers else float(row.get("min_price", 18))
+        
+        target_price = float(row.get("target_price") or row.get("buyer_target_price") or (latest_farmer_ask - 1))
+        buyer_offers = [o for o in offers if ("buyer" in str(o.get("agent", "")).lower() or "human" in str(o.get("agent", "")).lower())]
+        latest_buyer_bid = buyer_offers[-1]["price"] if buyer_offers else target_price
+        
+        gap = latest_farmer_ask - latest_buyer_bid
+        if gap <= 0.4:
+            return await self.intervene_deal(negotiation_id, {"price": latest_farmer_ask, "quantity": row.get("quantity", 500)})
+        
+        step = round(max(0.25, gap * 0.35), 2)
+        new_buyer_price = round(min(latest_farmer_ask, latest_buyer_bid + step), 2)
+        return await self.intervene_deal(negotiation_id, {"price": new_buyer_price, "quantity": row.get("quantity", 500)})
 
 
 

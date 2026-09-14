@@ -15,7 +15,7 @@ export default function NotFound() {
           The module or dashboard you are looking for does not exist or has been moved in the latest enterprise deployment.
         </p>
         <Link 
-          to="/"
+          to="/dashboard"
           className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition"
         >
           <ArrowLeft size={18} /> Return to Dashboard

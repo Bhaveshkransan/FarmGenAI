@@ -58,7 +58,47 @@ MANDI_PRICE_DATABASE: Dict[str, Dict[str, Any]] = {
         "mandi_avg_price": 46.00,
         "modal_price_range": [42.0, 49.0],
         "msp_price": 46.00,
-        "top_mandi": "Latur Mandi",
+        "top_mandi": "Latur APMC Mandi",
+        "price_trend": "BULLISH",
+        "last_updated": "2026-08-04",
+    },
+    "Sugarcane": {
+        "mandi_avg_price": 3.60,
+        "modal_price_range": [3.20, 4.00],
+        "msp_price": 3.40,
+        "top_mandi": "Kolhapur APMC Mandi",
+        "price_trend": "STABLE",
+        "last_updated": "2026-08-04",
+    },
+    "Cotton": {
+        "mandi_avg_price": 72.00,
+        "modal_price_range": [68.0, 77.0],
+        "msp_price": 71.21,
+        "top_mandi": "Jalgaon APMC Mandi",
+        "price_trend": "BULLISH",
+        "last_updated": "2026-08-04",
+    },
+    "Jowar": {
+        "mandi_avg_price": 32.50,
+        "modal_price_range": [29.0, 36.0],
+        "msp_price": 31.80,
+        "top_mandi": "Solapur APMC Mandi",
+        "price_trend": "STABLE",
+        "last_updated": "2026-08-04",
+    },
+    "Bajra": {
+        "mandi_avg_price": 26.50,
+        "modal_price_range": [24.0, 29.5],
+        "msp_price": 25.00,
+        "top_mandi": "Ahmednagar APMC Mandi",
+        "price_trend": "STABLE",
+        "last_updated": "2026-08-04",
+    },
+    "Rice": {
+        "mandi_avg_price": 30.00,
+        "modal_price_range": [26.0, 35.0],
+        "msp_price": 23.00,
+        "top_mandi": "Gondia APMC Mandi",
         "price_trend": "BULLISH",
         "last_updated": "2026-08-04",
     },
@@ -67,10 +107,27 @@ MANDI_PRICE_DATABASE: Dict[str, Dict[str, Any]] = {
 
 def get_crop_market_price(crop: str, location: str = "Nashik") -> Dict[str, Any]:
     """
-    Fetch mandi price benchmarks and MSP for a given crop.
+    Fetch mandi price benchmarks and MSP for a given crop with alias support.
     """
-    key = crop.capitalize()
-    data = MANDI_PRICE_DATABASE.get(key)
+    c_lower = str(crop or "").lower().strip()
+    data = None
+
+    for k, v in MANDI_PRICE_DATABASE.items():
+        if k.lower() == c_lower or k.lower() in c_lower or c_lower in k.lower():
+            data = v
+            break
+
+    if not data:
+        if "sorghum" in c_lower:
+            data = MANDI_PRICE_DATABASE.get("Jowar")
+        elif "millet" in c_lower:
+            data = MANDI_PRICE_DATABASE.get("Bajra")
+        elif "paddy" in c_lower:
+            data = MANDI_PRICE_DATABASE.get("Rice")
+        elif "cane" in c_lower:
+            data = MANDI_PRICE_DATABASE.get("Sugarcane")
+        elif "kapas" in c_lower:
+            data = MANDI_PRICE_DATABASE.get("Cotton")
 
     if not data:
         # Generically estimate price if crop is custom

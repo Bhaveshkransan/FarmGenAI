@@ -9,6 +9,13 @@ class SignupRequest(BaseModel):
     location: str
     language: str = "Marathi"
     role: str # Added for role-based testing
+    buyer_persona: Optional[str] = None # restaurant, food_processing, wholesale_trader, retail_chain, institutional
+    business_name: Optional[str] = None
+    fssai_license: Optional[str] = None
+    gstin: Optional[str] = None
+    mandi_license: Optional[str] = None
+    processing_capacity: Optional[str] = None
+    procurement_window: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -27,6 +34,10 @@ class AuthResponse(BaseModel):
     preferences: Optional[Dict] = {}
     trust_score: float = 4.0
     message: str
+    buyer_persona: Optional[str] = None
+    business_name: Optional[str] = None
+    fssai_license: Optional[str] = None
+    gstin: Optional[str] = None
 
 
 class VerificationRequest(BaseModel):

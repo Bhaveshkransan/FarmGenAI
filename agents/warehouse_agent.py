@@ -41,7 +41,7 @@ class WarehouseAgent(BaseAgent):
             schema={"decision": "ACCEPT", "reason": "...", "risk": "low"}
         )
 
-        decision = thought.get("decision", "ACCEPT").upper()
+        decision = str(thought.get("decision", "ACCEPT")).upper()
         reason = thought.get("reason", "Storage requested.")
 
         # Physical capacity secondary check

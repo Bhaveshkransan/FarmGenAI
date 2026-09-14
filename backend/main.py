@@ -70,6 +70,13 @@ async def lifespan(app: FastAPI):
     
     await bootstrap_peer_network()
     
+    # Pre-warm RAG embeddings model and vector stores to eliminate runtime cold starts
+    try:
+        from backend.services.rag_service import rag_service
+        logger.info("RAG Service pre-warmed successfully.")
+    except Exception as e:
+        logger.warning(f"RAG Service pre-warm warning: {e}")
+    
     await redis_manager.connect()
     if redis_manager.client:
         from backend.websocket.manager import redis_pubsub_listener
@@ -106,6 +113,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:8080",
     ],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -178,7 +186,6 @@ app.include_router(dashboard_router, prefix="/api/v1/dashboards", tags=["Dashboa
 app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["Integrations"])
 
 # Agents Telemetry
-from backend.api.v1.agents import router as agents_router
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])
 
 # Health check

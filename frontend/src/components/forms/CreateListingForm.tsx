@@ -3,6 +3,7 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { X, Sprout, ImagePlus, Loader2, ChevronRight, ChevronLeft, CheckCircle2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useNotification } from '../../contexts/NotificationContext';
+import { TOP_MAHARASHTRA_CROPS } from '../../utils/validation';
 
 const CROP_CATEGORIES = ['Vegetables', 'Fruits', 'Grains', 'Pulses', 'Spices', 'Others'];
 const QUALITY_GRADES = ['Premium (A+)', 'Grade A', 'Grade B', 'Grade C (Processing)'];
@@ -179,7 +180,18 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Crop Name *</label>
-                      <input {...register('crop')} placeholder="e.g. Tomato" className="w-full form-input bg-slate-50" />
+                      <input 
+                        list="maharashtra-listing-crops"
+                        {...register('crop')} 
+                        placeholder="e.g. Sugarcane, Soybean, Cotton, Onion..." 
+                        className="w-full form-input bg-slate-50" 
+                      />
+                      <datalist id="maharashtra-listing-crops">
+                        {TOP_MAHARASHTRA_CROPS.map(c => <option key={c} value={c} />)}
+                        <option value="Tomato" />
+                        <option value="Wheat" />
+                        <option value="Potato" />
+                      </datalist>
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Specific Variety *</label>

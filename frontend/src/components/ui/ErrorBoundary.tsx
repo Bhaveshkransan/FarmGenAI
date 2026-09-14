@@ -20,7 +20,7 @@ export default class ErrorBoundary extends React.Component {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
     
     try {
-      fetch('http://localhost:8000/log-error', {
+      fetch('/log-error', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

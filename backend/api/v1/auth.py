@@ -18,6 +18,7 @@ class TokenResponse(BaseModel):
     user: dict
 
 @router.post("/register", response_model=TokenResponse)
+@router.post("/signup", response_model=TokenResponse)
 async def register(request: SignupRequest, db: AsyncSession = Depends(get_db)):
     repo = UserRepository(db)
     if await repo.get_by_email(request.email):
@@ -28,7 +29,19 @@ async def register(request: SignupRequest, db: AsyncSession = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {"id": user.id, "email": user.email, "role": user.role, "full_name": user.full_name}
+        "user": {
+            "id": user.id, 
+            "email": user.email, 
+            "role": user.role, 
+            "full_name": user.full_name,
+            "name": user.full_name,
+            "buyer_persona": getattr(request, "buyer_persona", "food_processing"),
+            "business_name": getattr(request, "business_name", user.full_name),
+            "fssai_license": getattr(request, "fssai_license", ""),
+            "gstin": getattr(request, "gstin", ""),
+            "mandi_license": getattr(request, "mandi_license", ""),
+            "processing_capacity": getattr(request, "processing_capacity", "")
+        }
     }
 
 @router.post("/login", response_model=TokenResponse)

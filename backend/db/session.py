@@ -52,10 +52,9 @@ def is_postgres_running(url: str) -> bool:
         except Exception:
             return False
     try:
-        loop = asyncio.get_running_loop()
-        return True
-    except RuntimeError:
-        return asyncio.run(_test())
+        return _run_async(_test())
+    except Exception:
+        return False
 
 db_url = settings.DATABASE_URL
 if os.getenv("TESTING") == "1" or not is_postgres_running(db_url):

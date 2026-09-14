@@ -6,25 +6,83 @@ FR-4: Buyer Requirement Posting
 """
 
 import uuid
+import re
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from backend.services.security import get_current_user
 from database.db import Database
 
 router = APIRouter(tags=["Buyer Requirements"])
 
+MAHARASHTRA_DISTRICTS_LOWER = [
+    "maharashtra", "all maharashtra", "any", "nashik", "pune", "mumbai", "nagpur", "aurangabad",
+    "chhatrapati sambhajinagar", "sambhajinagar", "solapur", "kolhapur", "ahmednagar", "satara",
+    "sangli", "amravati", "thane", "kalyan", "jalgaon", "latur", "dhule", "nanded", "akola",
+    "chandrapur", "parbhani", "buldhana", "yavatmal", "ratnagiri", "sindhudurg", "beed", "jalna",
+    "raigad", "palghar", "osmanabad", "dharashiv", "wardha", "bhandara", "gondia", "gadchiroli",
+    "hingoli", "washim", "navi mumbai", "panvel", "baramati", "shirur", "manchar", "dindori",
+    "lasalgaon", "pimpalgaon", "yeola", "malegaon", "sangamner", "kopargaon", "shrirampur"
+]
+
 
 class BuyerRequirementCreate(BaseModel):
     crop: str = Field(..., example="Wheat")
     quantity: float = Field(..., gt=0, example=1000.0)
-    target_price: float = Field(..., gt=0, example=22.0)
+    target_price: float = Field(None, example=22.0)
     max_price: float = Field(None, example=26.0)
-    location: str = Field(..., example="Pune")
-    budget: float = Field(..., gt=0, example=30000.0)
+    location: str = Field(None, example="Pune")
+    budget: float = Field(None, example=30000.0)
     delivery_days: int = Field(7, ge=1, example=7)
     quality_grade: str = Field("A", example="A")
     notes: str = Field("", example="Prefer certified organic")
+    # Frontend form aliases
+    maxBudget: Optional[float] = None
+    preferredLocation: Optional[str] = None
+    quality: Optional[str] = None
+    deliveryDate: Optional[str] = None
+    transportRequired: Optional[bool] = None
+    storageRequired: Optional[bool] = None
+
+    @validator("crop")
+    def validate_crop(cls, v):
+        if not v or not str(v).strip():
+            raise ValueError("Crop name is required.")
+        val = str(v).strip()
+        if not re.match(r"^[A-Za-z\s()/-]+$", val):
+            raise ValueError("Crop name must contain only letters and standard characters (e.g. 'Jowar (Sorghum)').")
+        return val.title()
+
+    @validator("location", "preferredLocation", pre=True, always=True)
+    def validate_location(cls, v):
+        if not v or not str(v).strip():
+            return "Maharashtra"
+        clean = str(v).strip().lower()
+        if clean in ["any", "all", "all maharashtra"]:
+            return "All Maharashtra"
+        if not any(dist in clean for dist in MAHARASHTRA_DISTRICTS_LOWER):
+            raise ValueError(
+                f"AgriNegotiator procurement is strictly restricted to Maharashtra mandis & districts. "
+                f"'{v}' is outside our operational service area."
+            )
+        return str(v).strip().title()
+
+    @validator("deliveryDate", pre=True, always=True)
+    def validate_delivery_date(cls, v):
+        if not v or not str(v).strip():
+            return None
+        v_clean = str(v).strip()
+        try:
+            target_d = datetime.strptime(v_clean.split("T")[0], "%Y-%m-%d").date()
+            today = datetime.now(timezone.utc).date()
+            if target_d < today:
+                raise ValueError("Delivery deadline cannot be in the past.")
+        except ValueError as err:
+            if "past" in str(err):
+                raise
+            raise ValueError("Invalid delivery deadline date format. Expected YYYY-MM-DD.")
+        return v_clean
 
 
 class BuyerRequirementUpdate(BaseModel):
@@ -36,6 +94,44 @@ class BuyerRequirementUpdate(BaseModel):
     notes: str = None
 
 
+CROP_ALIASES = {
+    "sugarcane": {"sugarcane", "cane", "ganna"},
+    "soybean": {"soybean", "soya", "soyabean"},
+    "cotton": {"cotton", "kapas", "raw cotton"},
+    "jowar": {"jowar", "sorghum", "great millet"},
+    "sorghum": {"jowar", "sorghum", "great millet"},
+    "onion": {"onion", "onions", "pyaz", "kanda"},
+    "bajra": {"bajra", "pearl millet", "millet", "sajje"},
+    "pearl millet": {"bajra", "pearl millet", "millet"},
+    "rice": {"rice", "paddy", "chawal", "dhan"},
+    "paddy": {"rice", "paddy", "chawal", "dhan"},
+    "wheat": {"wheat", "gehun"},
+    "tomato": {"tomato", "tomatoes", "tamatar"},
+    "potato": {"potato", "potatoes", "aloo"},
+}
+
+def crops_match(req_c: str, prod_c: str) -> bool:
+    r = (req_c or "").lower().strip()
+    p = (prod_c or "").lower().strip()
+    if not r or not p:
+        return False
+    if r == p or r in p or p in r:
+        return True
+    r_words = set(re.findall(r'[a-zA-Z]+', r))
+    p_words = set(re.findall(r'[a-zA-Z]+', p))
+    if r_words & p_words:
+        return True
+    for w in r_words:
+        aliases = CROP_ALIASES.get(w, set())
+        if aliases & p_words or any(al in p for al in aliases):
+            return True
+    for w in p_words:
+        aliases = CROP_ALIASES.get(w, set())
+        if aliases & r_words or any(al in r for al in aliases):
+            return True
+    return False
+
+@router.get("")
 @router.get("/")
 async def list_requirements(
     crop: str = None,
@@ -44,11 +140,16 @@ async def list_requirements(
 ):
     """Return all active buyer requirements, optionally filtered."""
     buyers = await Database.list_buyers_async()
-    reqs = [r for r in buyers if r.get("kind") == "requirement"]
+    reqs = [
+        r for r in buyers 
+        if (r.get("kind") == "requirement" or str(r.get("id", "")).startswith("req_"))
+        and r.get("crop") and str(r.get("crop")).strip()
+        and (r.get("quantity") or 0) > 0
+    ]
     if crop:
-        reqs = [r for r in reqs if r.get("crop", "").lower() == crop.lower()]
+        reqs = [r for r in reqs if crops_match(crop, str(r.get("crop", "")))]
     if location:
-        reqs = [r for r in reqs if r.get("location", "").lower() == location.lower()]
+        reqs = [r for r in reqs if str(r.get("location", "")).lower() == location.lower()]
     active = [r for r in reqs if r.get("status") == "ACTIVE"]
     return {"success": True, "data": active, "count": len(active)}
 
@@ -56,19 +157,75 @@ async def list_requirements(
 async def get_my_requirements(current_user: dict = Depends(get_current_user)):
     """Return buyer requirements for the logged in user."""
     buyers = await Database.list_buyers_async()
-    my_reqs = [r for r in buyers if r.get("kind") == "requirement" and r.get("user_id") == current_user["sub"]]
+    my_reqs = [
+        r for r in buyers 
+        if (r.get("kind") == "requirement" or str(r.get("id", "")).startswith("req_"))
+        and r.get("user_id") == current_user["sub"]
+        and r.get("crop") and str(r.get("crop")).strip()
+        and (r.get("quantity") or 0) > 0
+    ]
     return {"success": True, "data": my_reqs, "count": len(my_reqs)}
+
+@router.get("/{requirement_id}/matches")
+async def get_requirement_matches(
+    requirement_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Find matching produce listings for a specific buyer requirement."""
+    buyers = await Database.list_buyers_async()
+    req = next((r for r in buyers if (r.get("id") == requirement_id or r.get("requirement_id") == requirement_id)), None)
+    if not req:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    
+    produce_list = await Database.list_produce_async()
+    req_crop = str(req.get("crop") or "").lower().strip()
+    req_max_p = float(req.get("max_price") or 999999)
+    req_target_p = float(req.get("target_price") or req_max_p)
+    
+    matches = []
+    for item in produce_list:
+        p_crop = str(item.get("crop") or "").lower().strip()
+        if not p_crop:
+            continue
+        
+        if req_crop and crops_match(req_crop, p_crop):
+            p_price = float(item.get("min_price") or item.get("expected_price") or 0)
+            score = 70
+            
+            if p_price <= req_target_p:
+                score += 30
+            elif p_price <= req_max_p:
+                score += 15
+            elif p_price <= req_max_p * 1.2:
+                score += 5
+            
+            matches.append({
+                **item,
+                "match_score": min(100, score),
+                "is_perfect_price": p_price <= req_target_p,
+                "is_within_budget": p_price <= req_max_p,
+                "price_diff": round(p_price - req_target_p, 2)
+            })
+            
+    matches.sort(key=lambda x: (-x.get("match_score", 0), x.get("min_price", 99999)))
+    return {
+        "success": True, 
+        "requirement": req, 
+        "data": matches, 
+        "count": len(matches)
+    }
 
 @router.get("/{requirement_id}")
 async def get_requirement(requirement_id: str, current_user: dict = Depends(get_current_user)):
     """Return a specific buyer requirement."""
     buyers = await Database.list_buyers_async()
-    req = next((r for r in buyers if r.get("id") == requirement_id and r.get("kind") == "requirement"), None)
+    req = next((r for r in buyers if r.get("id") == requirement_id and (r.get("kind") == "requirement" or str(r.get("id", "")).startswith("req_"))), None)
     if not req:
         raise HTTPException(status_code=404, detail="Requirement not found")
     return {"success": True, "data": req}
 
 
+@router.post("")
 @router.post("/")
 async def create_requirement(
     payload: BuyerRequirementCreate,
@@ -76,15 +233,40 @@ async def create_requirement(
 ):
     """Post a new buyer requirement."""
     req_id = f"req_{str(uuid.uuid4())[:8]}"
+    data = payload.dict()
+    
+    # Normalize fields across frontend schemas
+    loc = data.get("location") or data.get("preferredLocation") or "Maharashtra"
+    max_p = data.get("max_price") or data.get("maxBudget") or 25.0
+    target_p = data.get("target_price") or data.get("maxBudget") or max_p
+    qty = float(data.get("quantity", 500))
+    bgt = data.get("budget") or (qty * float(max_p))
+    grade = data.get("quality_grade") or data.get("quality") or "A"
+    
     req = {
         "id": req_id,
+        "requirement_id": req_id,
         "kind": "requirement",
         "user_id": current_user["sub"],
         "buyer_name": current_user.get("name", "Buyer"),
         "status": "ACTIVE",
+        "crop": data.get("crop", "Produce"),
+        "quantity": qty,
+        "target_price": float(target_p),
+        "max_price": float(max_p),
+        "budget": float(bgt),
+        "location": loc,
+        "quality_grade": grade,
+        "quality": grade,
         "created_at": datetime.now(timezone.utc).isoformat(),
-        **payload.dict(),
+        **data,
     }
+    req["location"] = loc
+    req["target_price"] = float(target_p)
+    req["max_price"] = float(max_p)
+    req["budget"] = float(bgt)
+    req["quality_grade"] = grade
+
     await Database.upsert_buyer_async(req)
     return {"success": True, "data": req, "requirement_id": req_id}
 

@@ -10,7 +10,7 @@ class RedisManager:
     @classmethod
     async def connect(cls):
         try:
-            cls.client = aioredis.from_url(REDIS_URL, decode_responses=True)
+            cls.client = aioredis.from_url(REDIS_URL, decode_responses=True, socket_timeout=1.5, socket_connect_timeout=1.5)
             await cls.client.ping()
             logger.info("Connected to Redis successfully.")
         except Exception as e:

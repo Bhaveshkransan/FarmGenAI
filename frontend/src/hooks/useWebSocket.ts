@@ -13,6 +13,15 @@ export function useWebSocket(url) {
     if (!url) return;
 
     let finalUrl = url;
+    if (typeof window !== 'undefined') {
+      const isHttps = window.location.protocol === 'https:';
+      const defaultWsProto = isHttps ? 'wss:' : 'ws:';
+      if (finalUrl.startsWith('/')) {
+        finalUrl = `${defaultWsProto}//${window.location.host}${finalUrl}`;
+      } else if (finalUrl.includes('localhost:8000') && window.location.hostname !== 'localhost') {
+        finalUrl = `${defaultWsProto}//${window.location.host}/api/v1/ws`;
+      }
+    }
     const token = localStorage.getItem('agri_token');
     if (token && !finalUrl.includes('token=')) {
       finalUrl = finalUrl.includes('?') ? `${finalUrl}&token=${token}` : `${finalUrl}?token=${token}`;

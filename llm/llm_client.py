@@ -24,29 +24,44 @@ load_dotenv(override=False)
 logger = logging.getLogger("LLMClient")
 
 OLLAMA_URL: str = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
-OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen3:8b")
+OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama").lower()
 ENABLE_LLM: bool = os.getenv("ENABLE_LLM", "true").lower() in {"1", "true", "yes"}
 
 
 class LLMClient:
-    """Unified LLM client supporting Ollama (Primary) and Gemini (Fallback)."""
+    """Unified LLM client supporting Cloud Gemini (Zero-setup) and Ollama (Local)."""
 
     def __init__(self):
         self.enabled = ENABLE_LLM
+        self.provider = LLM_PROVIDER
         self.ollama_url = OLLAMA_URL
         self.ollama_model = OLLAMA_MODEL
         self.gemini_key = GEMINI_API_KEY
 
-    def generate(self, prompt: str, model: str = None, temperature: float = 0.7, max_tokens: int = 250) -> str | None:
-        """
-        Generate text completion.
-        Tries Ollama local endpoint first, falls back to Gemini API, then None.
-        """
-        if not self.enabled:
+    def _generate_gemini(self, prompt: str) -> str | None:
+        if not self.gemini_key:
             return None
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.gemini_key)
+            g_model = genai.GenerativeModel("gemini-2.0-flash")
+            res = g_model.generate_content(prompt)
+            if res and res.text:
+                return res.text.strip()
+        except Exception as e:
+            try:
+                # Fallback to gemini-1.5-flash if 2.0 isn't available
+                g_model = genai.GenerativeModel("gemini-1.5-flash")
+                res = g_model.generate_content(prompt)
+                if res and res.text:
+                    return res.text.strip()
+            except Exception:
+                logger.warning(f"Gemini generation failed: {e}")
+        return None
 
-        # 1. Try Ollama (Local Primary)
+    def _generate_ollama(self, prompt: str, model: str = None, temperature: float = 0.7, max_tokens: int = 120) -> str | None:
         try:
             url = f"{self.ollama_url}/api/generate"
             payload = {
@@ -55,28 +70,30 @@ class LLMClient:
                 "stream": False,
                 "options": {
                     "temperature": temperature,
-                    "num_predict": max_tokens,
+                    "num_predict": min(max_tokens, 120),
                 }
             }
-            response = requests.post(url, json=payload, timeout=60)
+            # 12s timeout allows fast generation while avoiding hangs on CPU
+            response = requests.post(url, json=payload, timeout=12)
             if response.status_code == 200:
                 text = response.json().get("response", "")
                 if text and len(text.strip()) > 0:
                     return text.strip()
         except Exception:
             pass
+        return None
 
-        # 2. Try Gemini API (Cloud Fallback)
-        if self.gemini_key:
-            try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.gemini_key)
-                g_model = genai.GenerativeModel("gemini-2.5-flash")
-                res = g_model.generate_content(prompt)
-                if res and res.text:
-                    return res.text.strip()
-            except Exception as e:
-                logger.warning(f"Gemini fallback failed: {e}")
+    def generate(self, prompt: str, model: str = None, temperature: float = 0.7, max_tokens: int = 120) -> str | None:
+        """
+        Generate text completion with local Ollama routing.
+        """
+        if not self.enabled:
+            return None
+
+        # Prioritize local Ollama (qwen2.5:1.5b)
+        res = self._generate_ollama(prompt, model, temperature, max_tokens)
+        if res:
+            return res
 
         return None
 
@@ -189,8 +206,41 @@ Respond STRICTLY in JSON:
     def get_langchain_llm(self, temperature: float = 0.4):
         """
         Returns a LangChain-compatible chat model for use in LangGraph nodes.
-        Priority: ChatOllama (Local) → ChatGoogleGenerativeAI (Gemini Fallback) → None
+        Priority: Gemini (Cloud, if provider is gemini) or ChatOllama (Local) → Fallback
         """
+        # Strict Ollama mode
+        if self.provider == "ollama":
+            try:
+                from langchain_ollama import ChatOllama
+                return ChatOllama(
+                    model=self.ollama_model,
+                    base_url=self.ollama_url,
+                    temperature=temperature,
+                )
+            except Exception:
+                pass
+            return None
+
+        # If Gemini is configured as provider
+        if self.provider == "gemini" and self.gemini_key:
+            try:
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                return ChatGoogleGenerativeAI(
+                    model="gemini-2.0-flash",
+                    google_api_key=self.gemini_key,
+                    temperature=temperature,
+                )
+            except Exception:
+                try:
+                    from langchain_google_genai import ChatGoogleGenerativeAI
+                    return ChatGoogleGenerativeAI(
+                        model="gemini-1.5-flash",
+                        google_api_key=self.gemini_key,
+                        temperature=temperature,
+                    )
+                except Exception:
+                    pass
+
         # 1. Try Ollama (Local Primary)
         try:
             from langchain_ollama import ChatOllama
@@ -202,18 +252,6 @@ Respond STRICTLY in JSON:
             return llm
         except Exception:
             pass
-
-        # 2. Try Gemini (Cloud Fallback)
-        if self.gemini_key:
-            try:
-                from langchain_google_genai import ChatGoogleGenerativeAI
-                return ChatGoogleGenerativeAI(
-                    model="gemini-2.5-flash",
-                    google_api_key=self.gemini_key,
-                    temperature=temperature,
-                )
-            except Exception:
-                pass
 
         return None
 

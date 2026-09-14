@@ -48,6 +48,13 @@ export default function AppRoutes() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+
+        {/* Top-Level Role Aliases */}
+        <Route path="/buyer" element={<Navigate to="/dashboard/buyer" replace />} />
+        <Route path="/farmer" element={<Navigate to="/dashboard/farmer" replace />} />
+        <Route path="/warehouse" element={<Navigate to="/dashboard/warehouse" replace />} />
+        <Route path="/transport" element={<Navigate to="/dashboard/transport" replace />} />
+        <Route path="/processor" element={<Navigate to="/dashboard/processor" replace />} />
         
         {/* Protected Routes Wrapper */}
         <Route element={<DashboardLayout />}>
@@ -57,6 +64,11 @@ export default function AppRoutes() {
 
           {/* Alias Routes — Protected: any authenticated role */}
           <Route element={<ProtectedRoute allowedRoles={['farmer', 'buyer', 'warehouse', 'transport', 'processor', 'admin']} />}>
+            <Route path="/buyer" element={<Navigate to="/dashboard/buyer" replace />} />
+            <Route path="/farmer" element={<Navigate to="/dashboard/farmer" replace />} />
+            <Route path="/warehouse" element={<Navigate to="/dashboard/warehouse" replace />} />
+            <Route path="/transport" element={<Navigate to="/dashboard/transport" replace />} />
+            <Route path="/processor" element={<Navigate to="/dashboard/processor" replace />} />
             <Route path="/farmer/listings" element={<Navigate to="/dashboard/farmer" replace />} />
             <Route path="/farmer/listings/new" element={<Navigate to="/dashboard/farmer" replace />} />
             <Route path="/farmer/negotiations" element={<Navigate to="/dashboard/farmer" replace />} />

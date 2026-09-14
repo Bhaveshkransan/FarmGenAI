@@ -8,10 +8,13 @@ from backend.api.v1.dependencies import get_db
 
 router = APIRouter(tags=["Auth"])
 
+import inspect
+
 @router.post("/signup", response_model=AuthResponse)
+@router.post("/register", response_model=AuthResponse)
 async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
-    # Note: signup_user will eventually be updated to accept `db`.
-    result = signup_user(data.dict())
+    res = signup_user(data.dict())
+    result = await res if inspect.isawaitable(res) else res
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     
@@ -19,7 +22,7 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
     repo = UserRepository(db)
     user = await repo.get_by_email(data.email)
     
-    # Store the role in the database for persistence (upsert logic to be expanded in Phase C)
+    # Store the role in the database for persistence
     if user:
         user.role = data.role
         await db.commit()
@@ -29,7 +32,8 @@ async def signup(data: SignupRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=AuthResponse)
 async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = login_user(data.dict())
+    res = login_user(data.dict())
+    result = await res if inspect.isawaitable(res) else res
     if "error" in result:
         raise HTTPException(status_code=401, detail=result["error"])
     
