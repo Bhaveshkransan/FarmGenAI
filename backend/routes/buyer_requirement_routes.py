@@ -49,10 +49,11 @@ class BuyerRequirementCreate(BaseModel):
     def validate_crop(cls, v):
         if not v or not str(v).strip():
             raise ValueError("Crop name is required.")
-        val = str(v).strip()
-        if not re.match(r"^[A-Za-z\s()/-]+$", val):
-            raise ValueError("Crop name must contain only letters and standard characters (e.g. 'Jowar (Sorghum)').")
-        return val.title()
+        from shared.crop_catalog import validate_buyer_crop
+        try:
+            return validate_buyer_crop(str(v).strip())
+        except ValueError as e:
+            raise ValueError(str(e))
 
     @validator("location", "preferredLocation", pre=True, always=True)
     def validate_location(cls, v):

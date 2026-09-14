@@ -17,9 +17,11 @@ import re
 import time
 import requests
 import logging
-from dotenv import load_dotenv
-
-load_dotenv(override=False)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=False)
+except ImportError:
+    pass
 
 logger = logging.getLogger("LLMClient")
 

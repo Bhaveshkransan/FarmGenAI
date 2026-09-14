@@ -304,13 +304,13 @@ class TestBuyerAgentExtensive(unittest.TestCase):
 
     def test_B32_generate_purchase_order_structure(self):
         b = BuyerAgent("CorpProcure", budget=50000, max_quantity=2000, target_price=20.0, persona="retail_supermarket")
-        po = b.generate_purchase_order(price=19.50, quantity=1000, seller_name="RameshFarmer", context={"crop": "Tomato"})
+        po = b.generate_purchase_order(price=19.50, quantity=1000, seller_name="RameshFarmer", context={"crop": "Onion"})
 
         assert po["po_number"].startswith("PO-")
         assert po["buyer_name"] == "CorpProcure"
         assert po["buyer_persona"] == "retail_supermarket"
         assert po["seller_name"] == "RameshFarmer"
-        assert po["crop"] == "Tomato"
+        assert po["crop"] == "Onion"
         assert po["agreed_price"] == 19.50
         assert po["agreed_quantity"] == 1000
         assert po["total_value"] == 19500.0
@@ -321,7 +321,7 @@ class TestBuyerAgentExtensive(unittest.TestCase):
         b = BuyerAgent("DealCloser", budget=30000, max_quantity=1000, target_price=22.0)
         resp = b.respond_to_offer(
             {"price": 21.0, "quantity": 500},
-            {"market_price": 22.0, "round": 1, "seller_name": "SureshFarmer", "crop": "Wheat"},
+            {"market_price": 22.0, "round": 1, "seller_name": "SureshFarmer", "crop": "Soybean"},
             force_deterministic=True,
         )
         assert resp["type"] == "ACCEPT"
@@ -329,7 +329,7 @@ class TestBuyerAgentExtensive(unittest.TestCase):
         contract = resp["contract"]
         assert contract["po_number"].startswith("PO-")
         assert contract["seller_name"] == "SureshFarmer"
-        assert contract["crop"] == "Wheat"
+        assert contract["crop"] == "Soybean"
         assert contract["agreed_price"] == 21.0
         assert contract["agreed_quantity"] == 500
 

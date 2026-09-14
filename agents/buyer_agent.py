@@ -20,6 +20,13 @@ import uuid
 from datetime import datetime, timezone
 from agents.base_agent import BaseAgent
 from intelligence.llm_client import LLMClient
+from shared.crop_catalog import (
+    BUYER_SUPPORTED_CROPS,
+    normalize_crop_name,
+    is_supported_buyer_crop,
+    validate_buyer_crop,
+    get_crop_benchmark_info,
+)
 
 try:
     llm_client = LLMClient()
@@ -76,6 +83,7 @@ class BuyerAgent(BaseAgent):
         min_shelf_life: int = 2,
         preferred_crops: list[str] | None = None,
         persona: str | None = None,
+        crop: str | None = None,
     ):
         # Configure persona-derived attributes if passed
         self.persona = persona if persona in BUYER_PERSONAS else "custom"
@@ -114,7 +122,23 @@ class BuyerAgent(BaseAgent):
 
         self.location = str(location) if location is not None else None
         self.min_shelf_life = min_shelf_life
-        self.preferred_crops = preferred_crops or []
+
+        # Strict 7-crop normalization
+        if crop is not None:
+            self.crop = validate_buyer_crop(crop)
+        else:
+            self.crop = None
+
+        if preferred_crops:
+            norm_crops = []
+            for c in preferred_crops:
+                norm = normalize_crop_name(c)
+                if norm:
+                    norm_crops.append(norm)
+            self.preferred_crops = norm_crops
+        else:
+            self.preferred_crops = [self.crop] if self.crop else []
+
         self.inventory = 0.0
 
         # Opening bid initialization
@@ -179,12 +203,14 @@ class BuyerAgent(BaseAgent):
         Generates formal structured digital purchase order upon reaching DEAL.
         """
         contract_id = f"PO-{uuid.uuid4().hex[:8].upper()}"
+        crop_name = context.get("crop") if context else getattr(self, "crop", None)
+        normalized_crop = normalize_crop_name(crop_name) if crop_name else (self.crop or "Produce")
         contract = {
             "po_number": contract_id,
             "buyer_name": self.name,
             "buyer_persona": self.persona,
             "seller_name": seller_name,
-            "crop": context.get("crop", "Produce") if context else "Produce",
+            "crop": normalized_crop,
             "agreed_price": round(price, 2),
             "agreed_quantity": round(quantity, 2),
             "total_value": round(price * quantity, 2),
@@ -203,9 +229,23 @@ class BuyerAgent(BaseAgent):
     def _validate_offer_inputs(self, offer: dict, context: dict | None = None) -> tuple[str, str]:
         """
         Guards against malformed, malicious, or unfulfillable offers.
+        Enforces strict 7-crop allowlist restriction for BuyerAgent.
         """
         if not isinstance(offer, dict):
             return "REJECT", "Invalid offer format (must be a dictionary)."
+
+        # Strict 7-crop validation
+        crop_input = (
+            offer.get("crop")
+            or (context.get("crop") if context else None)
+            or getattr(self, "crop", None)
+        )
+        if crop_input is not None:
+            if not is_supported_buyer_crop(crop_input):
+                return "REJECT", (
+                    f"Unsupported crop '{crop_input}'. BuyerAgent strictly negotiates only "
+                    f"the 7 Maharashtra crops: Sugarcane, Soybean, Cotton, Jowar, Onion, Bajra, Rice."
+                )
 
         price = offer.get("price")
         if (
