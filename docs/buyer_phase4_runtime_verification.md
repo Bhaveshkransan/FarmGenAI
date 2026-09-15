@@ -6,7 +6,7 @@
 **Base Commit Comparison**: `bc53986` (`farmer` branch)  
 **Execution Environment**: Windows (PowerShell / Python 3.12.10)  
 **Verification Date**: September 15, 2026  
-**Status**: **ALL TESTS PASSED (136/136 Automated Pytest, 16/16 Manual Verification Scenarios)**  
+**Status**: **ALL TESTS PASSED (141/141 Automated Pytest, 16/16 Manual Verification Scenarios)**  
 
 ---
 
@@ -35,9 +35,9 @@ In Phase 4 and its verified correction, both deficiencies have been completely r
 | **Buyer Economic State Suite** | `tests/test_05_buyer_profile_economic_state.py` | 12 | 0 | **100%** |
 | **Buyer Crop Isolation Suite** | `tests/test_05_buyer_crop_isolation.py` | 17 | 0 | **100%** |
 | **Buyer Real Data Ingestion Suite** | `tests/test_05_buyer_real_data_ingestion.py` | 7 | 0 | **100%** |
-| **Buyer Runtime ML Integration Suite** | `tests/test_05_buyer_runtime_ml_integration.py` | 10 | 0 | **100%** |
+| **Buyer Runtime ML Integration Suite** | `tests/test_05_buyer_runtime_ml_integration.py` | 15 | 0 | **100%** |
 | **Manual Verification Scenarios** | `MAN-BUYER-ML-01` to `MAN-BUYER-GRAPH-04` | 16 | 0 | **100%** |
-| **Total Empirical Assertions** | Combined Automated & Manual | **152** | **0** | **100%** |
+| **Total Empirical Assertions** | Combined Automated & Manual | **157** | **0** | **100%** |
 
 ---
 
@@ -485,5 +485,124 @@ A dedicated 10-test automated verification suite was created:
 | **Economic Guardrail Integrity** | Mathematical guarantee: $P \le P_{\max}$ and total cost $\le \text{budget}$. | `tests/test_05_buyer_runtime_ml_integration.py` | **VERIFIED** |
 | **LangGraph Auto-Resolution** | `buyer_node()` auto-resolves features into graph state and logs ML market anchors. | `backend/agents/graph_orchestrator.py:L615` | **VERIFIED** |
 | **FarmerAgent Code Isolation** | Strict 0 diff lines against base `bc53986`. | `agents/farmer_agent.py` | **VERIFIED (0 lines)** |
-| **Full Regression Suite** | 136 / 136 tests passing (100% PASS rate). | Automated Pytest Run | **VERIFIED** |
+| **Full Regression Suite** | 141 / 141 tests passing (100% PASS rate). | Automated Pytest Run | **VERIFIED** |
+
+---
+
+## 17. FINAL PHASE 4 USER-PATH VERIFICATION
+
+> [!NOTE]
+> **Verification Standard & Boundary Disclaimer**:
+> Repository-level and executable API/runtime verification completed; browser/UI interaction could not be independently executed in this development environment.
+> Classification standards applied:
+> - **VERIFIED**: Executable, empirical evidence exists on disk and in automated tests.
+> - **PARTIALLY VERIFIED**: Code/test evidence exists but external browser UI interaction is unavailable.
+> - **NOT VERIFIED**: No sufficient evidence.
+
+### 17.1 Actual Model Verification (Model Artifact & Schema)
+- **Artifact Inspected**: `backend/models/buyer_price_prediction_model.pkl` (4,685 bytes)
+- **Pipeline Architecture**: `Pipeline(steps=[('scaler', StandardScaler()), ('ridge', Ridge(alpha=10.0))])`
+- **Input Dimension**: Exactly 19 float features:
+  - 12 Numerical: `modal_price_kg`, `min_price_kg`, `max_price_kg`, `spread`, `arrival_mt`, `lag_1_modal`, `lag_2_modal`, `rolling_3_modal`, `momentum`, `arrival_shock`, `month_sin`, `month_cos`
+  - 7 One-Hot Crop Flags: `Bajra`, `Cotton`, `Jowar`, `Onion`, `Rice`, `Soybean`, `Sugarcane`
+- **Target Variable**: `target_next_modal_kg` — Next-period wholesale APMC modal price forecast ($P_{\text{modal}, t+1}$) in ₹/kg.
+- **Leakage Integrity**: Features represent observations strictly at time $t$ or prior lags; target is time $t+1$. Zero future target leakage.
+- **Status**: **VERIFIED** (Tested without mocks in `test_11_real_model_artifact_structure_and_prediction`).
+
+### 17.2 Real Data Provenance Verification
+- **Dataset**: `backend/dataset/buyer_feature_dataset.csv`
+- **Row Count**: 13,179 clean historical records (Zero synthetic or augmented records).
+- **APMC Coverage**: 327 unique Maharashtra APMC mandis across 32 districts.
+- **Date Range**: September 2014 to October 2016.
+- **Crop Distribution**:
+  - Sugarcane: 73 observations
+  - Soybean: 1,939 observations
+  - Cotton: 1,327 observations
+  - Jowar: 2,569 observations
+  - Onion: 2,581 observations
+  - Bajra: 2,126 observations
+  - Rice: 2,564 observations
+- **Chronological Validity**: $date < next\_date$ holds across 100% of rows (0 anomalies).
+- **Status**: **VERIFIED** (Tested in `test_12_dataset_provenance_and_no_target_leakage`).
+
+### 17.3 Runtime Location Lookup Hierarchy Verification
+The runtime pricing service indexes the feature dataset in memory and resolves produce metrics using a 6-tier hierarchy:
+
+| Level | Query Location | Resolved Mandi | Match Level Tag | Audit Status | Is Real Data? |
+|---|---|---|---|:---:|:---:|
+| **A. Exact APMC** | `Latur` | Latur | `apmc_exact_match (Latur)` | `ML_USED` | `True` |
+| **B. APMC Token Match** | `latur mandi apmc` | Latur | `apmc_token_match (Latur)` | `ML_USED` | `True` |
+| **C. Exact District** | `Pune` | Indapur | `district_exact_match (Pune)` | `ML_USED` | `True` |
+| **D. District Token** | `pune district maharashtra` | Indapur | `district_token_match (Pune)` | `ML_USED` | `True` |
+| **E. Substring Match** | `lat` | Latur | `apmc_substring_match (Latur)` | `ML_USED` | `True` |
+| **F. Statewide Fallback** | `""` | Varud | `state_latest_fallback (Varud, Amaravathi)` | `ML_USED` | `True` |
+| **G. Unknown Location** | `Atlantis 999 Unknown` | Varud | `state_latest_fallback (Varud, Amaravathi)` | `ML_USED` | `True` |
+
+- **Status**: **VERIFIED** (Tested in `test_13_runtime_location_hierarchy_all_levels`). Statewide fallback is explicitly stamped as fallback.
+
+### 17.4 7-Crop & Unsupported Crop Verification
+
+#### Supported Crops (Runtime ML Predictions)
+| Crop | Predicted Modal Price ($P_{t+1}$) | Mandi Resolved | Audit Status | Is Real Data? | Verdict |
+|---|:---:|---|:---:|:---:|:---:|
+| **Sugarcane** | ₹5.92 / kg | Ulhasnagar (Thane) | `ML_USED` | `True` | **VERIFIED** |
+| **Soybean** | ₹8.26 / kg (Latur: ₹32.08 / kg) | Varud (Amaravathi) | `ML_USED` | `True` | **VERIFIED** |
+| **Cotton** | ₹44.15 / kg | Mandhal (Nagpur) | `ML_USED` | `True` | **VERIFIED** |
+| **Jowar** | ₹12.15 / kg | Raver-Sawada (Jalgaon) | `ML_USED` | `True` | **VERIFIED** |
+| **Onion** | ₹7.84 / kg | Mangalwedha (Solapur) | `ML_USED` | `True` | **VERIFIED** |
+| **Bajra** | ₹12.55 / kg | Nampur (Nasik) | `ML_USED` | `True` | **VERIFIED** |
+| **Rice** | ₹19.93 / kg | Sironcha (Gadchiroli) | `ML_USED` | `True` | **VERIFIED** |
+
+#### Unsupported Crops Rejection Test
+| Crop | Valuation Fallback Status | Negotiation Decision | Contract / PO Generated? | Verdict |
+|---|:---:|:---:|:---:|:---:|
+| **Mango** | `FALLBACK_USED` (`is_ml_prediction: False`) | `REJECT` ("Unsupported crop") | **NONE** | **VERIFIED** |
+| **Wheat** | `FALLBACK_USED` (`is_ml_prediction: False`) | `REJECT` ("Unsupported crop") | **NONE** | **VERIFIED** |
+| **Tomato** | `FALLBACK_USED` (`is_ml_prediction: False`) | `REJECT` ("Unsupported crop") | **NONE** | **VERIFIED** |
+| **Potato** | `FALLBACK_USED` (`is_ml_prediction: False`) | `REJECT` ("Unsupported crop") | **NONE** | **VERIFIED** |
+| **Pomegranate** | `FALLBACK_USED` (`is_ml_prediction: False`) | `REJECT` ("Unsupported crop") | **NONE** | **VERIFIED** |
+| **Turmeric** | `FALLBACK_USED` (`is_ml_prediction: False`) | `REJECT` ("Unsupported crop") | **NONE** | **VERIFIED** |
+| **Maize** | `FALLBACK_USED` (`is_ml_prediction: False`) | `REJECT` ("Unsupported crop") | **NONE** | **VERIFIED** |
+
+### 17.5 Purchase Scenarios Verification Table (Scenarios A through J)
+
+| Test | Input | Expected | Actual | ML Used? | Result |
+|---|---|---|---|:---:|:---:|
+| **TEST A (Normal Purchase)** | Soybean, Latur, 500kg, Offer ₹41.6, Res ₹45.0 | ACCEPT at ₹41.6 for 500kg with PO | `ACCEPT ₹41.6/kg for 500kg (PO-FE4F37D1)` | **YES** | **PASS** |
+| **TEST B (Ask > Reservation)** | Soybean, Offer ₹55.0, Res ₹40.0 | COUNTER $\le$ ₹40.0 or REJECT | `COUNTER at ₹26.89/kg <= ₹40.0` | **YES** | **PASS** |
+| **TEST C (Ask Within Res)** | Soybean, Offer ₹42.0, Res ₹45.0 | COUNTER or ACCEPT $\le$ ₹45.0 | `ACCEPT / COUNTER within ₹45.0` | **YES** | **PASS** |
+| **TEST D (Exceeds Budget)** | Bajra, 100kg @ ₹12.0, Budget ₹500 | Qty capped to $\le \lfloor 500/12 \rfloor = 41$kg or counter cost $\le$ ₹500 | `COUNTER for 41kg (Total ₹493 <= ₹500)` | **YES** | **PASS** |
+| **TEST E (Full Qty Affordable)** | Soybean, 500kg @ ₹41.6, Budget ₹50,000 | ACCEPT full 500kg (Cost ₹20,800 $\le$ ₹50,000) | `ACCEPT for 500kg (Total ₹20,800)` | **YES** | **PASS** |
+| **TEST F (Unsupported Crop)** | Tomato, 100kg @ ₹20.0 | Immediate REJECT; no PO | `REJECT: Unsupported crop 'Tomato'` | **NO** | **PASS** |
+| **TEST G (Alias Crop "soya")** | soya, 500kg @ ₹41.6, Res ₹45.0 | Normalized to Soybean, ML executes, ACCEPT | `Normalized to 'Soybean', ACCEPT ₹41.6` | **YES** | **PASS** |
+| **TEST H (Invalid Quantity)** | Soybean, Qty: -50kg, NaN | Immediate REJECT | `REJECT: Invalid quantity` | **NO** | **PASS** |
+| **TEST I (Invalid Price)** | Soybean, Price: -₹10, Infinity | Immediate REJECT | `REJECT: Invalid price` | **NO** | **PASS** |
+| **TEST J (Unknown Location)** | Soybean, Location: "Atlantis Unknown" | Statewide fallback, valid ML prediction | `state_latest_fallback, ML_USED, ₹8.26` | **YES** | **PASS** |
+
+### 17.6 Mathematical Economic Safety Guarantees
+All executed transactions satisfy deterministic constraints:
+1. $\text{ACCEPTED\_PRICE} \le \text{reservation\_price}$ (e.g. ₹41.6 $\le$ ₹45.0)
+2. $\text{TOTAL\_PURCHASE\_COST} \le \text{available\_budget}$ (e.g. ₹20,800 $\le$ ₹50,000)
+3. $\text{ACCEPTED\_QUANTITY} \le \text{requested\_quantity}$ (500 $\le$ 500)
+4. $\text{ACCEPTED\_QUANTITY} \le \text{max\_quantity}$ (500 $\le$ 500)
+5. $\text{ACCEPTED\_QUANTITY} \le \lfloor \text{budget} / \text{price} \rfloor$ (500 $\le$ 1,201)
+- **Status**: **VERIFIED**.
+
+### 17.7 ML Value Trace (Market Anchor vs. Reservation Price)
+Empirical trace proving ML prediction anchors negotiation without forcing rigid equality:
+- **Step 1 (APMC Feature Sample)**: Latur Soybean modal price ₹30.60/kg on October 2016 (`buyer_feature_dataset.csv`)
+- **Step 2 (ML Model Inference)**: Predicted next modal price: **₹32.08/kg**
+- **Step 3 (Market Valuation Anchor)**: `get_market_valuation()` = **₹32.08/kg**
+- **Step 4 (Opening Bid)**: `make_offer()` bids **₹26.31/kg** (discounted from anchor based on buyer persona)
+- **Step 5 (Concession Counter)**: `respond_to_offer()` counters **₹26.89/kg** (bounded by reservation ceiling ₹45.0/kg)
+- **Is Forced to Equal ML Prediction?**: **False** (Acts as an anchor, not a rigid price).
+- **Status**: **VERIFIED**.
+
+### 17.8 Teammate & Legacy Protection Summary
+- `git diff bc53986..HEAD -- agents/farmer_agent.py`: **0 lines changed** (100% untouched).
+- `tests/test_05_farmer_agent_extensive.py`: **23/23 tests passing**.
+- `backend/dataset/historical_negotiations.json`: **Untouched**.
+- **Legacy Crop Handling**: Legacy crop aliases (Wheat, Tomato, Potato) in `backend/routes/buyer_requirement_routes.py` remain preserved outside the BuyerAgent boundary so existing product listings are undisturbed, while `BuyerRequirementCreate` strictly enforces the 7-crop boundary.
+- **Status**: **VERIFIED**.
+
 
