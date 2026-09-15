@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Database, ExternalLink, X, Loader2, Search } from 'lucide-react';
 import { api } from '@/services/api';
 import { useQuery } from '@tanstack/react-query';
@@ -19,17 +20,18 @@ export default function RagContextViewer({ isOpen, onClose, query = 'market pric
           crop: crop
         }
       });
-      return res.data?.data || [];
+      const returnedData = res.data?.data;
+      return Array.isArray(returnedData) ? returnedData : [];
     },
     enabled: isOpen
   });
 
   if (!isOpen) return null;
 
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/20 z-40 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="fixed inset-y-0 right-0 w-80 sm:w-96 border-l border-slate-200 bg-white h-full flex flex-col shadow-2xl z-50 transform transition-transform">
+  return typeof document !== 'undefined' ? createPortal(
+    <div className="relative z-[9999]">
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="fixed inset-y-0 right-0 w-80 sm:w-96 border-l border-slate-200 bg-white h-full flex flex-col shadow-2xl transform transition-transform">
       <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
         <h3 className="font-bold text-slate-700 flex items-center gap-2">
           <Database size={16} className="text-emerald-600" /> RAG Knowledge Base
@@ -139,6 +141,7 @@ export default function RagContextViewer({ isOpen, onClose, query = 'market pric
         )}
       </div>
     </div>
-    </>
-  );
+    </div>,
+    document.body
+  ) : null;
 }

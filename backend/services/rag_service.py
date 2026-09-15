@@ -315,8 +315,10 @@ class RAGService:
 
     def ingest_knowledge_base(self):
         """Parse PDFs and Markdown files from datasets and index them in bulk."""
-        crop_knowledge_dir = r"c:\PROJECT\FarmGenAI\backend\dataset\crop_knowledge"
-        gov_schemes_dir = r"c:\PROJECT\FarmGenAI\backend\dataset\government_schemes"
+        base_dir = os.path.dirname(__file__)
+        dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "dataset"))
+        crop_knowledge_dir = os.path.join(dataset_dir, "crop_knowledge")
+        gov_schemes_dir = os.path.join(dataset_dir, "government_schemes")
 
         splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=100)
 
@@ -423,8 +425,10 @@ class RAGService:
 
     def ingest_mandi_prices_and_negotiations(self):
         """Load cleaned mandi prices and historical logs into ChromaDB in bulk."""
-        mandi_file = r"c:\PROJECT\FarmGenAI\backend\dataset\cleaned_mandi_prices.json"
-        neg_file = r"c:\PROJECT\FarmGenAI\backend\dataset\historical_negotiations.json"
+        base_dir = os.path.dirname(__file__)
+        dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "dataset"))
+        mandi_file = os.path.join(dataset_dir, "cleaned_mandi_prices.json")
+        neg_file = os.path.join(dataset_dir, "historical_negotiations.json")
 
         # 1. Ingest Mandi Prices
         if os.path.exists(mandi_file):
@@ -433,7 +437,7 @@ class RAGService:
             
             # Read MSP values to attach as metadata for agent context if available
             msp_map = {}
-            msp_file = r"c:\PROJECT\FarmGenAI\backend\dataset\cleaned_msp_prices.json"
+            msp_file = os.path.join(dataset_dir, "cleaned_msp_prices.json")
             if os.path.exists(msp_file):
                 with open(msp_file, "r", encoding="utf-8") as f:
                     msp_data = json.load(f)
@@ -457,11 +461,11 @@ class RAGService:
                         msp_str = f"₹{msp_val:.2f}/quintal" if msp_val else "Not Available"
                         
                         text = (
-                            f"Market transaction: Crop {r['crop']} ({r['crop_full_name']}) at "
-                            f"{r['mandi_name']} in state {r['state']}. Date: {r['date']}.\n"
+                            f"Market transaction: Crop {r['crop']} ({r.get('crop_full_name', r['crop'])}) at "
+                            f"{r.get('mandi_name', r.get('mandi', 'Unknown Mandi'))} in state {r.get('state', 'Maharashtra')}. Date: {r['date']}.\n"
                             f"Price: ₹{r['price_per_quintal']:.2f}/quintal (₹{r['price_per_quintal']/100:.2f}/kg).\n"
                             f"Government MSP (2026-27): {msp_str}.\n"
-                            f"Mandi arrivals volume: {r['arrival_mt']:.2f} metric tonnes."
+                            f"Mandi arrivals volume: {r.get('arrival_mt', 0.0):.2f} metric tonnes."
                         )
                         new_texts.append(text)
                         new_ids.append(doc_id)

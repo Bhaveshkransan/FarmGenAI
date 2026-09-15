@@ -40,6 +40,7 @@ async def redis_pubsub_listener(redis_client):
                             "negotiation_id": neg_id,
                             "message": event_data.get("message") or f"{event_data.get('agent')}: Proposing ₹{event_data.get('price')}/kg.",
                             "agent_type": agent_type,
+                            "agent_name": str(event_data.get("agent", "")),
                             "offer": event_data.get("price"),
                         })
                     elif event_type == "agreement":

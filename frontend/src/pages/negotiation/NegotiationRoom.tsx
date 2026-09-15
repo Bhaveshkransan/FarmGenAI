@@ -85,8 +85,8 @@ export default function NegotiationRoom() {
     if (lastMessage && String(lastMessage.negotiation_id) === String(id)) {
       if (lastMessage.event === 'NEGOTIATION_LOG') {
         setMessages(prev => [...prev, {
-          agent: lastMessage.agent_type === 'farmer' ? 'Your AI (Farmer)' : 
-                 (lastMessage.agent_type === 'system' ? 'System' : 'Buyer Agent'),
+          agent: lastMessage.agent_name || (lastMessage.agent_type === 'farmer' ? 'Your AI (Farmer)' : 
+                 (lastMessage.agent_type === 'system' ? 'System' : 'Buyer Agent')),
           message: lastMessage.message,
           type: lastMessage.offer ? 'offer' : 'text',
           price: lastMessage.offer,
@@ -107,6 +107,9 @@ export default function NegotiationRoom() {
         };
         setAgreementData(finalDeal);
         setShowAgreement(true);
+        if (Array.isArray(lastMessage.logs)) {
+          setMessages(lastMessage.logs);
+        }
       }
     }
   }, [lastMessage, negState]);
@@ -369,8 +372,8 @@ export default function NegotiationRoom() {
                         <div className="px-4 pb-4 border-t border-slate-100 bg-slate-50/50 rounded-b-xl">
                            <h5 className="text-xs font-bold text-slate-500 uppercase my-3 flex items-center gap-1.5"><MessageSquare size={14}/> Agent Negotiation Chat</h5>
                            <div className="space-y-3 p-3 rounded-lg max-h-60 overflow-y-auto bg-white border border-slate-200">
-                             {messages.filter(m => m.agent?.includes(buyer.buyer_name) || m.agent === 'System' || m.agent === 'Your AI (Farmer)' || m.agent === 'Human (You)').length === 0 && <p className="text-xs text-slate-400">No chat history yet.</p>}
-                             {messages.filter(m => m.agent?.includes(buyer.buyer_name) || m.agent === 'System' || m.agent === 'Your AI (Farmer)' || m.agent === 'Human (You)').map((m, i) => (
+                             {messages.filter(m => m.agent?.toLowerCase().includes(buyer.buyer_name.toLowerCase()) || m.agent === 'System' || m.agent === 'Your AI (Farmer)' || m.agent === 'Human (You)').length === 0 && <p className="text-xs text-slate-400">No chat history yet.</p>}
+                             {messages.filter(m => m.agent?.toLowerCase().includes(buyer.buyer_name.toLowerCase()) || m.agent === 'System' || m.agent === 'Your AI (Farmer)' || m.agent === 'Human (You)').map((m, i) => (
                                <div key={i} className={`flex ${m.agent === 'Your AI (Farmer)' || m.agent === 'Human (You)' ? 'justify-end' : 'justify-start'}`}>
                                  <div className={`max-w-[85%] rounded-lg p-2.5 text-xs ${m.agent === 'Your AI (Farmer)' || m.agent === 'Human (You)' ? 'bg-emerald-100 text-emerald-900 rounded-tr-none' : m.agent === 'System' ? 'bg-slate-100 text-slate-500 text-center w-full shadow-none' : 'bg-white border border-slate-200 shadow-sm rounded-tl-none'}`}>
                                     <p className="font-bold text-[10px] mb-1 opacity-60">{m.agent}</p>
@@ -518,7 +521,7 @@ export default function NegotiationRoom() {
       </div>
       
       {/* Floating RAG Modal */}
-      <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} />
+      <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} crop={negState?.crop} />
     </div>
   );
 }
