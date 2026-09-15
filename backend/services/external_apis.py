@@ -334,6 +334,14 @@ class MandiAPIClient:
         loop = asyncio.get_event_loop()
 
         def _fetch():
+            from backend.core.constants import SUPPORTED_CROPS
+            supported_lower = [c.lower() for c in SUPPORTED_CROPS]
+            if crop.lower() not in supported_lower:
+                logger.warning(f"Crop '{crop}' is not supported. Cannot fetch live price.")
+                return {"source": "None", "crop": crop, "location": location,
+                        "mandi": "N/A", "modal_price": None, "live_modal_price": None,
+                        "trend": "Unknown", "volatility_pct": 0, "status": "UNAVAILABLE"}
+
             # Phase 1
             records = DataGovInClient.fetch(crop, state="Maharashtra", limit=10)
             if not records:

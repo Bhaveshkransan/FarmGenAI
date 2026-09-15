@@ -21,12 +21,14 @@ from backend.services.external_apis import MandiAPIClient, OpenMeteoClient, Real
 from backend.services.rag_service import rag_service
 from llm.llm_client import client as llm_client
 
+from backend.core.constants import SUPPORTED_CROPS
+
 router = APIRouter(prefix="/market-intelligence", tags=["Market Intelligence"])
 
 
 @router.get("/compare")
 async def compare_mandis(
-    crop: str = Query(..., description="Crop name: Sugarcane, Soybean, Cotton, Jowar, Onion, Bajra, Rice"),
+    crop: str = Query(..., description=f"Crop name: {', '.join(SUPPORTED_CROPS)}"),
     lat: float = Query(..., description="Farmer's latitude"),
     lon: float = Query(..., description="Farmer's longitude"),
     radius_km: float = Query(500.0, description="Search radius in km (default 500)"),
@@ -48,6 +50,16 @@ async def compare_mandis(
     Also returns the AI recommendation (SELL NOW / WAIT/STORE).
     """
     try:
+        supported_lower = [c.lower() for c in SUPPORTED_CROPS]
+        if crop.lower() not in supported_lower:
+            raise HTTPException(status_code=422, detail=f"Unsupported crop: {crop}. Supported: {SUPPORTED_CROPS}")
+            
+        # Normalize crop name
+        for c in SUPPORTED_CROPS:
+            if c.lower() == crop.lower():
+                crop = c
+                break
+
         nearby_mandis = await MandiAPIClient.get_nearby_mandis(lat, lon, crop, radius_km)
 
         if not nearby_mandis:
@@ -125,7 +137,7 @@ async def compare_mandis(
 
 @router.get("/price")
 async def get_crop_price(
-    crop: str = Query(..., description="Crop name"),
+    crop: str = Query(..., description=f"Crop name: {', '.join(SUPPORTED_CROPS)}"),
     location: str = Query("Nashik", description="Location / mandi name"),
     base_price: float = Query(0.0, description="Your expected base price for trend comparison"),
 ):
@@ -134,6 +146,16 @@ async def get_crop_price(
     Returns trend and volatility vs your expected price.
     """
     try:
+        supported_lower = [c.lower() for c in SUPPORTED_CROPS]
+        if crop.lower() not in supported_lower:
+            raise HTTPException(status_code=422, detail=f"Unsupported crop: {crop}. Supported: {SUPPORTED_CROPS}")
+            
+        # Normalize crop name
+        for c in SUPPORTED_CROPS:
+            if c.lower() == crop.lower():
+                crop = c
+                break
+
         result = await MandiAPIClient.get_live_price(crop, location, base_price)
         weather = await OpenMeteoClient.get_weather(location)
         return {
@@ -195,7 +217,7 @@ def _generate_recommendation(best: Optional[dict], highest_net: float, all_mandi
 
 @router.get("/insights")
 async def get_market_insights(
-    crop: str = Query(..., description="Crop name"),
+    crop: str = Query(..., description=f"Crop name: {', '.join(SUPPORTED_CROPS)}"),
     location: str = Query("Maharashtra", description="Location / district name"),
 ):
     """
@@ -203,6 +225,16 @@ async def get_market_insights(
     Provides live price + historical RAG context + LLM Sell/Hold recommendation.
     """
     try:
+        supported_lower = [c.lower() for c in SUPPORTED_CROPS]
+        if crop.lower() not in supported_lower:
+            raise HTTPException(status_code=422, detail=f"Unsupported crop: {crop}. Supported: {SUPPORTED_CROPS}")
+            
+        # Normalize crop name
+        for c in SUPPORTED_CROPS:
+            if c.lower() == crop.lower():
+                crop = c
+                break
+
         # 1. Fetch live market price
         live_price_data = await MandiAPIClient.get_live_price(crop, location, 0.0)
         current_modal_price = float(
@@ -287,7 +319,7 @@ async def get_market_insights(
                         f"({pct_change:.1f}% change) in 7 days."
                     )
                 else:
-                    ml_prediction = f"Crop '{crop}' not in ML model. Supported: {list(crop_models.keys())}"
+                    ml_prediction = f"ML Prediction Unavailable (Model not trained for {crop})"
         except Exception as e:
             ml_prediction = f"ML Prediction unavailable: {str(e)}"
 
@@ -367,3 +399,4 @@ Focus on actionable advice based on the ML Forecast and market trends. Do not us
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+

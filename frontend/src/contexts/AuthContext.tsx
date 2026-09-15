@@ -28,7 +28,7 @@ export function AuthProvider({ children }) {
     const handleStorageChange = (e) => {
       if (e.key === 'agri_token' && e.newValue === null) {
         dispatch({ type: AUTH_ACTIONS.LOGOUT });
-        window.location.href = '/login';
+        window.location.href = '/';
       }
     };
     window.addEventListener('storage', handleStorageChange);
@@ -81,7 +81,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('agri_user');
     localStorage.removeItem('agri_token');
     dispatch({ type: AUTH_ACTIONS.LOGOUT });
-    window.location.href = '/login';
+    window.location.href = '/';
   };
 
   const triggerSessionExpired = () => {

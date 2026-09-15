@@ -136,10 +136,12 @@ class NegotiationManager:
         m_offers = final_state.get("market_offers", [])
 
         if final_status == "DEAL" and deal:
+            self.memory.add_price(deal.get("buyer_name", "Buyer"), deal.get("price", 0))
             deal_data = {
                 "buyer_name": deal.get("buyer_name", "Buyer"),
-                "price": deal.get("price"),
-                "quantity": deal.get("quantity"),
+                "buyer_id": deal.get("buyer_id", "Unknown"),
+                "price": deal.get("price", 0),
+                "quantity": deal.get("quantity", 0),
                 "transport_partner": self.transporter.name if self.transporter else "Local-Self"
             }
             self._emit_live("agreement", deal_data)

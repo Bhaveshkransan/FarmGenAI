@@ -1,5 +1,5 @@
 from typing import Optional, Dict, List, Any
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class CropListingCreate(BaseModel):
@@ -28,22 +28,36 @@ class CropListingCreate(BaseModel):
     images: Optional[List[str]] = None
     description: str = Field("", example="Organic grade A")
 
-    @root_validator(pre=False, skip_on_failure=True)
-    def validate_logic(cls, values):
-        qty = values.get('quantity')
-        min_qty = values.get('min_sale_quantity')
+    @model_validator(mode='after')
+    def validate_logic(self):
+        crop = self.crop
+        from backend.core.constants import SUPPORTED_CROPS
+        if crop:
+            # Case-insensitive validation
+            supported_lower = [c.lower() for c in SUPPORTED_CROPS]
+            if crop.lower() not in supported_lower:
+                raise ValueError(f"Crop '{crop}' is not supported. Supported crops: {SUPPORTED_CROPS}")
+            # Normalize crop name
+            for c in SUPPORTED_CROPS:
+                if c.lower() == crop.lower():
+                    self.crop = c
+                    break
+
+        qty = self.quantity
+        min_qty = self.min_sale_quantity
         if qty is not None and min_qty is not None and min_qty > qty:
             raise ValueError('minimum_sale_quantity cannot be greater than available quantity')
         
-        min_p = values.get('min_price')
-        exp_p = values.get('expected_price')
+        min_p = self.min_price
+        exp_p = self.expected_price
         if min_p is not None and exp_p is not None and min_p > exp_p:
             raise ValueError('minimum price cannot be greater than expected price')
         
-        return values
+        return self
 
 
 class CropListingUpdate(BaseModel):
+    crop: Optional[str] = None
     quantity: float = None
     min_sale_quantity: float = None
     expected_price: float = None
@@ -64,16 +78,27 @@ class CropListingUpdate(BaseModel):
     description: str = None
     status: str = None  # "ACTIVE" | "SOLD" | "EXPIRED"
 
-    @root_validator(pre=False, skip_on_failure=True)
-    def validate_logic(cls, values):
-        qty = values.get('quantity')
-        min_qty = values.get('min_sale_quantity')
+    @model_validator(mode='after')
+    def validate_logic(self):
+        crop = getattr(self, 'crop', None)
+        if crop:
+            from backend.core.constants import SUPPORTED_CROPS
+            supported_lower = [c.lower() for c in SUPPORTED_CROPS]
+            if crop.lower() not in supported_lower:
+                raise ValueError(f"Crop '{crop}' is not supported. Supported crops: {SUPPORTED_CROPS}")
+            for c in SUPPORTED_CROPS:
+                if c.lower() == crop.lower():
+                    self.crop = c
+                    break
+
+        qty = self.quantity
+        min_qty = self.min_sale_quantity
         if qty is not None and min_qty is not None and min_qty > qty:
             raise ValueError('minimum_sale_quantity cannot be greater than available quantity')
         
-        min_p = values.get('min_price')
-        exp_p = values.get('expected_price')
+        min_p = self.min_price
+        exp_p = self.expected_price
         if min_p is not None and exp_p is not None and min_p > exp_p:
             raise ValueError('minimum price cannot be greater than expected price')
         
-        return values
+        return self

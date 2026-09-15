@@ -46,7 +46,34 @@ async def start_negotiation(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        return await service_start_negotiation(request.model_dump(), scenario="direct-sale", db=db)
+        from backend.core.redis import redis_manager
+        import json
+        
+        neg_id = Database.generate_id("neg")
+        
+        if redis_manager.client:
+            # Create a placeholder in the DB so the frontend doesn't 404 when it immediately fetches the room
+            await Database.create_negotiation_async({
+                "negotiation_id": neg_id,
+                "status": "QUEUED",
+                "crop": request.crop,
+                "quantity": request.quantity,
+                "min_price": request.min_price,
+                "farmer_name": request.farmer_name,
+                "user_id": request.user_id,
+                "logs": [f"🚀 [System] Negotiation {neg_id} queued in Redis. Waiting for background worker..."]
+            })
+            
+            await redis_manager.client.xadd(
+                "agri:negotiation:jobs",
+                {
+                    "neg_id": neg_id,
+                    "payload": json.dumps(request.model_dump())
+                }
+            )
+            return {"negotiation_id": neg_id, "status": "queued"}
+        else:
+            return await service_start_negotiation(request.model_dump(), scenario="direct-sale", db=db)
     except Exception as e:
         import traceback
         traceback.print_exc()

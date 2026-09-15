@@ -71,7 +71,7 @@ class TestNegotiationManager(unittest.TestCase):
         self.assertTrue(len(mgr.logs) > 0)
 
     def test_price_series_populated(self):
-        mgr = _make_manager()
+        mgr = _make_manager(min_price=18, target_price=20)
         import asyncio
         asyncio.run(mgr.start_negotiation(market_price=18))
         series = mgr.memory.get_price_series()

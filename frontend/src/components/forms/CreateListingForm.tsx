@@ -451,12 +451,12 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Expected Target Price (₹) *</label>
-                    <input type="number" step="0.5" {...register('expected_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-blue-200 focus:ring-blue-500" />
+                    <input type="number" step="any" {...register('expected_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-blue-200 focus:ring-blue-500" />
                     {errors.expected_price && <p className="text-red-500 text-xs mt-1">{errors.expected_price.message as string}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Minimum Acceptable Price (₹) *</label>
-                    <input type="number" step="0.5" {...register('min_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-red-200 focus:ring-red-500" />
+                    <input type="number" step="any" {...register('min_price', { valueAsNumber: true })} className="w-full form-input bg-slate-50 border-red-200 focus:ring-red-500" />
                     {errors.min_price && <p className="text-red-500 text-xs mt-1">{errors.min_price.message as string}</p>}
                   </div>
                   <div className="md:col-span-2">

@@ -27,30 +27,58 @@ export default function AgentWorkflowStepper({ activeAgent }) {
   };
 
   return (
-    <div className="w-full bg-slate-900 rounded-xl p-4 shadow-inner mb-6 border border-slate-800">
-      <div className="flex justify-between items-center relative">
-        {/* Connecting Line */}
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-800 -z-10 -translate-y-1/2"></div>
-        
+    <div className="w-full bg-white rounded-xl mb-6">
+      <div className="space-y-3">
         {steps.map((step, idx) => {
           const status = getStepStatus(step.id);
           
           return (
-            <div key={idx} className="flex flex-col items-center bg-slate-900 px-2 relative z-10">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                status === 'completed' ? 'bg-emerald-500 text-slate-900' :
-                status === 'active' ? 'bg-blue-500 text-white animate-pulse ring-4 ring-blue-500/30' :
-                'bg-slate-800 text-slate-500 border border-slate-700'
-              }`}>
-                {status === 'completed' ? <CheckCircle2 size={16} /> : step.icon}
+            <div key={idx} className="flex flex-col">
+              <div className="flex justify-between items-center">
+                <span className={`text-xs font-bold uppercase tracking-widest ${
+                  status === 'completed' ? 'text-slate-800' :
+                  status === 'active' ? 'text-emerald-600' :
+                  'text-slate-400'
+                }`}>
+                  {step.label}
+                </span>
+                
+                {status === 'completed' ? (
+                  <CheckCircle2 size={16} className="text-emerald-500" />
+                ) : status === 'active' ? (
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> RUNNING
+                  </span>
+                ) : null}
               </div>
-              <span className={`text-[10px] uppercase font-bold mt-2 tracking-wider ${
-                status === 'active' ? 'text-blue-400' :
-                status === 'completed' ? 'text-emerald-500' :
-                'text-slate-500'
-              }`}>
-                {step.label}
-              </span>
+
+              {/* Show sub-steps if active */}
+              {status === 'active' && step.id === 'Negotiator' && (
+                <div className="mt-3 pl-2 border-l-2 border-emerald-100 space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Current Execution</p>
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <CheckCircle2 size={14} className="text-emerald-500" /> Listing analyzed
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <CheckCircle2 size={14} className="text-emerald-500" /> Market context retrieved
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <CheckCircle2 size={14} className="text-emerald-500" /> RAG context retrieved
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <CheckCircle2 size={14} className="text-emerald-500" /> Buyers matched
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-700">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-0.5"></span> Negotiating with buyers
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="w-3 h-3 rounded-full border border-slate-300 ml-0.5"></div> Deal evaluation
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <div className="w-3 h-3 rounded-full border border-slate-300 ml-0.5"></div> Final selection
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

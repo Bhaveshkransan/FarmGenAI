@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/services/api';
+import { API_CONFIG } from '@/config/api';
 import { Leaf, TrendingUp, AlertCircle, Clock, Plus, MapPin, Navigation, TrendingDown, Minus } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '@/components/ui/StatCard';
@@ -29,7 +30,7 @@ export default function FarmerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/negotiation`;
+  const wsUrl = `${API_CONFIG.WS_URL}/negotiation`;
   const { isConnected, lastMessage } = useWebSocket(wsUrl);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
@@ -43,7 +44,7 @@ export default function FarmerDashboard() {
   const [listingsFilterCrop, setListingsFilterCrop] = useState('');
   const [listingsSearch, setListingsSearch] = useState('');
 
-  const { data: listings, isLoading, isError, refetch } = useQuery({
+  const { data: listings, isLoading, isError, refetch: refetchListings } = useQuery({
     queryKey: ['farmer_listings'],
     queryFn: async () => {
       const res = await api.get('/listings/me');
@@ -57,7 +58,7 @@ export default function FarmerDashboard() {
     return true;
   });
 
-  const { data: negotiations, isLoading: negLoading } = useQuery({
+  const { data: negotiations, isLoading: negLoading, refetch: refetchNegotiations } = useQuery({
     queryKey: ['farmer_negotiations'],
     queryFn: async () => {
       const res = await api.get('/negotiations/');
@@ -66,13 +67,24 @@ export default function FarmerDashboard() {
   });
 
 
-  const { data: workflows, isLoading: workflowsLoading } = useQuery({
+  const { data: workflows, isLoading: workflowsLoading, refetch: refetchWorkflows } = useQuery({
     queryKey: ['farmer_workflows'],
     queryFn: async () => {
       const res = await api.get('/workflows/');
       return res.data?.data || [];
     }
   });
+
+  useEffect(() => {
+    if (lastMessage) {
+      if (lastMessage.event === 'NEGOTIATION_FINISHED') {
+        refetchNegotiations();
+        refetchListings();
+      } else if (lastMessage.event === 'SCENARIO_READY') {
+        refetchWorkflows();
+      }
+    }
+  }, [lastMessage, refetchNegotiations, refetchListings, refetchWorkflows]);
 
   const fetchMandiComparison = (lat: number, lon: number, crop: string) => {
     setMandiLoading(true);
@@ -510,7 +522,7 @@ export default function FarmerDashboard() {
       <CreateListingForm
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={() => refetch()}
+        onSuccess={() => refetchListings()}
       />
     </div>
   );

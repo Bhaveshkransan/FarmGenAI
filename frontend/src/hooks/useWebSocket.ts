@@ -13,6 +13,11 @@ export function useWebSocket(url) {
     if (!url) return;
 
     let finalUrl = url;
+    if (finalUrl.startsWith('/')) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      finalUrl = `${protocol}//${window.location.host}${finalUrl}`;
+    }
+
     const token = localStorage.getItem('agri_token');
     if (token && !finalUrl.includes('token=')) {
       finalUrl = finalUrl.includes('?') ? `${finalUrl}&token=${token}` : `${finalUrl}?token=${token}`;

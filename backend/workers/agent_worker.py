@@ -51,6 +51,28 @@ async def _build_initial_state(payload: dict, neg_id: str) -> dict:
     if market_price == 0:
         market_price = min_price * 1.15  # fallback estimate
 
+    from backend.services.negotiation_service import NegotiationService
+    
+    # We pass None for DB as we just need the helper methods for agent construction
+    service = NegotiationService(db=None)
+    
+    farmer_obj = await service._build_farmer(payload)
+    
+    # Generate mock market offers based on payload criteria
+    market_offers = await service._generate_market_offers(payload)
+    
+    buyer_objs = []
+    for off in market_offers[:5]:  # Take top 5
+        b_obj = await service._build_buyer({
+            "name": off["buyer_name"],
+            "budget": off["budget"],
+            "max_quantity": off["offered_quantity"],
+            "target_price": off["target_price"],
+            "location": off["location"],
+            "strategy": off.get("strategy", "")
+        })
+        buyer_objs.append(b_obj)
+
     return {
         "crop": payload.get("crop", "Unknown"),
         "quantity": float(payload.get("quantity", 100)),
@@ -71,7 +93,7 @@ async def _build_initial_state(payload: dict, neg_id: str) -> dict:
         "plan": None,
         "reflection": None,
         "selected_buyer": None,
-        "market_offers": [],
+        "market_offers": market_offers,
         "user_id": payload.get("user_id"),
         "latest_farmer_ask": None,
         "latest_buyer_offer": None,
@@ -79,6 +101,8 @@ async def _build_initial_state(payload: dict, neg_id: str) -> dict:
         "rag_context": None,
         "market_intelligence": None,
         "recommendation": None,
+        "farmer_agent_obj": farmer_obj,
+        "buyer_agent_objs": buyer_objs
     }
 
 
@@ -167,11 +191,23 @@ async def run_worker():
                     try:
                         await publish("status_update", {"message": f"🔄 LangGraph started for {neg_id}"})
                         initial_state = await _build_initial_state(payload, neg_id)
-                        final_state = await graph_orchestrator.ainvoke(initial_state)
+                        
+                        # Immediately save market offers to DB so frontend can fetch them
+                        await Database.update_negotiation_async(neg_id, {"market_offers": initial_state["market_offers"]})
+                        
+                        final_state = initial_state
+                        last_log_idx = 0
+                        
+                        async for event in graph_orchestrator.astream(initial_state):
+                            for node_name, state in event.items():
+                                final_state = state
+                                logs = state.get("logs", [])
+                                while last_log_idx < len(logs):
+                                    await publish("status_update", {"message": logs[last_log_idx]})
+                                    last_log_idx += 1
+                                    
                         result = await _serialize_result(final_state, neg_id)
                         await Database.update_negotiation_async(neg_id, result)
-                        for log_line in final_state.get("logs", []):
-                            await publish("status_update", {"message": log_line})
                         await publish("negotiation_finished", result)
                         logger.info(f"✅ Negotiation {neg_id} completed via LangGraph. Status: {result['status']}")
                         use_fallback = False
@@ -225,6 +261,11 @@ async def run_worker():
                         "round": 3,
                         "buyer_name": "AgriMart Aggregator"
                     }
+                    
+                    from backend.services.negotiation_service import NegotiationService
+                    service = NegotiationService(db=None)
+                    market_offers = await service._generate_market_offers(payload)
+                    
                     result = {
                         "negotiation_id": neg_id,
                         "status": "DEAL",
@@ -233,6 +274,7 @@ async def run_worker():
                         "summary": f"Deal at ₹{final_price}/kg with AgriMart Aggregator",
                         "logs": [f"📋 [Planner] {crop} negotiation strategy set.", f"✅ Deal reached at ₹{final_price}/kg!"],
                         "history": history,
+                        "market_offers": market_offers,
                         "completed_at": datetime.now(timezone.utc).isoformat(),
                     }
                     await publish("status_update", {"message": f"✅ [Validator] Deal reached at ₹{final_price}/kg!"})

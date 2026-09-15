@@ -196,7 +196,8 @@ class RAGService:
                 else:
                     conditions.append({"crop": canonical["rag_mapping"]})
             else:
-                logger.warning(f"RAG query received invalid crop: {crop}. Proceeding without crop filter.")
+                logger.error(f"RAG query received invalid crop: {crop}. Aborting query.")
+                raise ValueError(f"Unsupported crop: {crop}")
         if district:
             conditions.append({"district": district.strip().capitalize()})
         if date:

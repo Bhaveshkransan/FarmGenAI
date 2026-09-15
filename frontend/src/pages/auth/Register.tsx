@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Sprout } from 'lucide-react';
+import { Sprout, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Register() {
@@ -37,6 +37,11 @@ export default function Register() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow-sm sm:rounded-xl sm:px-10 border border-slate-200">
+          <div className="mb-6">
+            <Link to="/" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors">
+              <ArrowLeft size={16} className="mr-1" /> Back to Home
+            </Link>
+          </div>
           <form className="space-y-4" onSubmit={handleSubmit}>
             {error && (
               <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm font-medium border border-red-100">

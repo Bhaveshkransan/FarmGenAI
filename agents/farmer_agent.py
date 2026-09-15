@@ -149,14 +149,11 @@ class FarmerAgent(BaseAgent):
                 reason = f"Floor defense: countered at ₹{counter_price}/kg instead of walking away in round {curr_r}."
 
             if decision == "ACCEPT":
-                # Only accept below min_price if extreme spoilage AND no processor
+                # Strictly enforce min_price constraint
                 if price < self.min_price:
-                    if self.shelf_life <= 1 and not self.has_processor_option and price >= self.min_price * 0.8:
-                        reason += " (Critical spoilage accepted below min)"
-                    else:
-                        decision = "COUNTER"
-                        counter_price = self.min_price
-                        reason = f"LLM Override: Cannot accept ₹{price} below minimum price of ₹{self.min_price}."
+                    decision = "COUNTER"
+                    counter_price = self.min_price
+                    reason = f"LLM Override: Cannot accept ₹{price} below strict minimum price of ₹{self.min_price}."
                     
             if decision == "COUNTER":
                 # Ensure counter price is mathematically valid
@@ -206,8 +203,8 @@ class FarmerAgent(BaseAgent):
             if self.has_processor_option and price < processor_value:
                 return {"decision": "REJECT", "counter_price": None, "reason": "Offer below processor salvage value. Will send to processor."}
             if price >= self.min_price * 0.8:
-                return {"decision": "ACCEPT", "counter_price": None, "reason": "Critical spoilage risk. Accepting lower price to avoid total loss."}
-            return {"decision": "REJECT", "counter_price": None, "reason": "Offer is too low even for distressed sale."}
+                return {"decision": "ACCEPT", "counter_price": None, "reason": "Critical spoilage risk. Accepting offer meeting 80% of minimum price."}
+            return {"decision": "REJECT", "counter_price": None, "reason": "Offer is below minimum price, even for distressed sale."}
 
         # Level 1: Normal Target Resolution
         if price >= self.current_price * 0.98:

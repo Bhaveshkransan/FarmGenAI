@@ -70,7 +70,7 @@ export default function LandingPage() {
         {/* Features Section */}
         <div className="py-20 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               
               <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
                 <div className="bg-emerald-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
@@ -79,16 +79,6 @@ export default function LandingPage() {
                 <h3 className="text-xl font-bold text-slate-900 mb-3">Multi-Agent Negotiation</h3>
                 <p className="text-slate-600">
                   AI Copilots negotiate on your behalf using Reinforcement Learning to optimize your Best Alternative To a Negotiated Agreement (BATNA).
-                </p>
-              </div>
-
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-                <div className="bg-emerald-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
-                  <Truck className="text-emerald-600 h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">Flexible Supply Chain</h3>
-                <p className="text-slate-600">
-                  The system dynamically routes deals directly or integrates 3rd-party logistics and warehousing based on requirement parameters.
                 </p>
               </div>
 
