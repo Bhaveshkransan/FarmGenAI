@@ -367,35 +367,74 @@ class BuyerAgent(BaseAgent):
         else:
             norm_crop = None
 
+        # Lazy service resolution if not yet loaded
+        if self.pricing_service is None and get_buyer_pricing_service:
+            try:
+                self.pricing_service = get_buyer_pricing_service()
+            except Exception:
+                self.pricing_service = None
+
         if norm_crop and is_supported_buyer_crop(norm_crop) and self.pricing_service:
             features = None
+            feature_meta = None
             if context and isinstance(context.get("market_features"), dict):
                 features = context["market_features"]
+                feature_meta = context.get("feature_source", {
+                    "dataset": "caller_context",
+                    "type": "context_market_features",
+                    "is_real_data": True,
+                })
             elif context and "modal_price_kg" in context:
                 features = {
                     col: context[col] for col in self.pricing_service.feature_cols
                     if col in context
                 }
+                feature_meta = context.get("feature_source", {
+                    "dataset": "caller_context",
+                    "type": "flat_context_features",
+                    "is_real_data": True,
+                })
+
+            loc = location or self.location
+
+            # Dynamically resolve features from real APMC historical dataset if missing or incomplete
+            if not features or any(col not in features for col in self.pricing_service.feature_cols):
+                try:
+                    features, feature_meta = self.pricing_service.get_market_features(norm_crop, loc)
+                except Exception as e:
+                    self.log_action(f"Failed to auto-resolve market features: {e}")
+                    features = None
 
             if features:
                 try:
                     pred_res = self.pricing_service.predict_modal_price(
-                        norm_crop, features, location=location or self.location
+                        norm_crop, features, location=loc, feature_source=feature_meta
                     )
                     self.last_ml_prediction = pred_res
                     predicted_modal = pred_res["predicted_modal_price"]
+                    match_info = feature_meta.get("match_level", "APMC record") if feature_meta else "APMC record"
                     self.log_action(
-                        f"ML Valuation: Predicted next-period modal price for {norm_crop} is ₹{predicted_modal}/kg"
+                        f"ML Valuation: Predicted next-period modal price for {norm_crop} is ₹{predicted_modal}/kg (Source: {match_info})"
                     )
                     return float(predicted_modal)
                 except Exception as e:
                     self.last_ml_prediction = None
                     self.log_action(f"ML Valuation controlled fallback: {e}")
 
-        self.last_ml_prediction = None
-        if context and context.get("market_price") is not None:
-            return float(context["market_price"])
-        return self.target_price
+        # Deterministic fallback when crop is unsupported or prediction is unavailable
+        fallback_price = float(context["market_price"]) if (context and context.get("market_price") is not None) else self.target_price
+        self.last_ml_prediction = {
+            "audit_status": "FALLBACK_USED",
+            "is_ml_prediction": False,
+            "crop": norm_crop,
+            "fallback_price": fallback_price,
+            "reason": (
+                f"Unsupported crop '{target_crop}'" if (target_crop and not is_supported_buyer_crop(norm_crop or target_crop))
+                else "Pricing service unavailable or feature resolution failed"
+            ),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        return fallback_price
 
     def evaluate_offer(self, offer: dict, context: dict | None = None) -> str:
         """

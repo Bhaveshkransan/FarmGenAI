@@ -71,6 +71,7 @@ class NegotiationState(TypedDict):
     recommendation: Optional[str]           # Recommendation agent output
     farmer_agent_obj: Optional[Any]
     buyer_agent_objs: Optional[List[Any]]
+    market_features: Optional[Dict[str, Any]]
 
 
 # ─────────────────────────────────────────────
@@ -607,6 +608,20 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
         logs.append("⚠️ [Buyers Pool] No BuyerAgent objects found in state! Aborting.")
         return {"history": history, "current_offers": [], "logs": logs}
     
+    # Auto-resolve legitimate market features from real APMC dataset if not already in graph state
+    resolved_features = state.get("market_features")
+    feature_meta = None
+    if not resolved_features and state.get("crop"):
+        try:
+            from backend.services.buyer_pricing_service import get_buyer_pricing_service
+            pricing_svc = get_buyer_pricing_service()
+            if pricing_svc:
+                resolved_features, feature_meta = pricing_svc.get_market_features(
+                    state.get("crop"), state.get("location")
+                )
+        except Exception as ex:
+            logger.debug(f"Could not auto-resolve market features in buyer_node: {ex}")
+
     for buyer in buyer_agents:
         buyer_name = buyer.name
         
@@ -617,14 +632,22 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
             "crop": state.get("crop"),
             "location": state.get("location"),
         }
-        if state.get("market_features"):
-            context_payload["market_features"] = state["market_features"]
+        if resolved_features:
+            context_payload["market_features"] = resolved_features
+            if feature_meta:
+                context_payload["feature_source"] = feature_meta
 
         response = buyer.respond_to_offer(offer_payload, context=context_payload)
 
         decision_type = response.get("type", "REJECT")
         counter_price = response.get("price", farmer_ask)
         message = response.get("message", "")
+
+        # Log ML prediction anchor if utilized
+        if getattr(buyer, "last_ml_prediction", None) and buyer.last_ml_prediction.get("audit_status") == "ML_USED":
+            pred_p = buyer.last_ml_prediction["predicted_modal_price"]
+            src_desc = buyer.last_ml_prediction.get("feature_source", {}).get("match_level", "APMC historical")
+            logs.append(f"🧠 [{buyer_name}] ML Market Anchor: ₹{pred_p}/kg (Source: {src_desc})")
 
         logs.append(f"🤝 [{buyer_name}] {decision_type} ₹{counter_price}/kg: {message}")
 
@@ -682,12 +705,15 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
                 "status": "COUNTER"
             })
 
-    return {
+    result = {
         "history": history,
         "current_offers": current_offers,
         "logs": logs,
         "buyer_agent_objs": buyer_agents,
     }
+    if resolved_features:
+        result["market_features"] = resolved_features
+    return result
 
 
 # ─────────────────────────────────────────────

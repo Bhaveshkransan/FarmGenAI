@@ -6,23 +6,24 @@
 **Base Commit Comparison**: `bc53986` (`farmer` branch)  
 **Execution Environment**: Windows (PowerShell / Python 3.12.10)  
 **Verification Date**: September 15, 2026  
-**Status**: **ALL TESTS PASSED (126/126 Automated Pytest, 16/16 Manual Verification Scenarios)**  
+**Status**: **ALL TESTS PASSED (136/136 Automated Pytest, 16/16 Manual Verification Scenarios)**  
 
 ---
 
 ## 1. Executive Summary & Verification Verdict
 
-This report certifies the successful execution and completion of **Phase 4: Buyer ML Runtime Integration and LangGraph End-to-End Resolution** for the autonomous Buyer Agent in FarmGenAI.
+This report certifies the successful execution and completion of **Phase 4: Buyer ML Runtime Integration and LangGraph End-to-End Resolution** (including the Phase 4 Correction for dynamic runtime feature flow) for the autonomous Buyer Agent in FarmGenAI.
 
 In the Phase 3 verification audit, two critical defects were diagnosed:
 1. **Dormant ML Artifact**: The pre-trained Ridge regression pipeline (`backend/models/buyer_price_prediction_model.pkl`) was serialized on disk but never invoked during live negotiation rounds.
 2. **LangGraph Orchestrator Failures**: Four test failures in `tests/test_05_langgraph_nodes.py` occurred due to fragile dictionary accesses (`NoneType` strategies and missing buyer agent instances in state).
 
-In Phase 4, both deficiencies have been completely resolved:
+In Phase 4 and its verified correction, both deficiencies have been completely resolved:
 - A thread-safe, singleton **Runtime Pricing Service** (`backend/services/buyer_pricing_service.py`) was created to safely load, validate, and execute the fitted 19-dimensional model pipeline without retraining on startup.
+- Real historical market features (13,179 observations across 349 APMCs in `buyer_feature_dataset.csv`) are dynamically resolved at runtime without requiring manual caller pre-seeding.
 - `BuyerAgent` in `agents/buyer_agent.py` was integrated with `get_market_valuation()`, grounding its opening bid (`make_offer`) and concession curve (`respond_to_offer`) in forward APMC modal market forecasts ($P_{\text{modal}, t+1}$).
 - The strict economic hierarchy was rigorously preserved: ML forecasts act purely as wholesale market anchors and **never override** the Buyer's reservation ceiling ($P_{\max}$), cash budget, quality grade adjustments, or persona concession curves.
-- `backend/agents/graph_orchestrator.py` was made null-safe, enabling dynamic instantiation and state persistence of `BuyerAgent` objects.
+- `backend/agents/graph_orchestrator.py` was made null-safe and equipped with automatic feature resolution in `buyer_node()`.
 - **Zero modification was made to FarmerAgent** (`agents/farmer_agent.py` diff against base `bc53986` is strictly 0 lines).
 
 ### Summary Verification Verdict
@@ -34,8 +35,9 @@ In Phase 4, both deficiencies have been completely resolved:
 | **Buyer Economic State Suite** | `tests/test_05_buyer_profile_economic_state.py` | 12 | 0 | **100%** |
 | **Buyer Crop Isolation Suite** | `tests/test_05_buyer_crop_isolation.py` | 17 | 0 | **100%** |
 | **Buyer Real Data Ingestion Suite** | `tests/test_05_buyer_real_data_ingestion.py` | 7 | 0 | **100%** |
+| **Buyer Runtime ML Integration Suite** | `tests/test_05_buyer_runtime_ml_integration.py` | 10 | 0 | **100%** |
 | **Manual Verification Scenarios** | `MAN-BUYER-ML-01` to `MAN-BUYER-GRAPH-04` | 16 | 0 | **100%** |
-| **Total Empirical Assertions** | Combined Automated & Manual | **142** | **0** | **100%** |
+| **Total Empirical Assertions** | Combined Automated & Manual | **152** | **0** | **100%** |
 
 ---
 
@@ -386,6 +388,102 @@ flowchart TD
 
 ### Recommended Next Actions
 1. **Commit Changes**: Commit all Phase 4 changes on branch `feature/buyer-agent-verification` with commit message:  
-   `buyer: integrate runtime price model and fix negotiation graph`.
+   `buyer: verify runtime ML feature flow`.
 2. **Push Branch**: Push branch to remote `bhavesh/feature/buyer-agent-verification`.
 3. **DO NOT MERGE**: Preserve branch independence; do not merge into `main` or teammate branches without team lead review.
+
+---
+
+## 16. Phase 4 Correction — Runtime ML Verification
+
+### 16.1 Integration Gap Diagnosed & Root Cause
+In initial code audits, it was identified that `BuyerAgent.get_market_valuation()` and LangGraph's `buyer_node()` only triggered ML predictions if the caller explicitly pre-seeded a 12-dimensional `market_features` dictionary in the execution context or state. Under standard invocation (`market_features=None`), the agent defaulted to static context or target prices without executing the pre-trained Ridge regression pipeline.
+
+### 16.2 Real Data Ingestion & Feature Resolution Architecture
+To solve this without synthetic data or artificial approximations:
+1. **Thread-Safe In-Memory Indexing**: `BuyerPricePredictionService` was enhanced with `threading.Lock()` double-checked locking for lazy loading and thread-safe caching.
+2. **Authoritative Feature Source**: The service indexes the 13,179 clean historical records in `backend/dataset/buyer_feature_dataset.csv` (covering 349 APMCs across Maharashtra).
+3. **Multi-Tier Hierarchical Location Matching**:
+   - Level 1: Exact APMC name match (case/whitespace normalized)
+   - Level 2: Token match on APMC name
+   - Level 3: Exact District match
+   - Level 4: Token match on District name
+   - Level 5: Substring match
+   - Level 6: Statewide latest observation for the canonical crop
+4. **Time $t$ Integrity**: Features represent strictly historical observations at time $t$ to forecast $P_{\text{modal}, t+1}$, eliminating any target data leakage.
+
+### 16.3 Standalone BuyerAgent & LangGraph Wiring
+- In `agents/buyer_agent.py`: `get_market_valuation()` auto-resolves features from `self.pricing_service.get_market_features(norm_crop, loc)` if missing from context.
+- In `backend/agents/graph_orchestrator.py`: `buyer_node()` auto-resolves features, enriches `state["market_features"]`, injects them into `context_payload`, and logs `🧠 [Buyer] ML Market Anchor: ₹{P}/kg (Source: {match_level})`.
+- Every prediction generates an explicit audit payload stored in `self.last_ml_prediction` with `"audit_status": "ML_USED"` or `"FALLBACK_USED"`.
+
+### 16.4 Economic Hierarchy & Guardrails
+The economic hierarchy was rigorously preserved:
+- **Market Valuation Anchor**: The ML output anchors the opening bid (`make_offer`) and concession curve (`respond_to_offer`).
+- **Reservation Ceiling Defense (Case A)**: Under high asks or forecasts, the Buyer strictly caps bids and counters at $P_{\max}$.
+- **Budget Protection (Case B)**: When cash balance is low, order quantity is bounded by $\lfloor\text{budget} / P\rfloor$. If affordable quantity is 0, the offer is rejected.
+- **Normal Anchoring (Case C)**: Within budget and ceiling, the concession formula converges toward a mutually viable agreement.
+
+### 16.5 Automated Test Suite: `test_05_buyer_runtime_ml_integration.py`
+A dedicated 10-test automated verification suite was created:
+1. `test_01_all_seven_crops_auto_resolve_and_predict`: All 7 crops auto-resolve real features and execute `model.predict()` with `audit_status == "ML_USED"`.
+2. `test_02_buyer_agent_standalone_valuation_auto_resolves`: Standalone `BuyerAgent` resolves features and outputs `audit_status == "ML_USED"`.
+3. `test_03_make_offer_anchored_by_ml_prediction`: `make_offer()` invokes ML and anchors initial bid.
+4. `test_04_respond_to_offer_anchored_by_ml`: `respond_to_offer()` invokes ML and anchors counter-offer.
+5. `test_05_economic_guardrail_case_a_reservation_ceiling`: High ask is capped at $P_{\max}$.
+6. `test_06_economic_guardrail_case_b_budget_protection`: Order commitments strictly $\le \text{budget}$.
+7. `test_07_economic_guardrail_case_c_normal_anchored_bid`: Normal valuation anchors valid counter.
+8. `test_08_unsupported_crop_fallback_audit_status`: Unsupported crop ('Mango') falls back with `audit_status == "FALLBACK_USED"`.
+9. `test_09_thread_safe_pricing_service`: 21 concurrent threads across all crops execute without race conditions.
+10. `test_10_langgraph_buyer_node_auto_resolves_and_logs`: LangGraph `buyer_node` auto-resolves features and logs ML anchor.
+
+**Result: 10/10 PASSED in 28.47s.**
+
+### 16.6 Full Regression Suite Results
+| Test Suite | Passing | Failing | Success Rate |
+|---|:---:|:---:|:---:|
+| `tests/test_05_buyer_agent_extensive.py` | 38 | 0 | **100%** |
+| `tests/test_05_buyer_crop_isolation.py` | 17 | 0 | **100%** |
+| `tests/test_05_buyer_profile_economic_state.py` | 12 | 0 | **100%** |
+| `tests/test_05_buyer_real_data_ingestion.py` | 7 | 0 | **100%** |
+| `tests/test_05_buyer_runtime_ml_integration.py` | 10 | 0 | **100%** |
+| `tests/test_05_langgraph_nodes.py` | 29 | 0 | **100%** |
+| `tests/test_05_farmer_agent_extensive.py` | 23 | 0 | **100%** |
+| **Total Regression Suite** | **136** | **0** | **100%** |
+
+### 16.7 End-to-End Live Negotiation Trace
+- **Scenario**: 500 kg Soybean in Latur; Farmer initial ask ₹44.0/kg; Buyer target ₹41.0/kg, reservation ₹45.0/kg.
+- **Initial State `market_features`**: `None` (no manual pre-seeding).
+- **Execution Log**:
+  ```
+  📡 [Matching Engine] Matched Top 1 Buyers: BigBasket_Procurement
+  👨‍🌾 [Farmer] Round 1: Buyer offered ₹41.0/kg
+  👨‍🌾 [Farmer] COUNTER ₹41.6/kg: Farmer_Tukaram: COUNTER ₹41.6/kg: I can meet you part way.
+  🤝 [Buyers Pool] Round 1: Evaluating Farmer ask of ₹41.6/kg
+  🧠 [BigBasket_Procurement] ML Market Anchor: ₹32.08/kg (Source: apmc_exact_match (Latur))
+  🤝 [BigBasket_Procurement] ACCEPT ₹41.6/kg: BigBasket_Procurement: ACCEPTED ₹41.6/kg for 500.0kg (PO-FE4F37D1, Total: ₹20800.0): Offered price is within acceptable 3% operational tolerance.
+  ⚖️ [Ranker] Evaluating buyer responses...
+  🏆 [Ranker] BigBasket_Procurement ACCEPTED. Moving to DEAL.
+  ⚖️ [Validator] Validating deal constraints.
+  ⚖️ [Validator][LLM] Valid=True. Validation successful.
+  ```
+- **Audit Verification on State**:
+  - `audit_status`: `ML_USED`
+  - `is_ml_prediction`: `True`
+  - `predicted_modal_price`: `₹32.08/kg`
+  - `match_level`: `apmc_exact_match (Latur)`
+  - `dataset`: `buyer_feature_dataset.csv`
+  - `is_real_data`: `True`
+
+### 16.8 Final Claim vs. Reality Accounting Table
+
+| Feature / Metric Claimed | Actual Repository Reality | Evidence File / Code Symbol | Status |
+|---|---|---|:---:|
+| **Dynamic Feature Ingestion** | Real APMC historical dataset indexed in memory (13,179 rows). Zero synthetic rows. | `buyer_feature_dataset.csv` | **VERIFIED** |
+| **Runtime ML Auto-Resolution** | Automatically resolves features and executes Ridge pipeline without manual context inputs. | `backend/services/buyer_pricing_service.py` | **VERIFIED** |
+| **Audit Status Differentiation** | Explicitly distinguishes `ML_USED` from `FALLBACK_USED` in `self.last_ml_prediction`. | `agents/buyer_agent.py:L385,L404` | **VERIFIED** |
+| **Economic Guardrail Integrity** | Mathematical guarantee: $P \le P_{\max}$ and total cost $\le \text{budget}$. | `tests/test_05_buyer_runtime_ml_integration.py` | **VERIFIED** |
+| **LangGraph Auto-Resolution** | `buyer_node()` auto-resolves features into graph state and logs ML market anchors. | `backend/agents/graph_orchestrator.py:L615` | **VERIFIED** |
+| **FarmerAgent Code Isolation** | Strict 0 diff lines against base `bc53986`. | `agents/farmer_agent.py` | **VERIFIED (0 lines)** |
+| **Full Regression Suite** | 136 / 136 tests passing (100% PASS rate). | Automated Pytest Run | **VERIFIED** |
+
