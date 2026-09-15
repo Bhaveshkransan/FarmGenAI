@@ -381,16 +381,19 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
         offered_qty = min(state["quantity"], float(profile.get("max_quantity", state["quantity"])))
         budget_limited_price = float(profile.get("budget", 0)) / max(offered_qty, 1)
 
+        target_price_clean = float(profile.get("target_price") if profile.get("target_price") is not None else state.get("min_price", 0.0))
+        market_price_clean = float(state.get("market_price") if state.get("market_price") is not None else target_price_clean)
+
         strategy = (profile.get("strategy") or "").lower()
-        if profile.get("offered_price"):
+        if profile.get("offered_price") is not None:
             opening_bid = min(float(profile["offered_price"]), budget_limited_price)
         elif "restaurant" in strategy or "premium" in strategy:
-            opening_bid = min(float(profile.get("target_price", state["min_price"])), budget_limited_price)
+            opening_bid = min(target_price_clean, budget_limited_price)
         else:
             opening_bid = min(
-                float(profile.get("target_price", state["min_price"])),
+                target_price_clean,
                 budget_limited_price,
-                float(state["market_price"] + 3)
+                market_price_clean + 3.0
             )
 
         offer_price = round(max(1.0, opening_bid), 2)
@@ -411,7 +414,7 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
             "offered_price": offer_price,
             "offered_quantity": round(offered_qty, 2),
             "budget": float(profile.get("budget", 0)),
-            "target_price": float(profile.get("target_price", state["min_price"])),
+            "target_price": target_price_clean,
             "status": "VIABLE" if is_viable else "BELOW_MIN_PRICE",
             "score": score
         })

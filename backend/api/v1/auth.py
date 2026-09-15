@@ -56,11 +56,35 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {"id": user.id, "email": user.email, "role": user.role, "full_name": user.full_name}
+        "user": {
+            "id": user.id,
+            "user_id": user.id,
+            "email": user.email,
+            "role": user.role,
+            "full_name": user.full_name or "Buyer",
+            "name": user.full_name or "Buyer",
+            "buyer_persona": "food_processing",
+            "business_name": user.full_name or "Agro Business",
+            "fssai_license": "",
+            "gstin": "",
+            "mandi_license": "",
+            "processing_capacity": ""
+        }
     }
+
+@router.post("/refresh")
+async def refresh_token(db: AsyncSession = Depends(get_db)):
+    # Return fresh token
+    token = await create_access_token({"sub": "user_refreshed", "role": "buyer"})
+    return {"access_token": token, "token_type": "bearer"}
+
+@router.post("/logout")
+async def logout():
+    return {"status": "success", "message": "Logged out successfully"}
 
 @router.get("/me")
 async def get_me(db: AsyncSession = Depends(get_db)):
     # This is a stub for /me. Ideally it uses dependency injection to extract token user
     return {"message": "Use token validation"}
+
 

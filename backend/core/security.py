@@ -11,23 +11,44 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 security_bearer = HTTPBearer()
 
 
-async def hash_password(password: str) -> str:
-    """Encrypt password string using Bcrypt."""
+class AwaitableStr(str):
+    def __await__(self):
+        async def _resolve():
+            return str(self)
+        return _resolve().__await__()
+
+
+class AwaitableBool:
+    def __init__(self, val: bool):
+        self._val = bool(val)
+    def __bool__(self):
+        return self._val
+    def __eq__(self, other):
+        return self._val == bool(other)
+    def __await__(self):
+        async def _resolve():
+            return self._val
+        return _resolve().__await__()
+
+
+def hash_password(password: str) -> AwaitableStr:
+    """Encrypt password string using Bcrypt. Supports both sync and await."""
     salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-    return hashed.decode('utf-8')
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+    return AwaitableStr(hashed)
 
 
-async def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Check plain password against stored hash."""
+def verify_password(plain_password: str, hashed_password: str) -> AwaitableBool:
+    """Check plain password against stored hash. Supports both sync and await."""
     try:
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        res = bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
     except Exception:
-        return False
+        res = False
+    return AwaitableBool(res)
 
 
-async def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Sign JWT token payload with secret signing key."""
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> AwaitableStr:
+    """Sign JWT token payload with secret signing key. Supports both sync and await."""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
@@ -35,7 +56,7 @@ async def create_access_token(data: dict, expires_delta: Optional[timedelta] = N
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-    return encoded_jwt
+    return AwaitableStr(encoded_jwt)
 
 
 async def verify_token(token: str) -> Optional[dict]:
