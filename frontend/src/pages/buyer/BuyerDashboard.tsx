@@ -246,7 +246,7 @@ export default function BuyerDashboard() {
       const res = await api.post('/negotiations/start-negotiation', payload);
       const negId = res.data?.negotiation_id || res.data?.id;
 
-      addNotification('success', `Autonomous Buyer Agent dispatched! Room: ${negId || 'Active'}`);
+      addNotification(`Autonomous Buyer Agent dispatched! Room: ${negId || 'Active'}`, 'success');
       setSelectedListing(null);
 
       if (negId) {
@@ -256,7 +256,7 @@ export default function BuyerDashboard() {
       }
     } catch (err: any) {
       console.error('Failed to start negotiation:', err);
-      addNotification('error', err.response?.data?.detail || err.message || 'Failed to dispatch AI agent');
+      addNotification(err.response?.data?.detail || err.message || 'Failed to dispatch AI agent', 'error');
     } finally {
       setIsStartingNeg(false);
     }
