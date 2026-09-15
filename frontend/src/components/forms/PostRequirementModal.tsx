@@ -57,9 +57,9 @@ export default function PostRequirementModal({
   const [crop, setCrop] = useState(initialCrop);
   const [variety, setVariety] = useState('');
   const [purpose, setPurpose] = useState('food_processing');
-  const [quantity, setQuantity] = useState(5000);
+  const [quantity, setQuantity] = useState<number | string>(5000);
   const [unit, setUnit] = useState('kg');
-  const [minBatchSize, setMinBatchSize] = useState(500);
+  const [minBatchSize, setMinBatchSize] = useState<number | string>(500);
   const [qualityGrade, setQualityGrade] = useState('Grade A');
   const [maxMoisture, setMaxMoisture] = useState(10);
   const [isOrganic, setIsOrganic] = useState(false);
@@ -71,6 +71,61 @@ export default function PostRequirementModal({
   const [maxCeilingPrice, setMaxCeilingPrice] = useState(52);
   const [aiIntel, setAiIntel] = useState<any>(null);
   const [isLoadingIntel, setIsLoadingIntel] = useState(false);
+
+  // Reset step & sync crop whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentStep(1);
+      if (initialCrop) setCrop(initialCrop);
+    }
+  }, [isOpen, initialCrop]);
+
+  // Handle quantity input with auto-batch adjustment
+  const handleQuantityChange = (val: string) => {
+    setQuantity(val);
+    const num = Number(val);
+    if (!isNaN(num) && num > 0) {
+      const curBatch = Number(minBatchSize) || 0;
+      if (curBatch > num || curBatch === 0) {
+        setMinBatchSize(Math.min(num, Math.max(10, Math.floor(num / 2))));
+      }
+    }
+  };
+
+  const handleUnitChange = (newUnit: string) => {
+    const oldUnit = unit;
+    setUnit(newUnit);
+    const num = Number(quantity);
+    if (!num || num <= 0) return;
+
+    if (oldUnit === 'kg' && newUnit === 'quintal') {
+      const q = Math.max(1, Math.round(num / 100));
+      setQuantity(q);
+      setMinBatchSize(Math.max(1, Math.floor(q / 2)));
+    } else if (oldUnit === 'kg' && newUnit === 'ton') {
+      const t = Math.max(1, Math.round(num / 1000));
+      setQuantity(t);
+      setMinBatchSize(Math.max(1, Math.floor(t / 2)));
+    } else if (oldUnit === 'quintal' && newUnit === 'kg') {
+      setQuantity(num * 100);
+      setMinBatchSize(Math.max(50, Math.floor((num * 100) / 2)));
+    } else if (oldUnit === 'quintal' && newUnit === 'ton') {
+      const t = Math.max(1, Math.round(num / 10));
+      setQuantity(t);
+      setMinBatchSize(Math.max(1, Math.floor(t / 2)));
+    } else if (oldUnit === 'ton' && newUnit === 'kg') {
+      setQuantity(num * 1000);
+      setMinBatchSize(Math.max(100, Math.floor((num * 1000) / 2)));
+    } else if (oldUnit === 'ton' && newUnit === 'quintal') {
+      setQuantity(num * 10);
+      setMinBatchSize(Math.max(1, Math.floor((num * 10) / 2)));
+    }
+  };
+
+  const setPresetQuantity = (qty: number) => {
+    setQuantity(qty);
+    setMinBatchSize(Math.min(qty, Math.max(10, Math.floor(qty / 2))));
+  };
 
   // Fetch ML Market Intel when crop changes
   useEffect(() => {
@@ -103,9 +158,17 @@ export default function PostRequirementModal({
       addNotification('Please select a commodity crop', 'error');
       return;
     }
-    if (currentStep === 2 && (!quantity || quantity <= 0)) {
-      addNotification('Please enter a valid quantity', 'error');
-      return;
+    if (currentStep === 2) {
+      const numQty = Number(quantity);
+      if (!numQty || numQty <= 0) {
+        addNotification('Please enter a valid procurement quantity greater than 0', 'error');
+        return;
+      }
+      let numBatch = Number(minBatchSize);
+      if (!numBatch || numBatch <= 0 || numBatch > numQty) {
+        numBatch = Math.min(numQty, Math.max(10, Math.floor(numQty / 2)));
+        setMinBatchSize(numBatch);
+      }
     }
     setCurrentStep(p => Math.min(p + 1, totalSteps));
   };
@@ -298,25 +361,95 @@ export default function PostRequirementModal({
                 <p className="text-slate-500">Specify procurement volume and fulfillment batch sizing.</p>
               </div>
 
+              {/* Quick Presets */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Quick Volume Presets
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {unit === 'kg' && [
+                    { label: '120 kg (Kitchen/Sample)', val: 120 },
+                    { label: '500 kg', val: 500 },
+                    { label: '1,000 kg (1 MT)', val: 1000 },
+                    { label: '5,000 kg (Commercial)', val: 5000 },
+                    { label: '10,000 kg (Bulk)', val: 10000 },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      onClick={() => setPresetQuantity(p.val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                        Number(quantity) === p.val
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                  {unit === 'quintal' && [
+                    { label: '5 Quintals', val: 5 },
+                    { label: '10 Quintals', val: 10 },
+                    { label: '50 Quintals', val: 50 },
+                    { label: '100 Quintals', val: 100 },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      onClick={() => setPresetQuantity(p.val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                        Number(quantity) === p.val
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                  {unit === 'ton' && [
+                    { label: '1 Ton', val: 1 },
+                    { label: '5 Tons', val: 5 },
+                    { label: '10 Tons', val: 10 },
+                    { label: '25 Tons', val: 25 },
+                  ].map((p) => (
+                    <button
+                      key={p.val}
+                      type="button"
+                      onClick={() => setPresetQuantity(p.val)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+                        Number(quantity) === p.val
+                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Total Quantity Required *</label>
                   <input
                     type="number"
-                    min="100"
-                    step="100"
+                    min="1"
+                    step={unit === 'ton' ? '0.5' : unit === 'quintal' ? '1' : '10'}
                     value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    onChange={(e) => handleQuantityChange(e.target.value)}
+                    placeholder="Enter total quantity"
                     className="w-full form-input text-xs rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-900 focus:ring-emerald-500"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Minimum procurement volume: 100 kg</p>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Procurement demand in {unit === 'kg' ? 'kilograms' : unit === 'quintal' ? 'quintals (100 kg)' : 'metric tons'}.
+                  </p>
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Measurement Unit *</label>
                   <select
                     value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
+                    onChange={(e) => handleUnitChange(e.target.value)}
                     className="w-full form-select text-xs rounded-xl bg-slate-50 border-slate-200 focus:ring-emerald-500 font-semibold text-slate-800"
                   >
                     <option value="kg">Kilograms (kg)</option>
@@ -326,18 +459,28 @@ export default function PostRequirementModal({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block font-semibold text-slate-700 mb-1">Minimum Batch Acceptance Size *</label>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block font-semibold text-slate-700">Minimum Batch Acceptance Size *</label>
+                    <span className="text-[10px] text-slate-400 font-mono">Max allowable: {quantity} {unit}</span>
+                  </div>
                   <input
                     type="number"
-                    min="50"
-                    step="50"
+                    min="1"
+                    max={Number(quantity) || 999999}
+                    step={unit === 'ton' ? '0.1' : unit === 'quintal' ? '1' : '10'}
                     value={minBatchSize}
-                    onChange={(e) => setMinBatchSize(Number(e.target.value))}
+                    onChange={(e) => setMinBatchSize(e.target.value)}
                     className="w-full form-input text-xs rounded-xl bg-slate-50 border-slate-200 font-medium text-slate-800 focus:ring-emerald-500"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Smallest lot size you will accept from an individual farmer/FPO.
-                  </p>
+                  {Number(minBatchSize) > Number(quantity) ? (
+                    <p className="text-[11px] text-amber-600 font-semibold mt-1 flex items-center gap-1">
+                      ⚠️ Batch size ({minBatchSize} {unit}) cannot exceed total quantity ({quantity} {unit}). It will be auto-clamped.
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Smallest lot size you will accept from an individual farmer/FPO dispatch.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

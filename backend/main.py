@@ -141,6 +141,21 @@ app.include_router(buyer_req_router, prefix="/api/v1/requirements", tags=["Buyer
 # Negotiation
 app.include_router(negotiation_router, prefix="/api/v1/negotiations", tags=["Negotiations"])
 
+# Legacy route compatibility
+app.include_router(farmer_router, prefix="/api/farmer", tags=["Farmers (Legacy)"])
+app.include_router(buyer_router, prefix="/api/buyer", tags=["Buyers (Legacy)"])
+from backend.schemas.negotiation_model import StartNegotiationRequest
+from backend.routes.negotiation_routes import start_negotiation_alt, get_negotiation_status_alt
+
+@app.post("/start-negotiation", tags=["Negotiation (Compatibility)"])
+async def start_negotiation_root(request: StartNegotiationRequest):
+    return await start_negotiation_alt(request)
+
+@app.get("/negotiation-status/{negotiation_id}", tags=["Negotiation (Compatibility)"])
+async def get_negotiation_status_root(negotiation_id: str):
+    return await get_negotiation_status_alt(negotiation_id)
+
+
 # Supply Chain
 app.include_router(warehouse_router, prefix="/api/v1/warehouse", tags=["Warehouse"])
 app.include_router(role_offer_router, prefix="/api/v1/role-offers", tags=["Role Offers"])

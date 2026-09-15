@@ -393,6 +393,42 @@ class Database:
         except Exception:
             pass
         return Database.negotiations.get(neg_id)
+
+    @classmethod
+    async def list_negotiations_async(cls, limit: int = 50) -> list:
+        try:
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(
+                    select(DBNegotiation).order_by(DBNegotiation.negotiation_id.desc()).limit(limit)
+                )
+                rows = res.scalars().all()
+                if rows:
+                    return [{
+                        "id": r.negotiation_id,
+                        "negotiation_id": r.negotiation_id,
+                        "crop": r.crop,
+                        "quantity": r.quantity,
+                        "farmer_id": r.farmer_id,
+                        "buyer_id": r.buyer_id,
+                        "user_id": r.user_id,
+                        "farmer": r.farmer_name,
+                        "farmer_name": r.farmer_name,
+                        "status": r.status,
+                        "current_round": r.current_round,
+                        "summary": r.summary,
+                        "final_price": r.final_price,
+                        "transport_plan": r.transport_plan,
+                        "peer_node": r.peer_node,
+                        "logs": r.logs or [],
+                        "market_offers": r.market_offers or [],
+                        "selected_buyer": r.selected_buyer or {},
+                        "signatures": r.signatures or {}
+                    } for r in rows]
+        except Exception:
+            pass
+        negs = list(Database.negotiations.values())
+        negs.reverse()
+        return negs[:limit]
     @classmethod
     async def update_negotiation_async(cls, neg_id: str, payload: dict):
         payload["negotiation_id"] = neg_id

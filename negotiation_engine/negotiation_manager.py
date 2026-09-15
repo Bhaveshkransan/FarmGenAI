@@ -81,9 +81,10 @@ class NegotiationManager:
         # Prepare inputs for the LangGraph State Machine
         state_buyers = []
         for b in self.buyers:
+            b_name = str(getattr(b, 'name', None) or 'default')
             state_buyers.append({
-                "id": getattr(b, "id", f"buyer_{getattr(b, 'name', 'default').lower()}"),
-                "name": b.name,
+                "id": getattr(b, "id", f"buyer_{b_name.lower()}"),
+                "name": b_name,
                 "target_price": b.target_price,
                 "budget": b.budget,
                 "max_quantity": b.max_quantity,

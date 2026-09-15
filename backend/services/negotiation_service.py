@@ -209,7 +209,7 @@ class NegotiationService:
         )
 
     async def _build_buyer(self, buyer_profile: dict):
-        strategy = buyer_profile.get("strategy", "").lower()
+        strategy = str(buyer_profile.get("strategy") or "").lower()
         if "restaurant" in strategy or "premium" in strategy:
             return RestaurantAgent(
                 name=buyer_profile["name"],
@@ -288,7 +288,7 @@ class NegotiationService:
                 for b in db_buyers
             ]
         for profile in buyer_profiles:
-            strategy = profile.get("strategy", "").lower()
+            strategy = str(profile.get("strategy") or "").lower()
             if profile.get("kind") == "offer":
                 continue
 
@@ -831,7 +831,7 @@ class NegotiationService:
         offer_payload = {"price": new_price, "quantity": qty}
         context_payload = {"market_price": market_p, "round": next_round}
 
-        farmer_resp = farmer.respond_to_offer(offer_payload, context=context_payload, force_deterministic=False)
+        farmer_resp = farmer.respond_to_offer(offer_payload, context=context_payload, force_deterministic=True)
         decision_type = farmer_resp.get("type", "COUNTER")
         counter_price = farmer_resp.get("price", new_price)
         farmer_msg = farmer_resp.get("message", "")
@@ -875,15 +875,15 @@ class NegotiationService:
         await self.db_repo.update_negotiation_async(negotiation_id, update_payload)
 
         try:
-            from backend.websocket.manager import manager as ws_manager
-            await ws_manager.broadcast(negotiation_id, {
+            from backend.websocket.agent_updates import agent_update_hub as ws_manager
+            await ws_manager.broadcast({
                 "event": "NEGOTIATION_LOG",
                 "negotiation_id": negotiation_id,
                 "agent_type": "buyer",
                 "message": buyer_offer["message"],
                 "offer": new_price
             })
-            await ws_manager.broadcast(negotiation_id, {
+            await ws_manager.broadcast({
                 "event": "NEGOTIATION_LOG",
                 "negotiation_id": negotiation_id,
                 "agent_type": "farmer",
@@ -892,7 +892,7 @@ class NegotiationService:
                 "status": new_status
             })
             if new_status == "DEAL":
-                await ws_manager.broadcast(negotiation_id, {
+                await ws_manager.broadcast({
                     "event": "NEGOTIATION_FINISHED",
                     "negotiation_id": negotiation_id,
                     "status": "DEAL",

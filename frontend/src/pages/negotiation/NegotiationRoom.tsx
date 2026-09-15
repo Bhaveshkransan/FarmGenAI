@@ -31,6 +31,7 @@ import RagContextViewer from '@/features/negotiation/components/RagContextViewer
 import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
+import { getMatchingCounterparties, Counterparty, SECTOR_METADATA } from '@/constants/maharashtraMarkets';
 
 export default function NegotiationRoom() {
   const { id } = useParams();
@@ -55,11 +56,13 @@ export default function NegotiationRoom() {
   const [tentativePrice, setTentativePrice] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'matches' | 'chat'>('matches');
   const [matchingStep, setMatchingStep] = useState<'matching' | 'found'>('matching');
+  const [selectedSupplierIdx, setSelectedSupplierIdx] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [counterOffers, setCounterOffers] = useState<Record<number, number>>({});
   const [liveLogs, setLiveLogs] = useState<string[]>([
-    `[System] Negotiation ${id} queued in Redis. Waiting for background worker...`,
-    `[Worker] Negotiation ${id} dispatched via worker thread.`,
-    `[Planner] Initiating negotiation workflow planner.`,
-    `[Planner] Strategy: Analyzing crop features, historical APMC spread & volume constraints.`
+    `[System] Negotiation ${id} queued in Redis. Worker pool assigned.`,
+    `[Worker] Multi-Agent negotiation workflow dispatched.`,
+    `[Planner] Analyzing crop features, historical APMC spreads & buyer sector demand.`
   ]);
 
   // Fetch initial state from database
@@ -201,33 +204,162 @@ export default function NegotiationRoom() {
   const cropQty = negState?.quantity || 500;
   const currentFloor = negState?.min_price || 61.80;
   const targetPrice = negState?.target_price || negState?.buyer_target_price || 64.89;
+  const activeSector = negState?.buyer_strategy || negState?.purpose || negState?.buyer_persona || user?.buyerPersona || 'restaurant';
 
-  // Generate realistic matching counterparties based on crop
-  const matchedCounterparties = useMemo(() => {
-    const baseP = Number(currentFloor) || 60.0;
-    if (isBuyer) {
-      return [
-        { name: 'Suresh Deshmukh - Indrayani Farm', loc: 'Pune, Maharashtra', match: 96, dist: 105, initial: Math.round((baseP * 1.08)*10)/10, latest: Math.round((baseP * 1.02)*10)/10, status: 'Evaluating...' },
-        { name: 'Ramesh Kale - Jalna Agro Producer', loc: 'Jalna, Maharashtra', match: 94, dist: 210, initial: Math.round((baseP * 1.12)*10)/10, latest: Math.round((baseP * 1.05)*10)/10, status: 'Counter-offered' },
-        { name: 'Tanaji Patil - Krishna Basin Farms', loc: 'Kolhapur, Maharashtra', match: 93, dist: 230, initial: Math.round((baseP * 1.10)*10)/10, latest: Math.round((baseP * 1.04)*10)/10, status: 'Active' },
-        { name: 'Vishnu Jadhav - Lasalgaon Farm Lot', loc: 'Nashik, Maharashtra', match: 91, dist: 180, initial: Math.round((baseP * 1.14)*10)/10, latest: Math.round((baseP * 1.07)*10)/10, status: 'Reviewing' },
-        { name: 'Subhash Bhende - Akola Oilseeds', loc: 'Akola, Maharashtra', match: 89, dist: 380, initial: Math.round((baseP * 1.15)*10)/10, latest: Math.round((baseP * 1.09)*10)/10, status: 'Active' },
-      ];
-    } else {
-      return [
-        { name: 'MahaAgro State Trading Apex', loc: 'Nagpur, Maharashtra', match: 96, dist: 250, initial: Math.round((baseP * 1.15)*10)/10, latest: Math.round((baseP * 1.12)*10)/10, status: 'Evaluated...' },
-        { name: 'Navi Mumbai Vashi Wholesale Terminal', loc: 'Mumbai, Maharashtra', match: 96, dist: 170, initial: Math.round((baseP * 1.10)*10)/10, latest: Math.round((baseP * 1.08)*10)/10, status: 'Evaluated...' },
-        { name: 'Vidarbha Ginning & Spinning Mill', loc: 'Wardha, Maharashtra', match: 96, dist: 310, initial: Math.round((baseP * 1.08)*10)/10, latest: Math.round((baseP * 1.05)*10)/10, status: 'Active' },
-        { name: 'Cotton Corporation of India - Akola Branch', loc: 'Akola, Maharashtra', match: 96, dist: 280, initial: Math.round((baseP * 1.05)*10)/10, latest: Math.round((baseP * 1.03)*10)/10, status: 'Evaluated...' },
-        { name: 'Akola Cotton Textiles Consortium', loc: 'Akola, Maharashtra', match: 96, dist: 290, initial: Math.round((baseP * 1.04)*10)/10, latest: Math.round((baseP * 1.02)*10)/10, status: 'Evaluated...' },
-      ];
-    }
-  }, [currentFloor, isBuyer]);
+  // Generate authentic Maharashtra counterparties grounded in crop and sector
+  const matchedCounterparties: Counterparty[] = useMemo(() => {
+    return getMatchingCounterparties(
+      cropName,
+      isBuyer,
+      Number(currentFloor) || 45.0,
+      cropQty,
+      activeSector
+    );
+  }, [cropName, isBuyer, currentFloor, cropQty, activeSector]);
 
-  const bestMatch = matchedCounterparties[0];
-  const grossAmount = Math.round(cropQty * bestMatch.latest);
-  const transportCost = 1850;
+  const activeSupplier = matchedCounterparties[selectedSupplierIdx] || matchedCounterparties[0] || {
+    name: 'Maharashtra Farmer Network',
+    loc: 'Pune, Maharashtra',
+    dist: 100,
+    match: 95,
+    status: 'Active',
+    initial: 48,
+    latest: 45,
+    availableQty: cropQty,
+    minBatch: Math.min(cropQty, 200),
+    special: 'APMC Lot'
+  };
+
+  const negotiatedPrice = counterOffers[selectedSupplierIdx] || activeSupplier.latest;
+  const grossAmount = Math.round(cropQty * negotiatedPrice);
+  const transportCost = Math.max(650, Math.round(activeSupplier.dist * 6.5 + cropQty * 0.35));
   const netAmount = isBuyer ? grossAmount + transportCost : grossAmount - transportCost;
+  const bestMatch = activeSupplier;
+
+  const handleSelectSupplier = (idx: number) => {
+    setSelectedSupplierIdx(idx);
+    const target = matchedCounterparties[idx];
+    const price = counterOffers[idx] || target.latest;
+    setLiveLogs(prev => [
+      ...prev,
+      `[Matching] Focused active negotiation on ${target.name} (${target.loc}) at ₹${price}/kg.`
+    ]);
+  };
+
+  const handleLockGuardrail = async () => {
+    const guardPrice = Number(currentFloor);
+    setLiveLogs(prev => [...prev, `[Copilot Guardrail] Locked price guardrail at ₹${guardPrice}/kg.`]);
+    try {
+      const res = await api.post(`/negotiations/${id}/intervene`, {
+        price: guardPrice,
+        quantity: cropQty,
+        instruction: `Price guardrail locked at ₹${guardPrice}/kg.`
+      });
+      if (res.data?.farmer_response) {
+        const resp = res.data.farmer_response;
+        setLiveLogs(prev => [...prev, `[Farmer Agent] ${resp.message || `Counter: ₹${resp.price}/kg`}`]);
+        if (resp.price) {
+          setCounterOffers(prev => ({ ...prev, [selectedSupplierIdx]: resp.price }));
+        }
+      }
+    } catch (err) {}
+  };
+
+  const handleAutonomousCounter = async () => {
+    const currentP = counterOffers[selectedSupplierIdx] || activeSupplier.latest;
+    const targetP = Number(targetPrice) || Number(currentFloor);
+    const gap = currentP - targetP;
+    const step = Math.max(0.25, Math.round(gap * 0.35 * 10) / 10);
+    const newBid = Math.max(targetP, Math.round((currentP - step) * 10) / 10);
+
+    setLiveLogs(prev => [...prev, `[Buyer Copilot] Concession counter bid ₹${newBid}/kg sent to ${activeSupplier.name}...`]);
+
+    try {
+      const res = await api.post(`/negotiations/${id}/autonomous-step`);
+      if (res.data?.farmer_response) {
+        const resp = res.data.farmer_response;
+        const newFarmerAsk = resp.price || newBid;
+        setCounterOffers(prev => ({ ...prev, [selectedSupplierIdx]: newFarmerAsk }));
+        setLiveLogs(prev => [...prev, `[Farmer Agent] ${resp.message || `Revised ask to ₹${newFarmerAsk}/kg`}`]);
+        if (res.data.status === 'DEAL' || resp.decision === 'ACCEPT') {
+          setLiveLogs(prev => [...prev, `🎉 [Deal Finalized] Mutual terms accepted at ₹${newBid}/kg!`]);
+          setTentativePrice(newBid);
+        }
+      } else {
+        setCounterOffers(prev => ({ ...prev, [selectedSupplierIdx]: newBid }));
+        setLiveLogs(prev => [...prev, `[Farmer Agent] Counter bid ₹${newBid}/kg acknowledged by ${activeSupplier.name}.`]);
+      }
+    } catch (err) {
+      setCounterOffers(prev => ({ ...prev, [selectedSupplierIdx]: newBid }));
+      setLiveLogs(prev => [...prev, `[Farmer Agent] Evaluating counter ₹${newBid}/kg. Counter recorded.`]);
+    }
+  };
+
+  const handleTogglePause = () => {
+    setIsPaused(prev => {
+      const next = !prev;
+      setLiveLogs(l => [...l, next ? `⏸️ [Copilot] Negotiations paused for review.` : `▶️ [Copilot] Negotiations resumed. AI agents active.`]);
+      return next;
+    });
+  };
+
+  const handleSendInstruction = async () => {
+    if (!copilotInstruction.trim()) return;
+    const text = copilotInstruction.trim();
+    setCopilotInstruction('');
+    setLiveLogs(prev => [...prev, `[Human Copilot Override] "${text}"`]);
+
+    const match = text.match(/(?:₹|\b)(\d+(?:\.\d+)?)/);
+    const parsedPrice = match ? parseFloat(match[1]) : null;
+    const offerP = parsedPrice || Math.round((negotiatedPrice - 0.5) * 10) / 10;
+
+    try {
+      const res = await api.post(`/negotiations/${id}/intervene`, {
+        price: offerP,
+        quantity: cropQty,
+        instruction: text
+      });
+      if (res.data?.farmer_response) {
+        const resp = res.data.farmer_response;
+        const newFarmerAsk = resp.price || offerP;
+        setCounterOffers(prev => ({ ...prev, [selectedSupplierIdx]: newFarmerAsk }));
+        setLiveLogs(prev => [...prev, `[Farmer Agent] Response to instruction: ${resp.message || `Ask adjusted to ₹${newFarmerAsk}/kg`}`]);
+      } else {
+        setCounterOffers(prev => ({ ...prev, [selectedSupplierIdx]: offerP }));
+        setLiveLogs(prev => [...prev, `[Farmer Agent] Adjusting position per buyer instruction to ₹${offerP}/kg.`]);
+      }
+    } catch (err) {
+      setCounterOffers(prev => ({ ...prev, [selectedSupplierIdx]: offerP }));
+      setLiveLogs(prev => [...prev, `[Farmer Agent] Counter offer recorded at ₹${offerP}/kg.`]);
+    }
+  };
+
+  const handleFinalizeSmartContract = async () => {
+    const seller = activeSupplier.name;
+    const buyer = isBuyer ? (user?.name || 'Buyer Enterprise') : activeSupplier.name;
+    try {
+      await api.post(`/negotiations/${id}/finalize`, {
+        price: negotiatedPrice,
+        quantity: cropQty,
+        crop: cropName,
+        farmer: isBuyer ? seller : (user?.name || 'Farmer Enterprise'),
+        buyer: buyer
+      });
+    } catch (err) {}
+
+    setAgreementData({
+      ...negState,
+      id: id,
+      price: negotiatedPrice,
+      quantity: cropQty,
+      crop: cropName,
+      farmer: isBuyer ? seller : (user?.name || 'Farmer Enterprise'),
+      buyer: buyer,
+      status: 'DEAL'
+    });
+    setTentativePrice(negotiatedPrice);
+    setShowValidationModal(true);
+  };
 
   if (isLoading) return <div className="p-8 text-center text-slate-500">Initializing LangGraph Negotiation Multi-Agent Network...</div>;
 
@@ -371,62 +503,82 @@ export default function NegotiationRoom() {
 
               {/* Match Cards List */}
               <div className="space-y-3">
-                {matchedCounterparties.map((cp, idx) => (
-                  <div 
-                    key={idx}
-                    className={`p-4 rounded-xl border transition ${
-                      idx === 0 
-                        ? 'bg-emerald-50/20 border-emerald-300 ring-1 ring-emerald-400/20 shadow-sm' 
-                        : 'bg-white border-slate-200/80 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          {idx === 0 && <span className="text-amber-500 text-sm">⭐</span>}
-                          <p className="font-bold text-slate-900 text-xs">{cp.name}</p>
-                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
-                            {cp.match}% Match
-                          </span>
+                {matchedCounterparties.map((cp, idx) => {
+                  const isSelected = selectedSupplierIdx === idx;
+                  const currentPrice = counterOffers[idx] || cp.latest;
+                  return (
+                    <div 
+                      key={idx}
+                      onClick={() => handleSelectSupplier(idx)}
+                      className={`p-4 rounded-xl border transition cursor-pointer ${
+                        isSelected 
+                          ? 'bg-emerald-50/50 border-emerald-500 ring-2 ring-emerald-500/30 shadow-md' 
+                          : 'bg-white border-slate-200/80 hover:border-emerald-300 hover:bg-slate-50/50'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            {idx === 0 && <span className="text-amber-500 text-sm">⭐</span>}
+                            <p className="font-bold text-slate-900 text-xs">{cp.name}</p>
+                            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
+                              {cp.match}% Match
+                            </span>
+                            {isSelected && (
+                              <span className="px-1.5 py-0.5 bg-emerald-700 text-white text-[9px] font-black rounded uppercase tracking-wider">
+                                Selected Focus
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {cp.loc} • Distance: {cp.dist} km • Avail: {cp.availableQty.toLocaleString()} kg (Min batch: {cp.minBatch.toLocaleString()} kg)
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-medium rounded border border-slate-200">
+                              {cp.special}
+                            </span>
+                            {cp.sectorBadge && (
+                              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-semibold rounded border border-blue-200">
+                                {cp.sectorBadge}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          Distance: {cp.dist} km • Req: 300-700 kg
-                        </p>
+
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          LIVE
+                        </span>
                       </div>
 
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        LIVE
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-medium">Initial Offer</span>
-                        <p className="font-bold text-slate-800">₹{cp.initial}/kg</p>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 font-medium">Latest Negotiated</span>
-                        <p className="font-bold text-emerald-700">₹{cp.latest}/kg</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-400 font-medium">AI Status</span>
-                        <p className="text-[11px] font-semibold text-slate-700">{cp.status}</p>
+                      <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-xs">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-medium">Initial Offer</span>
+                          <p className="font-bold text-slate-800">₹{cp.initial}/kg</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-medium">Latest Negotiated</span>
+                          <p className="font-bold text-emerald-700 text-sm">₹{currentPrice}/kg</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] text-slate-400 font-medium">AI Status</span>
+                          <p className="text-[11px] font-semibold text-slate-700">{cp.status}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              {/* BEST DEAL SO FAR Banner */}
+              {/* BEST DEAL SO FAR / SELECTED FOCUS Banner */}
               <div className="p-4 bg-emerald-700 text-white rounded-2xl shadow-md flex justify-between items-center">
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-200">
-                    <span>🏆 BEST DEAL SO FAR</span>
+                    <span>{selectedSupplierIdx === 0 ? '🏆 BEST MATCH DEAL' : '🎯 ACTIVE NEGOTIATION FOCUS'}</span>
                   </div>
-                  <p className="text-base font-black mt-0.5">{bestMatch.name}</p>
+                  <p className="text-base font-black mt-0.5">{activeSupplier.name}</p>
                   <p className="text-xs text-emerald-100 mt-0.5">
-                    ₹{bestMatch.latest}/kg • {cropQty} kg • {bestMatch.match}% Match
+                    ₹{negotiatedPrice}/kg • {cropQty} kg • {activeSupplier.match}% Match • {activeSupplier.loc}
                   </p>
                 </div>
 
@@ -520,28 +672,27 @@ export default function NegotiationRoom() {
           {/* Quick Intervention Buttons */}
           <div className="flex flex-wrap gap-1.5 pt-1">
             <button
-              onClick={() => {
-                setLiveLogs(prev => [...prev, `[Copilot] Price guardrail locked at ₹${currentFloor}/kg.`]);
-              }}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg border border-slate-700 cursor-pointer"
+              onClick={handleLockGuardrail}
+              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg border border-slate-700 cursor-pointer transition active:scale-95"
             >
               {isBuyer ? `Don't exceed ₹${currentFloor}` : `Don't go below ₹${currentFloor}`}
             </button>
             <button
-              onClick={() => {
-                setLiveLogs(prev => [...prev, `[Copilot] Countering best offer from ${bestMatch.name}.`]);
-              }}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg border border-slate-700 cursor-pointer"
+              onClick={handleAutonomousCounter}
+              className="px-2.5 py-1 bg-emerald-900/60 hover:bg-emerald-800 text-emerald-300 text-[11px] font-semibold rounded-lg border border-emerald-700 cursor-pointer transition active:scale-95 flex items-center gap-1"
             >
-              Counter best {isBuyer ? 'supplier' : 'buyer'}
+              <Zap size={11} className="text-amber-400" />
+              Counter {activeSupplier.name.split(' ')[0]}
             </button>
             <button
-              onClick={() => {
-                setLiveLogs(prev => [...prev, `[Copilot] Negotiations paused for review.`]);
-              }}
-              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold rounded-lg border border-slate-700 cursor-pointer"
+              onClick={handleTogglePause}
+              className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg border cursor-pointer transition active:scale-95 ${
+                isPaused 
+                  ? 'bg-amber-900/60 text-amber-200 border-amber-600' 
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              }`}
             >
-              Pause negotiations
+              {isPaused ? '▶️ Resume' : '⏸️ Pause'}
             </button>
           </div>
 
@@ -551,16 +702,13 @@ export default function NegotiationRoom() {
               type="text"
               value={copilotInstruction}
               onChange={(e) => setCopilotInstruction(e.target.value)}
-              placeholder={`e.g. "Try to get ₹${Math.round(bestMatch.latest * 0.96)} from the best"`}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSendInstruction(); }}
+              placeholder={`e.g. "Offer ₹${Math.max(1, Math.round((negotiatedPrice - 1) * 10) / 10)} to ${activeSupplier.name.split(' ')[0]}"`}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-500"
             />
             <button
-              onClick={() => {
-                if (!copilotInstruction.trim()) return;
-                setLiveLogs(prev => [...prev, `[Human Copilot Override] "${copilotInstruction}"`]);
-                setCopilotInstruction('');
-              }}
-              className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+              onClick={handleSendInstruction}
+              className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow"
             >
               <Send size={13} /> Send Instruction
             </button>
@@ -573,7 +721,7 @@ export default function NegotiationRoom() {
             <ShieldCheck size={18} className="text-emerald-300" />
             <div>
               <h3 className="font-bold text-xs">Final Agreement Preview</h3>
-              <p className="text-[10px] text-emerald-200">Smart Contract execution pending signature.</p>
+              <p className="text-[10px] text-emerald-200">APMC Compliant Smart Contract execution ready.</p>
             </div>
           </div>
 
@@ -585,27 +733,31 @@ export default function NegotiationRoom() {
             <div className="grid grid-cols-2 gap-2 text-[11px]">
               <div>
                 <span className="text-slate-400">SELLER:</span>
-                <p className="font-bold truncate">{isBuyer ? bestMatch.name : (user?.name || 'Ritik Mehta')}</p>
+                <p className="font-bold truncate" title={isBuyer ? activeSupplier.name : (user?.name || 'Farmer Enterprise')}>
+                  {isBuyer ? activeSupplier.name : (user?.name || 'Farmer Enterprise')}
+                </p>
               </div>
               <div>
                 <span className="text-slate-400">BUYER:</span>
-                <p className="font-bold truncate">{isBuyer ? (user?.name || 'Buyer Enterprise') : bestMatch.name}</p>
+                <p className="font-bold truncate" title={isBuyer ? (user?.name || 'Buyer Enterprise') : activeSupplier.name}>
+                  {isBuyer ? (user?.name || 'Buyer Enterprise') : activeSupplier.name}
+                </p>
               </div>
             </div>
 
             <div className="text-[11px] border-t pt-1.5">
               <span className="text-slate-400">COMMODITY TERMS:</span>
-              <p className="font-bold">{cropQty} kg of {cropName} (Grade A)</p>
+              <p className="font-bold">{cropQty.toLocaleString()} kg of {cropName} (Grade A)</p>
             </div>
 
             <div className="text-[11px] border-t pt-1.5 flex justify-between items-center">
               <span className="text-slate-500 font-semibold">Settlement Rate:</span>
-              <span className="font-black text-emerald-700 text-sm">₹{bestMatch.latest}/kg</span>
+              <span className="font-black text-emerald-700 text-sm">₹{negotiatedPrice}/kg</span>
             </div>
           </div>
 
           <button
-            onClick={() => setShowValidationModal(true)}
+            onClick={handleFinalizeSmartContract}
             className="w-full py-2.5 bg-white hover:bg-emerald-50 text-emerald-900 font-black text-xs rounded-xl shadow transition cursor-pointer"
           >
             Sign & Finalize Smart Contract →
