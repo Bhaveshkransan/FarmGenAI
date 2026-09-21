@@ -294,11 +294,14 @@ async def knowledge_manager_node(state: NegotiationState) -> Dict[str, Any]:
     
     weather_data, mandi_data = await asyncio.gather(weather_task, mandi_task)
     
+    logs = list(state.get("logs", []))
+    logs.append("🧠 [KnowledgeManager] Live market data & context retrieved.")
+    
     return {
         "rag_context": rag_context, 
         "weather": weather_data,
         "live_mandi": mandi_data,
-        "logs": ["🧠 [KnowledgeManager] Live market data & context retrieved."]
+        "logs": logs
     }
 
 # ─────────────────────────────────────────────
@@ -1037,14 +1040,9 @@ async def _generate_recommendation(state: NegotiationState, deal: Optional[Dict]
         from backend.agents.prompts import RECOMMENDATION_PROMPT
         deal_type = deal.get("type", "DIRECT") if deal else "NONE"
         prompt = RECOMMENDATION_PROMPT.format(
-            crop=state["crop"],
-            quantity=state["quantity"],
-            farmer_min_price=state["min_price"],
-            direct_sale_result=f"Status={state['status']}, Price=₹{state.get('latest_buyer_offer', 0)}/kg",
-            storage_cost=round(1.8 * state["quantity"] * state["spoilage_days"], 2),
-            storage_days=state["spoilage_days"],
-            processor_offer=round(state["market_price"] * 0.8, 2),
-            market_price=state["market_price"]
+            crop=state.get("crop", "Produce"),
+            final_status=state.get("status", "COMPLETED"),
+            reflection_insights=str(state.get("reflection") or f"Direct sale result: {state.get('status')}")
         )
         rec = llm_client.generate(prompt, max_tokens=120)
         if rec:

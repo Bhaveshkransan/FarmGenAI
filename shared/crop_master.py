@@ -84,6 +84,11 @@ def get_allowed_ml_mappings():
 
 def get_crop_by_name(name):
     for c in CROPS.values():
-        if c["name"].lower() == name.lower() or c["ml_mapping"].lower() == name.lower():
+        # Check against all possible names/aliases to make it robust
+        if (c.get("name", "").lower() == name.lower() or 
+            c.get("ml_mapping", "").lower() == name.lower() or
+            c.get("rag_mapping", "").lower() == name.lower() or
+            c.get("crop_id", "").lower() == name.lower() or
+            c.get("mandi_api_mapping", "").lower() == name.lower()):
             return c
     return None

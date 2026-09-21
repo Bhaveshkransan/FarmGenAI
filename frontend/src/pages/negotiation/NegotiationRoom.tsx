@@ -33,9 +33,13 @@ export default function NegotiationRoom() {
     queryFn: async () => {
       return await negotiationService.getNegotiation(id);
     },
-    refetchInterval: (data) => {
-      if (!data) return 3000;
-      return (data.status === 'QUEUED' || data.status === 'ACTIVE') ? 3000 : false;
+    refetchInterval: (query: any) => {
+      const data = query?.state?.data || query;
+      if (!data) return 2000;
+      if (data.status === 'QUEUED' || data.status === 'ACTIVE' || !data.market_offers || data.market_offers.length === 0) {
+        return 2000;
+      }
+      return false;
     }
   });
 
@@ -63,11 +67,13 @@ export default function NegotiationRoom() {
       });
     });
 
-    // Map negotiation logs into system text bubbles
     const logs = negState.logs || [];
     logs.forEach(log => {
       if (typeof log === 'string') {
-        historicMessages.push({ agent: 'System', message: log, type: 'text' });
+        let parsedAgent = 'System';
+        if (log.includes('[Farmer]')) parsedAgent = 'Your AI (Farmer)';
+        else if (log.includes('[Buyer]')) parsedAgent = 'Buyer Agent';
+        historicMessages.push({ agent: parsedAgent, message: log, type: 'text' });
       }
     });
 
@@ -83,7 +89,12 @@ export default function NegotiationRoom() {
   // Handle incoming WS messages
   useEffect(() => {
     if (lastMessage && String(lastMessage.negotiation_id) === String(id)) {
-      if (lastMessage.event === 'NEGOTIATION_LOG') {
+      if (lastMessage.event === 'MARKET_OFFERS_MATCHED') {
+        refetch();
+      } else if (lastMessage.event === 'NEGOTIATION_LOG') {
+        if (!negState?.market_offers || negState.market_offers.length === 0) {
+          refetch();
+        }
         setMessages(prev => [...prev, {
           agent: lastMessage.agent_name || (lastMessage.agent_type === 'farmer' ? 'Your AI (Farmer)' : 
                  (lastMessage.agent_type === 'system' ? 'System' : 'Buyer Agent')),
@@ -103,12 +114,26 @@ export default function NegotiationRoom() {
           ...negState,
           price: lastMessage.final_price,
           quantity: negState?.quantity,
-          status: lastMessage.status
+          status: lastMessage.status,
+          market_price: lastMessage.market_price || negState?.market_price,
+          min_price: lastMessage.min_price || negState?.min_price
         };
         setAgreementData(finalDeal);
         setShowAgreement(true);
+        refetch(); // Immediately sync state to get final market_offers and pricing
+        
         if (Array.isArray(lastMessage.logs)) {
-          setMessages(lastMessage.logs);
+          // Map raw string logs to objects if they are strings, otherwise keep them
+          const finalMessages = lastMessage.logs.map(log => {
+            if (typeof log === 'string') {
+              let parsedAgent = 'System';
+              if (log.includes('[Farmer]')) parsedAgent = 'Your AI (Farmer)';
+              else if (log.includes('[Buyer]')) parsedAgent = 'Buyer Agent';
+              return { agent: parsedAgent, message: log, type: 'text' };
+            }
+            return log;
+          });
+          setMessages(finalMessages);
         }
       }
     }

@@ -390,26 +390,29 @@ class Database:
             if not db_neg:
                 db_neg = DBNegotiation(negotiation_id=neg_id)
                 session.add(db_neg)
-            if "crop" in payload: db_neg.crop = payload["crop"]
-            if "quantity" in payload: db_neg.quantity = payload["quantity"]
-            if "farmer_id" in payload: db_neg.farmer_id = payload["farmer_id"]
-            if "buyer_id" in payload: db_neg.buyer_id = payload["buyer_id"]
-            if "user_id" in payload: db_neg.user_id = payload["user_id"]
-            if "farmer_name" in payload: db_neg.farmer_name = payload["farmer_name"]
-            if "status" in payload: db_neg.status = payload["status"]
-            if "current_round" in payload: db_neg.current_round = payload["current_round"]
-            if "summary" in payload: db_neg.summary = payload["summary"]
-            if "final_price" in payload: db_neg.final_price = payload["final_price"]
-            if "market_price" in payload: db_neg.market_price = payload["market_price"]
-            if "min_price" in payload: db_neg.min_price = payload["min_price"]
-            if "transport_plan" in payload: db_neg.transport_plan = payload["transport_plan"]
-            if "peer_node" in payload: db_neg.peer_node = payload["peer_node"]
-            if "logs" in payload: db_neg.logs = payload["logs"]
-            if "market_offers" in payload: db_neg.market_offers = payload["market_offers"]
-            if "selected_buyer" in payload: db_neg.selected_buyer = payload["selected_buyer"]
-            if "signatures" in payload: db_neg.signatures = payload["signatures"]
+            if "crop" in payload and payload["crop"] is not None: db_neg.crop = payload["crop"]
+            if "quantity" in payload and payload["quantity"] is not None: db_neg.quantity = payload["quantity"]
+            if "farmer_id" in payload and payload["farmer_id"] is not None: db_neg.farmer_id = payload["farmer_id"]
+            if "buyer_id" in payload and payload["buyer_id"] is not None: db_neg.buyer_id = payload["buyer_id"]
+            if "user_id" in payload and payload["user_id"] is not None: db_neg.user_id = payload["user_id"]
+            if "farmer_name" in payload and payload["farmer_name"] is not None: db_neg.farmer_name = payload["farmer_name"]
+            if "status" in payload and payload["status"] is not None: db_neg.status = payload["status"]
+            if "current_round" in payload and payload["current_round"] is not None: db_neg.current_round = payload["current_round"]
+            if "summary" in payload and payload["summary"] is not None: db_neg.summary = payload["summary"]
+            if "final_price" in payload and payload["final_price"] is not None: db_neg.final_price = payload["final_price"]
+            if "market_price" in payload and payload["market_price"] is not None: db_neg.market_price = payload["market_price"]
+            if "min_price" in payload and payload["min_price"] is not None: db_neg.min_price = payload["min_price"]
+            if "transport_plan" in payload and payload["transport_plan"] is not None: db_neg.transport_plan = payload["transport_plan"]
+            if "peer_node" in payload and payload["peer_node"] is not None: db_neg.peer_node = payload["peer_node"]
+            if "logs" in payload and payload["logs"]: db_neg.logs = payload["logs"]
+            if "market_offers" in payload and payload["market_offers"]: db_neg.market_offers = payload["market_offers"]
+            if "selected_buyer" in payload and payload["selected_buyer"]: db_neg.selected_buyer = payload["selected_buyer"]
+            if "signatures" in payload and payload["signatures"] is not None: db_neg.signatures = payload["signatures"]
             await session.commit()
-        Database.negotiations[neg_id] = payload
+        if neg_id in Database.negotiations:
+            Database.negotiations[neg_id].update(payload)
+        else:
+            Database.negotiations[neg_id] = payload
     @classmethod
     async def append_offer_async(cls, negotiation_id: str, payload: dict) -> dict:
         p = deepcopy(payload)

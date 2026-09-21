@@ -95,46 +95,67 @@ export default function RagContextViewer({ isOpen, onClose, query = 'market pric
           </div>
         ) : (
         <>
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm mb-4">
-          <h4 className="font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-2 text-emerald-600">Market Information</h4>
-          <div className="flex justify-between items-center text-[10px] text-slate-500 mb-3 pb-2 border-b border-slate-200">
-            <span>Source: Mandi API & Historical Datasets</span>
-            <span>Updated: Live</span>
+        {activeCollection === 'market_prices' && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm mb-4 shadow-sm">
+            <h4 className="font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-2 text-emerald-600">Market Information</h4>
+            <div className="flex justify-between items-center text-[10px] text-slate-500 mb-3 pb-2 border-b border-slate-200">
+              <span>Source: Mandi API & Historical Datasets</span>
+              <span>Updated: Live</span>
+            </div>
+            <div className="space-y-4">
+              {contexts.map((ctx, idx) => (
+                <div key={idx} className="bg-white p-3 rounded border border-slate-100 shadow-sm">
+                  <p className="text-slate-800 text-xs font-semibold mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    {ctx.metadata?.crop || crop} Price Context
+                  </p>
+                  <p className="text-slate-600 text-xs leading-relaxed">{ctx.text || ctx.content}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="space-y-3">
-            {contexts.filter(c => activeCollection === 'market_prices').map((ctx, idx) => (
-              <div key={idx}>
-                <p className="text-slate-800 text-xs font-medium mb-1">{ctx.metadata?.crop || crop} Price Context</p>
-                <p className="text-slate-600 text-xs">{ctx.text || ctx.content}</p>
-              </div>
-            ))}
-            {activeCollection !== 'market_prices' && (
-              <p className="text-slate-400 text-xs italic">Switch to 'Prices' tab to view market data.</p>
-            )}
-          </div>
-        </div>
+        )}
 
-        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm mb-4">
-          <h4 className="font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-2 text-purple-600">Crop Knowledge</h4>
-          <div className="space-y-3">
-            {contexts.filter(c => activeCollection === 'crop_knowledge').map((ctx, idx) => (
-              <div key={idx}>
-                <p className="text-slate-800 text-xs font-medium mb-1">{ctx.metadata?.variety || 'Quality'} Requirements</p>
-                <p className="text-slate-600 text-xs">{ctx.text || ctx.content}</p>
-              </div>
-            ))}
-            {activeCollection !== 'crop_knowledge' && (
-               <p className="text-slate-400 text-xs italic">Switch to 'Knowledge' tab to view crop requirements.</p>
-            )}
+        {activeCollection === 'reflection_memory' && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm mb-4 shadow-sm">
+            <h4 className="font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-2 text-blue-600">Negotiation Strategies</h4>
+            <div className="space-y-4">
+              {contexts.map((ctx, idx) => (
+                <div key={idx} className="bg-white p-3 rounded border border-slate-100 shadow-sm">
+                  <p className="text-slate-800 text-xs font-semibold mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                    Strategy Insight
+                  </p>
+                  <p className="text-slate-600 text-xs leading-relaxed">{ctx.text || ctx.content}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {activeCollection === 'crop_knowledge' && (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm mb-4 shadow-sm">
+            <h4 className="font-bold text-slate-700 uppercase text-[10px] tracking-wider mb-2 text-purple-600">Crop Knowledge</h4>
+            <div className="space-y-4">
+              {contexts.map((ctx, idx) => (
+                <div key={idx} className="bg-white p-3 rounded border border-slate-100 shadow-sm">
+                  <p className="text-slate-800 text-xs font-semibold mb-1 flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400"></span>
+                    {ctx.metadata?.variety || 'Quality'} Requirements
+                  </p>
+                  <p className="text-slate-600 text-xs leading-relaxed">{ctx.text || ctx.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="bg-emerald-50 border border-emerald-100 rounded-lg p-4 text-sm mt-6">
-          <h4 className="font-bold text-emerald-800 text-xs mb-2">Retrieved because:</h4>
+          <h4 className="font-bold text-emerald-800 text-[11px] uppercase tracking-wider mb-2">Retrieved because:</h4>
           <ul className="list-disc pl-4 text-emerald-700 text-xs space-y-1">
-            <li>crop = {crop}</li>
-            <li>location = Maharashtra</li>
-            <li>query = {searchQuery}</li>
+            <li>crop = <span className="font-medium">{crop}</span></li>
+            <li>location = <span className="font-medium">Maharashtra</span></li>
+            <li>query = <span className="font-medium">"{searchQuery}"</span></li>
           </ul>
         </div>
         </>
