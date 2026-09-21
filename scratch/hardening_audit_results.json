@@ -1,0 +1,427 @@
+{
+  "model_verification": {
+    "model_path": "c:\\Users\\bhave\\Downloads\\Agrinegotiator-Ritik\\backend\\models\\buyer_price_prediction_model.pkl",
+    "file_size_bytes": 1807,
+    "model_type": "Ridge",
+    "pipeline_steps": [
+      "scaler",
+      "ridge"
+    ],
+    "numerical_feature_count": 12,
+    "feature_cols": [
+      "modal_price_kg",
+      "min_price_kg",
+      "max_price_kg",
+      "spread",
+      "arrival_mt",
+      "lag_1_modal",
+      "lag_2_modal",
+      "rolling_3_modal",
+      "momentum",
+      "arrival_shock",
+      "month_sin",
+      "month_cos"
+    ],
+    "one_hot_crop_count": 7,
+    "crop_list": [
+      "Bajra",
+      "Cotton",
+      "Jowar",
+      "Onion",
+      "Rice",
+      "Soybean",
+      "Sugarcane"
+    ],
+    "total_feature_dimensions": 19,
+    "dummy_prediction_test": 13.7018,
+    "target_variable": "target_next_modal_kg",
+    "target_meaning": "Next-period APMC modal wholesale price (P_modal, t+1) in Rs/kg",
+    "no_future_target_leakage": true,
+    "status": "VERIFIED"
+  },
+  "dataset_provenance": {
+    "dataset_path": "c:\\Users\\bhave\\Downloads\\Agrinegotiator-Ritik\\backend\\dataset\\buyer_feature_dataset.csv",
+    "total_records": 13179,
+    "unique_crops": [
+      "Bajra",
+      "Cotton",
+      "Jowar",
+      "Onion",
+      "Rice",
+      "Soybean",
+      "Sugarcane"
+    ],
+    "crop_counts": {
+      "Bajra": 2198,
+      "Cotton": 941,
+      "Jowar": 3491,
+      "Onion": 1771,
+      "Rice": 1269,
+      "Soybean": 3499,
+      "Sugarcane": 10
+    },
+    "unique_apmcs_count": 327,
+    "unique_districts_count": 32,
+    "earliest_date": "2014-09",
+    "latest_date": "2016-10",
+    "target_leakage_anomalies": 0,
+    "synthetic_rows_found": 0,
+    "status": "VERIFIED"
+  },
+  "runtime_lookup_verification": {
+    "A_exact_apmc": {
+      "crop": "Soybean",
+      "query_location": "Latur",
+      "resolved_apmc": "Latur",
+      "resolved_district": "Latur",
+      "match_level": "apmc_exact_match (Latur)",
+      "observation_date": "2016-10",
+      "is_real_data": true,
+      "status": "PASS"
+    },
+    "B_apmc_token": {
+      "crop": "Soybean",
+      "query_location": "latur mandi apmc",
+      "resolved_apmc": "Latur",
+      "resolved_district": "Latur",
+      "match_level": "apmc_token_match (Latur)",
+      "observation_date": "2016-10",
+      "is_real_data": true,
+      "status": "PASS"
+    },
+    "C_exact_district": {
+      "crop": "Soybean",
+      "query_location": "Pune",
+      "resolved_apmc": "Indapur",
+      "resolved_district": "Pune",
+      "match_level": "district_exact_match (Pune)",
+      "observation_date": "2016-10",
+      "is_real_data": true,
+      "status": "PASS"
+    },
+    "D_district_token": {
+      "crop": "Soybean",
+      "query_location": "pune district maharashtra",
+      "resolved_apmc": "Indapur",
+      "resolved_district": "Pune",
+      "match_level": "district_token_match (Pune)",
+      "observation_date": "2016-10",
+      "is_real_data": true,
+      "status": "PASS"
+    },
+    "E_substring": {
+      "crop": "Soybean",
+      "query_location": "lat",
+      "resolved_apmc": "Latur",
+      "resolved_district": "Latur",
+      "match_level": "apmc_substring_match (Latur)",
+      "observation_date": "2016-10",
+      "is_real_data": true,
+      "status": "PASS"
+    },
+    "F_statewide_fallback": {
+      "crop": "Soybean",
+      "query_location": "",
+      "resolved_apmc": "Varud",
+      "resolved_district": "Amaravathi",
+      "match_level": "state_latest_fallback (Varud, Amaravathi)",
+      "observation_date": "2016-10",
+      "is_real_data": true,
+      "status": "PASS"
+    },
+    "G_unknown_location": {
+      "crop": "Soybean",
+      "query_location": "Atlantis 999 Unknown",
+      "resolved_apmc": "Varud",
+      "resolved_district": "Amaravathi",
+      "match_level": "state_latest_fallback (Varud, Amaravathi)",
+      "observation_date": "2016-10",
+      "is_real_data": true,
+      "status": "PASS"
+    }
+  },
+  "seven_crop_verification": {
+    "Sugarcane": {
+      "predicted_modal_price": 5.92,
+      "audit_status": "ML_USED",
+      "is_real_data": true,
+      "apmc": "Ulhasnagar",
+      "match_level": "state_latest_fallback (Ulhasnagar, Thane)"
+    },
+    "Soybean": {
+      "predicted_modal_price": 8.26,
+      "audit_status": "ML_USED",
+      "is_real_data": true,
+      "apmc": "Varud",
+      "match_level": "state_latest_fallback (Varud, Amaravathi)"
+    },
+    "Cotton": {
+      "predicted_modal_price": 44.15,
+      "audit_status": "ML_USED",
+      "is_real_data": true,
+      "apmc": "Mandhal",
+      "match_level": "state_latest_fallback (Mandhal, Nagpur)"
+    },
+    "Jowar": {
+      "predicted_modal_price": 12.15,
+      "audit_status": "ML_USED",
+      "is_real_data": true,
+      "apmc": "Raver-Sawada",
+      "match_level": "state_latest_fallback (Raver-Sawada, Jalgaon)"
+    },
+    "Onion": {
+      "predicted_modal_price": 7.84,
+      "audit_status": "ML_USED",
+      "is_real_data": true,
+      "apmc": "Mangalwedha",
+      "match_level": "state_latest_fallback (Mangalwedha, Solapur)"
+    },
+    "Bajra": {
+      "predicted_modal_price": 12.55,
+      "audit_status": "ML_USED",
+      "is_real_data": true,
+      "apmc": "Nampur",
+      "match_level": "state_latest_fallback (Nampur, Nasik)"
+    },
+    "Rice": {
+      "predicted_modal_price": 19.93,
+      "audit_status": "ML_USED",
+      "is_real_data": true,
+      "apmc": "Sironcha",
+      "match_level": "state_latest_fallback (Sironcha, Gadchiroli)"
+    }
+  },
+  "unsupported_crops_verification": {
+    "Mango": {
+      "valuation_status": "FALLBACK_USED",
+      "is_ml_prediction": false,
+      "offer_decision": "REJECT",
+      "contract_generated": false,
+      "status": "PASS"
+    },
+    "Wheat": {
+      "valuation_status": "FALLBACK_USED",
+      "is_ml_prediction": false,
+      "offer_decision": "REJECT",
+      "contract_generated": false,
+      "status": "PASS"
+    },
+    "Tomato": {
+      "valuation_status": "FALLBACK_USED",
+      "is_ml_prediction": false,
+      "offer_decision": "REJECT",
+      "contract_generated": false,
+      "status": "PASS"
+    },
+    "Potato": {
+      "valuation_status": "FALLBACK_USED",
+      "is_ml_prediction": false,
+      "offer_decision": "REJECT",
+      "contract_generated": false,
+      "status": "PASS"
+    },
+    "Pomegranate": {
+      "valuation_status": "FALLBACK_USED",
+      "is_ml_prediction": false,
+      "offer_decision": "REJECT",
+      "contract_generated": false,
+      "status": "PASS"
+    },
+    "Turmeric": {
+      "valuation_status": "FALLBACK_USED",
+      "is_ml_prediction": false,
+      "offer_decision": "REJECT",
+      "contract_generated": false,
+      "status": "PASS"
+    },
+    "Maize": {
+      "valuation_status": "FALLBACK_USED",
+      "is_ml_prediction": false,
+      "offer_decision": "REJECT",
+      "contract_generated": false,
+      "status": "PASS"
+    }
+  },
+  "buyer_user_flow": {
+    "user_input": {
+      "crop": "Soybean",
+      "quantity": 500.0,
+      "target_price": 41.0,
+      "max_price": 45.0,
+      "location": "Latur",
+      "budget": 50000.0,
+      "delivery_days": 5
+    },
+    "api_pydantic_validation": "PASS",
+    "graph_final_status": "DEAL",
+    "deal_price": 41.6,
+    "deal_quantity": 500.0,
+    "deal_total_value": 20800.0,
+    "ml_audit_status": "ML_USED",
+    "ml_predicted_modal_price": 32.08,
+    "ml_feature_source": {
+      "dataset": "buyer_feature_dataset.csv",
+      "observation_date": "2016-10",
+      "apmc": "Latur",
+      "district": "Latur",
+      "match_level": "apmc_exact_match (Latur)",
+      "is_real_data": true
+    },
+    "status": "VERIFIED"
+  },
+  "purchase_scenarios": [
+    {
+      "test_id": "TEST A",
+      "description": "Normal purchase within reservation & budget",
+      "input": {
+        "crop": "Soybean",
+        "location": "Latur",
+        "offer_price": 41.6,
+        "offer_qty": 500.0
+      },
+      "expected": "ACCEPT at 41.6 for 500kg with PO",
+      "actual": "ACCEPT at Rs 41.6/kg for 500.0kg",
+      "ml_used": true,
+      "pass": true
+    },
+    {
+      "test_id": "TEST B",
+      "description": "Seller price above Buyer reservation price (P_max)",
+      "input": {
+        "crop": "Soybean",
+        "offer_price": 55.0,
+        "reservation_price": 40.0
+      },
+      "expected": "COUNTER <= 40.0 or REJECT",
+      "actual": "COUNTER at Rs 28.5/kg",
+      "ml_used": true,
+      "pass": true
+    },
+    {
+      "test_id": "TEST C",
+      "description": "Seller price within reservation ceiling",
+      "input": {
+        "crop": "Soybean",
+        "offer_price": 42.0,
+        "target": 38.0,
+        "reservation": 45.0
+      },
+      "expected": "COUNTER or ACCEPT with price <= 42.0 and <= 45.0",
+      "actual": "COUNTER at Rs 30.9/kg",
+      "ml_used": true,
+      "pass": true
+    },
+    {
+      "test_id": "TEST D",
+      "description": "Full quantity exceeds budget (100kg * Rs 12 = Rs 1200 > Budget Rs 500)",
+      "input": {
+        "crop": "Bajra",
+        "budget": 500.0,
+        "offer_price": 12.0,
+        "offer_qty": 100.0
+      },
+      "expected": "Quantity capped to <= floor(500/12)=41kg or counter cost <= Rs 500",
+      "actual": "COUNTER for 58kg (Total: Rs 493.0)",
+      "ml_used": true,
+      "pass": true
+    },
+    {
+      "test_id": "TEST E",
+      "description": "Full quantity is affordable within budget",
+      "input": {
+        "crop": "Soybean",
+        "budget": 50000.0,
+        "offer_price": 41.6,
+        "offer_qty": 500.0
+      },
+      "expected": "ACCEPT full 500kg (Total: Rs 20800 <= Rs 50000)",
+      "actual": "ACCEPT for 500.0kg (Total: Rs 20800.0)",
+      "ml_used": true,
+      "pass": true
+    },
+    {
+      "test_id": "TEST F",
+      "description": "Unsupported crop 'Tomato'",
+      "input": {
+        "crop": "Tomato",
+        "offer_price": 20.0,
+        "offer_qty": 100.0
+      },
+      "expected": "Immediate REJECT",
+      "actual": "REJECT: ScenarioBuyer: REJECTED: Unsupported crop 'Tomato'. BuyerAgent strictly negotiates only the 7 Maharashtra crops: Sugarcane, Soybean, Cotton, Jowar, Onion, Bajra, Rice.",
+      "ml_used": false,
+      "pass": true
+    },
+    {
+      "test_id": "TEST G",
+      "description": "Alias crop 'soya' normalizes to 'Soybean'",
+      "input": {
+        "crop": "soya",
+        "offer_price": 41.6,
+        "offer_qty": 500.0
+      },
+      "expected": "Normalizes to Soybean, ML executes, ACCEPT",
+      "actual": "Normalized to 'Soybean', ACCEPT at Rs 41.6/kg",
+      "ml_used": true,
+      "pass": true
+    },
+    {
+      "test_id": "TEST H",
+      "description": "Invalid quantity (negative or NaN)",
+      "input": {
+        "crop": "Soybean",
+        "quantities": [
+          -50.0,
+          "NaN"
+        ]
+      },
+      "expected": "REJECT for both",
+      "actual": "Negative: REJECT, NaN: REJECT",
+      "ml_used": false,
+      "pass": true
+    },
+    {
+      "test_id": "TEST I",
+      "description": "Invalid price (negative or Infinity)",
+      "input": {
+        "crop": "Soybean",
+        "prices": [
+          -10.0,
+          "Infinity"
+        ]
+      },
+      "expected": "REJECT for both",
+      "actual": "Negative: REJECT, Inf: REJECT",
+      "ml_used": false,
+      "pass": true
+    },
+    {
+      "test_id": "TEST J",
+      "description": "Unknown location triggers statewide latest fallback",
+      "input": {
+        "crop": "Soybean",
+        "location": "Atlantis Lost City"
+      },
+      "expected": "Statewide fallback, ML_USED, valid prediction",
+      "actual": "Audit: ML_USED, Level: state_latest_fallback (Varud, Amaravathi), Pred: Rs 8.26/kg",
+      "ml_used": true,
+      "pass": true
+    }
+  ],
+  "ml_value_trace": {
+    "step_1_input_feature_sample": {
+      "modal_price_kg": 30.6,
+      "min_price_kg": 21.22,
+      "max_price_kg": 32.27,
+      "arrival_mt": 24513.0,
+      "apmc": "Latur",
+      "district": "Latur",
+      "observation_date": "2016-10"
+    },
+    "step_2_model_prediction": 32.08,
+    "step_3_get_market_valuation": 32.08,
+    "step_4_make_offer_initial_bid": 26.31,
+    "step_5_respond_to_offer_counter": 26.89,
+    "is_forced_to_ml_prediction": false
+  }
+}
