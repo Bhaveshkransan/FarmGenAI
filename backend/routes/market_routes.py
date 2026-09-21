@@ -12,11 +12,6 @@ Endpoints:
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 import asyncio
-import os
-import pickle
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
 from backend.services.external_apis import MandiAPIClient, OpenMeteoClient, RealMandiDatasetClient
 from backend.services.rag_service import rag_service
 from llm.llm_client import client as llm_client
