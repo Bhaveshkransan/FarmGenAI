@@ -349,6 +349,8 @@ REAL_BUYERS = [
 
 async def seed():
     print("=== SEEDING POSTGRESQL WITH AUTHENTIC REAL RECORDS ===")
+    from backend.db.session import init_db
+    await init_db()
     async with engine.begin() as conn:
         # 1. Produce Table
         print("1. Cleaning produce table and inserting 7 real crop listings...")

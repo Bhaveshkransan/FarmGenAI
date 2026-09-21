@@ -51,8 +51,13 @@ def get_route_distance_and_duration(origin: str, destination: str) -> Dict[str, 
         logger.warning(f"OSRM routing request failed for {origin} -> {destination}: {e}. Falling back to Haversine matrix.")
 
     # Failsafe fallback distance matrix
-    from backend.services.matching_service import _get_distance_km
-    fallback_dist = _get_distance_km(origin, destination)
+    from backend.services.matching_service import CITY_DISTANCES_KM
+    orig_clean = (origin or "").strip()
+    dest_clean = (destination or "").strip()
+    fallback_dist = CITY_DISTANCES_KM.get(orig_clean, {}).get(dest_clean)
+    if fallback_dist is None:
+        fallback_dist = CITY_DISTANCES_KM.get(dest_clean, {}).get(orig_clean, 150.0 if orig_clean != dest_clean else 0.0)
+    fallback_dist = float(fallback_dist)
     fallback_duration = round(fallback_dist / 35.0, 2)  # Avg 35 km/h truck speed
 
     return {

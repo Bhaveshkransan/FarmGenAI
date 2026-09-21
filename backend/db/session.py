@@ -65,13 +65,38 @@ engine = create_async_engine(db_url, echo=False, poolclass=NullPool)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 async def init_db():
+    try:
+        from backend.db.models.schema import (
+            DBUser, DBFarmer, DBBuyer, DBProduce, DBNegotiation,
+            DBOffer, DBContract, DBHistory, DBAuthLog, DBWorkflowPlan
+        )
+        from backend.db.models.transport_agent_models import (
+            DBVehicle, DBFuelPrice, DBTollRate, DBTransportCostParameter, DBTransportTrip
+        )
+    except Exception as e:
+        logging.warning(f"Error importing models in init_db: {e}")
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        
-        try:
-            from backend.db.session import Base as V1Base
-            await conn.run_sync(V1Base.metadata.create_all)
-        except Exception as e:
-            logging.warning(f"Failed to create V1 tables: {e}")
+
+        # Automatic schema sync: add missing columns if tables existed previously
+        def _migrate_schema(sync_conn):
+            from sqlalchemy import inspect
+            inspector = inspect(sync_conn)
+            existing_tables = set(inspector.get_table_names())
+            for table_name, table in Base.metadata.tables.items():
+                if table_name in existing_tables:
+                    existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+                    for col in table.columns:
+                        if col.name not in existing_cols:
+                            col_type = col.type.compile(sync_conn.dialect)
+                            sql = f"ALTER TABLE {table_name} ADD COLUMN {col.name} {col_type}"
+                            try:
+                                sync_conn.execute(text(sql))
+                                logging.info(f"Auto-migrated missing column: {table_name}.{col.name}")
+                            except Exception as err:
+                                logging.warning(f"Could not add column {table_name}.{col.name}: {err}")
+
+        await conn.run_sync(_migrate_schema)
 
 

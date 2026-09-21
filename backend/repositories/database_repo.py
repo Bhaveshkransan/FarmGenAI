@@ -121,7 +121,10 @@ class Database:
             db_produce.min_price = p.get("min_price")
             db_produce.shelf_life = p.get("shelf_life")
             db_produce.location = p.get("location")
-            db_produce.quality = p.get("quality")
+            if hasattr(db_produce, "quality_info"):
+                db_produce.quality_info = p.get("quality_info") or {"quality": p.get("quality", "Good")}
+            elif hasattr(db_produce, "quality"):
+                db_produce.quality = p.get("quality")
             db_produce.language = p.get("language")
             db_produce.status = p.get("status")
             await session.commit()
@@ -130,26 +133,29 @@ class Database:
 
     @classmethod
     async def list_produce_async(cls) -> list:
-        async with AsyncSessionLocal() as session:
-            res = await session.execute(select(DBProduce))
-            rows = res.scalars().all()
-            results = []
-            for r in rows:
-                results.append({
-                    "id": r.id,
-                    "user_id": r.user_id,
-                    "farmer_name": r.farmer_name,
-                    "crop": r.crop,
-                    "quantity": r.quantity,
-                    "min_price": r.min_price,
-                    "shelf_life": r.shelf_life,
-                    "location": r.location,
-                    "quality": r.quality,
-                    "language": r.language,
-                    "status": r.status
-                })
-        Database.produce = {p["id"]: p for p in results}
-        return results
+        try:
+            async with AsyncSessionLocal() as session:
+                res = await session.execute(select(DBProduce))
+                rows = res.scalars().all()
+                results = []
+                for r in rows:
+                    results.append({
+                        "id": getattr(r, "id", None),
+                        "user_id": getattr(r, "user_id", None),
+                        "farmer_name": getattr(r, "farmer_name", None),
+                        "crop": getattr(r, "crop", None),
+                        "quantity": getattr(r, "quantity", 0),
+                        "min_price": getattr(r, "min_price", 0),
+                        "shelf_life": getattr(r, "shelf_life", 24),
+                        "location": getattr(r, "location", ""),
+                        "quality": getattr(r, "quality", getattr(r, "quality_info", "Good")),
+                        "language": getattr(r, "language", "en"),
+                        "status": getattr(r, "status", "ACTIVE")
+                    })
+            Database.produce = {p["id"]: p for p in results if p.get("id")}
+            return results
+        except Exception:
+            return list(Database.produce.values())
     @classmethod
     async def get_produce_async(cls, produce_id: str) -> dict | None:
         async with AsyncSessionLocal() as session:

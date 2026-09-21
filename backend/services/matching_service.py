@@ -55,24 +55,24 @@ async def _score_match(listing: Dict, requirement: Dict, buyer_user: Optional[Di
     score = 0.0
 
     # ── Price compatibility (40 pts) ──────────────────────
-    min_price = float(listing.get("min_price", 0))
-    target_price = float(requirement.get("target_price", 0))
-    max_price = float(requirement.get("max_price") or target_price * 1.2)
+    min_price = float(listing.get("min_price") or 0.0)
+    target_price = float(requirement.get("target_price") or 0.0)
+    max_price = float(requirement.get("max_price") or (target_price * 1.2))
 
-    if target_price >= min_price:
+    if target_price >= min_price and min_price > 0:
         score += 40.0  # Full compatibility
-    elif max_price >= min_price:
+    elif max_price >= min_price and max_price > 0:
         # Partial: within budget ceiling
-        ratio = (max_price - min_price) / max(max_price, 1)
+        ratio = (max_price - min_price) / max(max_price, 1.0)
         score += max(0, 20 + ratio * 20)
     else:
         score += 0.0  # Price incompatible
 
     # ── Quantity feasibility (25 pts) ──────────────────────
-    avail_qty = float(listing.get("quantity", 0))
-    req_qty = float(requirement.get("quantity", 0))
-    budget = float(requirement.get("budget", 0))
-    budget_qty = budget / max(target_price, 1)
+    avail_qty = float(listing.get("quantity") or 0.0)
+    req_qty = float(requirement.get("quantity") or 0.0)
+    budget = float(requirement.get("budget") or 0.0)
+    budget_qty = budget / max(target_price, 1.0)
 
     fulfillable_qty = min(avail_qty, req_qty, budget_qty)
     if req_qty > 0:
@@ -80,15 +80,16 @@ async def _score_match(listing: Dict, requirement: Dict, buyer_user: Optional[Di
         score += ratio * 25
 
     # ── Geographic proximity (20 pts) ─────────────────────
-    listing_loc = listing.get("location", "")
-    req_loc = requirement.get("location", "")
+    listing_loc = listing.get("location", "") or ""
+    req_loc = requirement.get("location", "") or ""
     dist = await _get_distance_km(listing_loc, req_loc)
     if dist <= MAX_MATCH_DISTANCE_KM:
         proximity_score = max(0, 1.0 - dist / MAX_MATCH_DISTANCE_KM) * 20
         score += proximity_score
 
     # ── Trust score (15 pts) ──────────────────────────────
-    trust = float((buyer_user or {}).get("trust_score", 3.5))
+    raw_trust = (buyer_user or {}).get("trust_score")
+    trust = float(raw_trust) if raw_trust is not None else 3.5
     score += min(trust / 5.0, 1.0) * 15
 
     return round(score, 2)
