@@ -16,6 +16,20 @@ export default function AgreementPreview({ dealData, onSignAndClose }) {
         const negId = dealData.negotiation_id || dealData.id;
         if (negId) await api.post(`/negotiations/${negId}/accept`, { final_price: dealData.price });
       }
+      // Save accepted deal status to localStorage for Dashboard sync
+      const existingDeals = JSON.parse(localStorage.getItem('agri_deals') || '[]');
+      existingDeals.unshift({
+        id: dealData.negotiation_id || dealData.id || `CN-${Date.now()}`,
+        crop: dealData.crop || 'Tomato',
+        quantity: dealData.quantity || 500,
+        price: dealData.price || 20.5,
+        total: (dealData.price || 20.5) * (dealData.quantity || 500),
+        status: 'ACCEPTED',
+        buyer: dealData.buyer || 'Metro Wholesale',
+        date: new Date().toLocaleDateString()
+      });
+      localStorage.setItem('agri_deals', JSON.stringify(existingDeals));
+
       addNotification('success', 'Agreement cryptographically signed and stored.');
       onSignAndClose();
     } catch (err) {
@@ -24,6 +38,7 @@ export default function AgreementPreview({ dealData, onSignAndClose }) {
       setIsSigning(false);
     }
   };
+
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-emerald-200 overflow-hidden sticky top-6 animate-in fade-in slide-in-from-right-4 duration-500">

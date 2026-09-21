@@ -1,144 +1,110 @@
-import React from 'react';
-import { Truck, Navigation, Route, Droplets, Loader2, AlertCircle, Package } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/services/api';
+import React, { useState } from 'react';
+import { Truck, Navigation, Route, Droplets, Cpu } from 'lucide-react';
+import StatCard from '@/components/ui/StatCard';
 import ChartCard from '@/components/ui/ChartCard';
+import DataTable from '@/components/ui/DataTable';
+import TransportAgentStudio from '@/features/transport/TransportAgentStudio';
+
+const routeData = [
+  { name: 'Mon', value: 450 },
+  { name: 'Tue', value: 520 },
+  { name: 'Wed', value: 610 },
+  { name: 'Thu', value: 580 },
+  { name: 'Fri', value: 890 },
+];
+
+const mockDeliveries = [
+  { id: '1', route: 'Nashik -> Mumbai', load: '10 MT Onions', eta: '4 hrs', status: 'In Transit' },
+  { id: '2', route: 'Pune -> Surat', load: '5 MT Tomatoes', eta: 'Pending Dispatch', status: 'Scheduled' },
+];
 
 export default function TransportDashboard() {
-  // Fetch fleet from backend
-  const { data: fleetData, isLoading, isError } = useQuery({
-    queryKey: ['transport-fleet'],
-    queryFn: async () => {
-      const res = await api.get('/transport/fleet');
-      return res.data?.fleet || res.data?.data || [];
-    },
-  });
+  const [activeTab, setActiveTab] = useState<'fleet' | 'agent'>('agent');
 
-  const fleet = fleetData || [];
-  const available = fleet.filter(v => v.current_location);
-  const totalVehicles = fleet.length;
-  
-  // Chart: rate per km distribution
-  const chartData = fleet.slice(0, 7).map(v => ({
-    name: (v.vehicle_type || 'Truck').substring(0, 8),
-    value: v.rate_per_km || 0
-  }));
+  const tableColumns = [
+    { header: 'Route', accessor: 'route', className: 'font-medium text-slate-800' },
+    { header: 'Payload', accessor: 'load', className: 'text-slate-600' },
+    { header: 'ETA', accessor: 'eta', className: 'text-slate-600' },
+    { 
+      header: 'Status', 
+      accessor: 'status',
+      render: (row: any) => (
+        <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+          row.status === 'In Transit' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+        }`}>
+          {row.status}
+        </span>
+      )
+    },
+  ];
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500">
       
       {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Truck className="text-amber-600" /> Logistics Fleet Manager
+            <Truck className="text-amber-600" /> Transport Logistics Hub
           </h1>
-          <p className="text-slate-500 mt-1">Track active deliveries, manage fleet capacity, and optimize routes.</p>
+          <p className="text-slate-500 mt-1">Manage fleet capacity, compute OSRM road routes, and run Transport Agent workflows.</p>
+        </div>
+
+        {/* Tab Selector */}
+        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <button
+            onClick={() => setActiveTab('agent')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 ${
+              activeTab === 'agent' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Cpu size={14} /> Transport Agent Studio
+          </button>
+          <button
+            onClick={() => setActiveTab('fleet')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition flex items-center gap-2 ${
+              activeTab === 'fleet' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Truck size={14} /> Fleet Overview
+          </button>
         </div>
       </div>
-      
-      {/* Loading */}
-      {isLoading && (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
-          <Loader2 className="animate-spin mx-auto text-amber-500 mb-3" size={32} />
-          <p className="text-slate-500">Loading fleet data...</p>
-        </div>
+
+      {/* Tab 1: Transport Agent Studio */}
+      {activeTab === 'agent' && (
+        <TransportAgentStudio />
       )}
 
-      {/* Error */}
-      {isError && (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
-          <AlertCircle className="mx-auto text-red-400 mb-3" size={32} />
-          <p className="text-slate-500">Failed to load fleet data.</p>
-        </div>
-      )}
-
-      {!isLoading && !isError && (
-        <>
-          {/* KPI Stats */}
+      {/* Tab 2: Fleet Overview */}
+      {activeTab === 'fleet' && (
+        <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <div className="p-2 bg-amber-100 rounded-xl w-fit mb-3"><Truck className="text-amber-600" size={20} /></div>
-              <p className="text-2xl font-bold text-slate-800">{totalVehicles}</p>
-              <p className="text-sm font-medium text-slate-600">Total Fleet</p>
-              <p className="text-xs text-slate-400 mt-1">All vehicle types</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <div className="p-2 bg-emerald-100 rounded-xl w-fit mb-3"><Navigation className="text-emerald-600" size={20} /></div>
-              <p className="text-2xl font-bold text-slate-800">{available.length}</p>
-              <p className="text-sm font-medium text-slate-600">Available Now</p>
-              <p className="text-xs text-slate-400 mt-1">Ready to dispatch</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <div className="p-2 bg-blue-100 rounded-xl w-fit mb-3"><Package className="text-blue-600" size={20} /></div>
-              <p className="text-2xl font-bold text-slate-800">
-                {fleet.length > 0 ? `${fleet.reduce((a, v) => a + (v.capacity_mt || 0), 0).toFixed(0)} MT` : '—'}
-              </p>
-              <p className="text-sm font-medium text-slate-600">Total Capacity</p>
-              <p className="text-xs text-slate-400 mt-1">Combined fleet capacity</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <div className="p-2 bg-purple-100 rounded-xl w-fit mb-3"><Route className="text-purple-600" size={20} /></div>
-              <p className="text-2xl font-bold text-slate-800">
-                {fleet.length > 0 ? `₹${(fleet.reduce((a, v) => a + (v.rate_per_km || 0), 0) / fleet.length).toFixed(1)}/km` : '—'}
-              </p>
-              <p className="text-sm font-medium text-slate-600">Avg Rate/km</p>
-              <p className="text-xs text-slate-400 mt-1">Fleet average</p>
-            </div>
+            <StatCard icon={<Navigation />} title="Active Deliveries" value="14" trend="3 arriving soon" color="blue" />
+            <StatCard icon={<Truck />} title="Available Fleet" value="7" trend="Out of 20 total vehicles" color="emerald" />
+            <StatCard icon={<Route />} title="Distance Covered" value="2,450 km" trend="This week" color="amber" />
+            <StatCard icon={<Droplets />} title="Fuel Efficiency" value="14.2 km/l" trend="+0.4 km/l vs last week" color="purple" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {chartData.length > 0 && (
-              <div className="lg:col-span-1">
-                <ChartCard 
-                  title="Rate per km by Vehicle Type" 
-                  subtitle="₹ per kilometre"
-                  data={chartData} 
-                  color="#f59e0b" 
-                  height={260}
-                />
-              </div>
-            )}
-            <div className={`${chartData.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'} bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden`}>
-              <div className="p-5 border-b border-slate-100">
-                <h2 className="font-bold text-slate-800">Fleet Inventory</h2>
-              </div>
-              {fleet.length === 0 ? (
-                <div className="p-12 text-center text-slate-400">
-                  <Truck size={32} className="mx-auto mb-3 opacity-30" />
-                  <p>No vehicles found in database.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-100">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        {['Provider', 'Vehicle Type', 'Capacity (MT)', 'Rate/km', 'Base Fare', 'Location', 'Rating'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {fleet.map((v, i) => (
-                        <tr key={v.transporter_id || i} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-4 py-3 text-sm font-medium text-slate-800">{v.provider_name || '—'}</td>
-                          <td className="px-4 py-3">
-                            <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">{v.vehicle_type}</span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{v.capacity_mt}</td>
-                          <td className="px-4 py-3 text-sm font-bold text-amber-600">₹{v.rate_per_km}/km</td>
-                          <td className="px-4 py-3 text-sm text-slate-600">₹{v.base_fare}</td>
-                          <td className="px-4 py-3 text-sm text-slate-500">{v.current_location || '—'}</td>
-                          <td className="px-4 py-3 text-sm font-bold text-blue-600">{v.rating}★</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+            <div className="lg:col-span-2 h-[350px]">
+              <DataTable 
+                title="Live Delivery Tracking" 
+                columns={tableColumns} 
+                data={mockDeliveries} 
+              />
+            </div>
+            <div className="lg:col-span-1 h-[350px]">
+              <ChartCard 
+                title="Fleet Mileage Trend" 
+                subtitle="Total km driven across fleet (Daily)"
+                data={routeData} 
+                color="#f59e0b" 
+                height={260}
+              />
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

@@ -135,5 +135,6 @@ xgboost
 scikit-learn
 pandas
 numpy
-pypdf==4.1.0  
- 
+pypdf==4.1.0
+faker>=24.0.0
+

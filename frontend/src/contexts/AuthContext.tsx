@@ -84,6 +84,7 @@ export function AuthProvider({ children }) {
     window.location.href = '/';
   };
 
+
   const triggerSessionExpired = () => {
     localStorage.removeItem('agri_user');
     localStorage.removeItem('agri_token');

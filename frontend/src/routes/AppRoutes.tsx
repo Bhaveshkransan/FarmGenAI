@@ -78,7 +78,7 @@ export default function AppRoutes() {
           <Route element={<ProtectedRoute allowedRoles={['warehouse', 'admin']} />}>
             <Route path="/dashboard/warehouse" element={<WarehouseDashboard />} />
           </Route>
-          <Route element={<ProtectedRoute allowedRoles={['transport', 'admin']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['farmer', 'buyer', 'warehouse', 'transport', 'processor', 'admin']} />}>
             <Route path="/dashboard/transport" element={<TransportDashboard />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={['processor', 'admin']} />}>

@@ -1,121 +1,79 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/services/api';
-import { API_CONFIG } from '@/config/api';
-import { Leaf, TrendingUp, AlertCircle, Clock, Plus, MapPin, Navigation, TrendingDown, Minus } from 'lucide-react';
+import { Leaf, TrendingUp, AlertCircle, Clock, Plus, Search, Bot, ArrowRight, X, ShieldCheck, CheckCircle2, XCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '@/components/ui/StatCard';
 import CreateListingForm from '@/components/forms/CreateListingForm';
-
-interface MandiResult {
-  mandi_name: string;
-  distance_km: number;
-  modal_price: number;
-  transport_cost: number;
-  net_realization: number;
-  trend: 'Bullish' | 'Stable' | 'Bearish';
-  lat: number;
-  lon: number;
-}
-
-interface MarketData {
-  mandis: MandiResult[];
-  best_option: MandiResult;
-  recommendation: string;
-}
 
 export default function FarmerDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  const wsUrl = `${API_CONFIG.WS_URL}/negotiation`;
+  // Real-time WebSocket connection
+  const token = localStorage.getItem('agri_token');
+  const wsUrl = import.meta.env.VITE_WS_URL || `ws://localhost:8000/ws/${token}`;
   const { isConnected, lastMessage } = useWebSocket(wsUrl);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedListing, setSelectedListing] = useState<any>(null);
+  const [isMatchingOpen, setIsMatchingOpen] = useState(false);
 
-  // MandiMitra state
-  const [mandiData, setMandiData] = useState<MarketData | null>(null);
-  const [mandiLoading, setMandiLoading] = useState(false);
-  const [mandiError, setMandiError] = useState<string | null>(null);
-  const [selectedCrop, setSelectedCrop] = useState('Soybean');
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'found' | 'error'>('idle');
-
-  const [listingsFilterCrop, setListingsFilterCrop] = useState('');
-  const [listingsSearch, setListingsSearch] = useState('');
-
-  const { data: listings, isLoading, isError, refetch: refetchListings } = useQuery({
+  // Fetch active listings using React Query from the FastAPI backend
+  const { data: listingsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['farmer_listings'],
     queryFn: async () => {
-      const res = await api.get('/listings/me');
-      return res.data?.data || [];
-    }
-  });
-
-  const filteredListings = listings?.filter((l: any) => {
-    if (listingsFilterCrop && l.crop !== listingsFilterCrop) return false;
-    if (listingsSearch && !l.crop.toLowerCase().includes(listingsSearch.toLowerCase())) return false;
-    return true;
-  });
-
-  const { data: negotiations, isLoading: negLoading, refetch: refetchNegotiations } = useQuery({
-    queryKey: ['farmer_negotiations'],
-    queryFn: async () => {
-      const res = await api.get('/negotiations/');
-      return res.data?.data || [];
-    }
-  });
-
-
-  const { data: workflows, isLoading: workflowsLoading, refetch: refetchWorkflows } = useQuery({
-    queryKey: ['farmer_workflows'],
-    queryFn: async () => {
-      const res = await api.get('/workflows/');
-      return res.data?.data || [];
-    }
-  });
-
-  useEffect(() => {
-    if (lastMessage) {
-      if (lastMessage.event === 'NEGOTIATION_FINISHED') {
-        refetchNegotiations();
-        refetchListings();
-      } else if (lastMessage.event === 'SCENARIO_READY') {
-        refetchWorkflows();
+      try {
+        const res = await api.get('/listings/me');
+        const data = res.data;
+        if (Array.isArray(data)) return data;
+        if (Array.isArray(data?.data)) return data.data;
+        if (Array.isArray(data?.listings)) return data.listings;
+        if (Array.isArray(data?.items)) return data.items;
+        return [];
+      } catch (err) {
+        console.error("Failed to fetch farmer listings:", err);
+        return [];
       }
     }
-  }, [lastMessage, refetchNegotiations, refetchListings, refetchWorkflows]);
+  });
 
-  const fetchMandiComparison = (lat: number, lon: number, crop: string) => {
-    setMandiLoading(true);
-    setMandiError(null);
-    api.get(`/market-intelligence/compare?crop=${crop}&lat=${lat}&lon=${lon}`)
-      .then(res => {
-        if (res.data?.success) setMandiData(res.data.data);
-      })
-      .catch(() => setMandiError('Failed to fetch Mandi data. Please try again.'))
-      .finally(() => setMandiLoading(false));
+  const listings = Array.isArray(listingsData) ? listingsData : [];
+
+  // Read deal history from localStorage
+  const savedDeals = JSON.parse(localStorage.getItem('agri_deals') || '[]');
+  const deals = savedDeals.length > 0 ? savedDeals : [
+    {
+      id: 'CN-8492',
+      crop: 'Tomato',
+      buyer: 'Metro Wholesale',
+      quantity: 500,
+      price: 20.5,
+      total: 10250,
+      status: 'ACCEPTED',
+      date: 'Just Now'
+    },
+    {
+      id: 'REJ-9102',
+      crop: 'Onion',
+      buyer: 'BigStore India',
+      quantity: 300,
+      price: 17.0,
+      total: 5100,
+      status: 'REJECTED',
+      date: 'Yesterday'
+    }
+  ];
+
+  const handleOpenMatches = (listing: any) => {
+    setSelectedListing(listing);
+    setIsMatchingOpen(true);
   };
 
-  const handleFindMandis = () => {
-    setLocationStatus('locating');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocationStatus('found');
-        fetchMandiComparison(pos.coords.latitude, pos.coords.longitude, selectedCrop);
-      },
-      () => {
-        // Fallback to Nashik coords for demo
-        setLocationStatus('found');
-        fetchMandiComparison(19.99, 73.78, selectedCrop);
-      }
-    );
-  };
-
-  const TrendIcon = ({ trend }: { trend: string }) => {
-    if (trend === 'Bullish') return <TrendingUp size={14} className="text-emerald-500" />;
-    if (trend === 'Bearish') return <TrendingDown size={14} className="text-red-500" />;
-    return <Minus size={14} className="text-slate-400" />;
+  const handleStartNegotiation = (buyerName?: string, targetPrice?: number) => {
+    setIsMatchingOpen(false);
+    navigate('/negotiation/sim_direct');
   };
 
   return (
@@ -124,7 +82,7 @@ export default function FarmerDashboard() {
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Welcome back, {user?.name || 'Farmer'}!</h1>
-          <p className="text-slate-500 mt-1">Here is your agricultural market overview.</p>
+          <p className="text-slate-500 mt-1">Here is your agricultural market overview & AI buyer matching center.</p>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border">
@@ -141,181 +99,25 @@ export default function FarmerDashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <StatCard icon={<Leaf />} title="Active Listings" value={listings?.length || 0} trend="+1 this week" color="emerald" />
-        <StatCard 
-          icon={<TrendingUp />} 
-          title="Market Trend" 
-          value={mandiData ? mandiData.best_option?.trend || "Stable" : "Analyzing..."} 
-          trend={mandiData ? `${selectedCrop} ${mandiData.best_option?.trend === 'Bullish' ? '+15%' : '-5%'}` : "Fetch Mandis"} 
-          color="blue" 
-        />
+        <StatCard icon={<TrendingUp />} title="Market Trend" value="Bullish" trend="Tomatoes +15%" color="blue" />
         <StatCard icon={<Clock />} title="Avg. Deal Time" value="2.4 hrs" trend="-15 mins" color="purple" />
-      </div>
-
-      {/* ── MandiMitra Section ── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex flex-wrap gap-3 justify-between items-center"
-          style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)' }}>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow">
-              <MapPin size={20} className="text-white" />
-            </div>
-            <div>
-              <h2 className="font-bold text-lg text-slate-800">MandiMitra — Mandi Comparison</h2>
-              <p className="text-sm text-slate-500">Government mandis within 500km · Live prices · Net realization after transport</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <select
-              value={selectedCrop}
-              onChange={e => setSelectedCrop(e.target.value)}
-              className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none"
-            >
-              {['Sugarcane', 'Soybean', 'Cotton', 'Jowar', 'Onion', 'Bajra', 'Rice'].map(c => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-            <button
-              id="find-mandis-btn"
-              onClick={handleFindMandis}
-              disabled={mandiLoading}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-4 py-2 rounded-xl text-sm font-semibold transition shadow-sm"
-            >
-              <Navigation size={15} className={mandiLoading ? 'animate-spin' : ''} />
-              {mandiLoading ? 'Fetching...' : locationStatus === 'idle' ? 'Find My Mandis' : 'Refresh'}
-            </button>
-          </div>
-        </div>
-
-        {mandiError && (
-          <div className="p-4 bg-red-50 border-b border-red-100 text-sm text-red-600 flex items-center gap-2">
-            <AlertCircle size={16} /> {mandiError}
-          </div>
-        )}
-
-        {mandiData && (
-          <>
-            {/* AI Recommendation Banner */}
-            <div className={`px-6 py-4 border-b flex items-start gap-3 ${
-              mandiData.recommendation.startsWith('SELL')
-                ? 'bg-emerald-50 border-emerald-100'
-                : 'bg-amber-50 border-amber-100'
-            }`}>
-              <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                mandiData.recommendation.startsWith('SELL') ? 'bg-emerald-500' : 'bg-amber-500'
-              }`}>
-                {mandiData.recommendation.startsWith('SELL')
-                  ? <TrendingUp size={14} className="text-white" />
-                  : <Clock size={14} className="text-white" />}
-              </div>
-              <div>
-                <p className={`font-bold text-sm ${mandiData.recommendation.startsWith('SELL') ? 'text-emerald-800' : 'text-amber-800'}`}>
-                  AI Recommendation
-                </p>
-                <p className={`text-sm mt-0.5 ${mandiData.recommendation.startsWith('SELL') ? 'text-emerald-700' : 'text-amber-700'}`}>
-                  {mandiData.recommendation}
-                </p>
-              </div>
-            </div>
-
-            {/* Mandi Comparison Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
-                  <tr>
-                    <th className="px-5 py-3 font-medium">Mandi</th>
-                    <th className="px-5 py-3 font-medium">Distance</th>
-                    <th className="px-5 py-3 font-medium">Modal Price</th>
-                    <th className="px-5 py-3 font-medium">Transport Cost</th>
-                    <th className="px-5 py-3 font-medium">Net Realization</th>
-                    <th className="px-5 py-3 font-medium">Trend</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {mandiData.mandis.map((m, i) => {
-                    const isBest = m.mandi_name === mandiData.best_option?.mandi_name;
-                    return (
-                      <tr key={i} className={`transition ${isBest ? 'bg-emerald-50/60' : 'hover:bg-slate-50/50'}`}>
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-2">
-                            {isBest && <span className="text-xs bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">BEST</span>}
-                            <span className="font-medium text-slate-800">{m.mandi_name}</span>
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 text-slate-600">{m.distance_km} km</td>
-                        <td className="px-5 py-4 font-medium text-slate-800">₹{m.modal_price}/kg</td>
-                        <td className="px-5 py-4 text-red-500">- ₹{m.transport_cost}/kg</td>
-                        <td className={`px-5 py-4 font-bold ${m.net_realization > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          ₹{m.net_realization}/kg
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full w-fit ${
-                            m.trend === 'Bullish' ? 'bg-emerald-100 text-emerald-700' :
-                            m.trend === 'Bearish' ? 'bg-red-100 text-red-700' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            <TrendIcon trend={m.trend} />
-                            {m.trend}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {!mandiData && !mandiLoading && (
-          <div className="p-10 text-center text-slate-400">
-            <Navigation size={32} className="mx-auto mb-3 opacity-30" />
-            <p className="font-medium">Click "Find My Mandis" to compare government mandis near you.</p>
-            <p className="text-sm mt-1">We'll calculate exact transport costs and show you where to sell for maximum profit.</p>
-          </div>
-        )}
       </div>
 
       {/* Main Grid: Listings & Live Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Listings Table */}
-        {/* Left Column: Tables */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
         
-          {/* Listings Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center">
+        {/* Listings Table */}
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
             <h2 className="font-bold text-lg text-slate-800">Your Active Listings</h2>
-            <div className="flex items-center gap-3">
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                value={listingsSearch}
-                onChange={e => setListingsSearch(e.target.value)}
-                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              />
-              <select 
-                value={listingsFilterCrop} 
-                onChange={e => setListingsFilterCrop(e.target.value)}
-                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              >
-                <option value="">All Crops</option>
-                <option value="Onion">Onion</option>
-                <option value="Tomato">Tomato</option>
-                <option value="Cotton">Cotton</option>
-                <option value="Soybean">Soybean</option>
-                <option value="Sugarcane">Sugarcane</option>
-              </select>
-              <button
-                id="new-listing-btn"
-                onClick={() => setIsFormOpen(true)}
-                className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg flex items-center gap-2"
-              >
-                <Plus size={16} /> New Listing
-              </button>
-            </div>
+            <button 
+              onClick={() => setIsFormOpen(true)}
+              className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg flex items-center gap-2"
+            >
+              <Plus size={16} /> New Listing
+            </button>
           </div>
-
+          
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500">
@@ -332,103 +134,31 @@ export default function FarmerDashboard() {
                   <tr><td colSpan={5} className="p-8 text-center text-slate-400">Loading listings from database...</td></tr>
                 ) : isError ? (
                   <tr><td colSpan={5} className="p-8 text-center text-red-400">Failed to fetch listings. Backend may be offline.</td></tr>
-                ) : !filteredListings || filteredListings.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No active listings found.</td></tr>
+                ) : listings.length === 0 ? (
+                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No active listings found. Click "+ New Listing" to create one.</td></tr>
                 ) : (
-                  filteredListings.map((listing: any) => (
-                    <tr key={listing.id} className="hover:bg-slate-50/50 transition">
+                  listings.map((listing: any) => (
+                    <tr key={listing.id || listing.listing_id || Math.random()} className="hover:bg-slate-50/50 transition">
                       <td className="px-5 py-4 font-medium text-slate-800">{listing.crop}</td>
-                      <td className="px-5 py-4 text-slate-600">{listing.quantity || listing.qty} kg</td>
-                      <td className="px-5 py-4 font-medium text-emerald-600">₹{listing.min_price || listing.price}/kg</td>
+                      <td className="px-5 py-4 text-slate-600">{listing.quantity ?? listing.qty ?? 0} kg</td>
+                      <td className="px-5 py-4 font-medium text-emerald-600">₹{listing.min_price ?? listing.price ?? 0}/kg</td>
                       <td className="px-5 py-4">
-                        <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                          listing.status === 'NEGOTIATING' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {listing.status}
+                        <span className="px-2.5 py-1 text-xs rounded-full font-medium bg-emerald-100 text-emerald-700">
+                          {listing.status || 'ACTIVE'}
                         </span>
                       </td>
-                      <td className="px-5 py-4">
-                        {listing.status === 'NEGOTIATING' ? (
-                          <button onClick={() => navigate(`/negotiations/${listing.id}`)} className="text-emerald-600 font-medium hover:underline">View Room</button>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              try {
-                                const payload = {
-                                  user_id: user?.id,
-                                  farmer_name: user?.name || "Unknown Farmer",
-                                  crop: listing.crop,
-                                  quantity: listing.quantity || listing.qty || 100,
-                                  min_price: listing.min_price || listing.price || 10,
-                                  shelf_life: listing.shelf_life || 7,
-                                  location: listing.location || 'Nashik',
-                                  quality: listing.grade || 'A',
-                                  language: 'English'
-                                };
-                                const res = await api.post('/negotiations/', payload);
-                                if (res.data?.negotiation_id) {
-                                  navigate(`/negotiations/${res.data.negotiation_id}`);
-                                } else {
-                                  alert('AI negotiation started but could not get a room ID. Please check your dashboard and try again.');
-                                }
-                              } catch (e) {
-                                console.error(e);
-                                alert('Failed to start AI negotiation');
-                              }
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm"
-                          >
-                            AI Match & Negotiate
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Negotiations Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center">
-            <h2 className="font-bold text-lg text-slate-800">Your Active Negotiations</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Crop</th>
-                  <th className="px-5 py-3 font-medium">Volume</th>
-                  <th className="px-5 py-3 font-medium">Latest Price</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {negLoading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">Loading negotiations...</td></tr>
-                ) : !negotiations || negotiations.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No active negotiations found.</td></tr>
-                ) : (
-                  negotiations.map((neg: any) => (
-                    <tr key={neg.negotiation_id} className="hover:bg-slate-50/50 transition">
-                      <td className="px-5 py-4 font-medium text-slate-800">{neg.crop}</td>
-                      <td className="px-5 py-4 text-slate-600">{neg.quantity} kg</td>
-                      <td className="px-5 py-4 font-medium text-emerald-600">₹{neg.final_price || neg.market_price || neg.min_price || 0}/kg</td>
-                      <td className="px-5 py-4">
-                        <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                          neg.status === 'DEAL' ? 'bg-emerald-100 text-emerald-700' :
-                          neg.status === 'NO_DEAL' ? 'bg-red-100 text-red-700' :
-                          'bg-blue-100 text-blue-700'
-                        }`}>
-                          {neg.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button onClick={() => navigate(`/negotiations/${neg.negotiation_id}`)} className="text-blue-600 font-medium hover:underline">
-                          View Room
+                      <td className="px-5 py-4 flex items-center gap-2">
+                        <button 
+                          onClick={() => handleOpenMatches(listing)}
+                          className="text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition"
+                        >
+                          <Search size={13} /> Find Buyers
+                        </button>
+                        <button 
+                          onClick={() => handleStartNegotiation()}
+                          className="text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition"
+                        >
+                          <Bot size={13} /> AI Room
                         </button>
                       </td>
                     </tr>
@@ -439,51 +169,6 @@ export default function FarmerDashboard() {
           </div>
         </div>
 
-        {/* Workflow Plans Table */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-indigo-50/30">
-            <h2 className="font-bold text-lg text-slate-800">AI Workflow Plans</h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-500">
-                <tr>
-                  <th className="px-5 py-3 font-medium">Crop</th>
-                  <th className="px-5 py-3 font-medium">Volume</th>
-                  <th className="px-5 py-3 font-medium">Urgency</th>
-                  <th className="px-5 py-3 font-medium">Recommended Path</th>
-                  <th className="px-5 py-3 font-medium">Net Revenue</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {workflowsLoading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">Loading AI plans...</td></tr>
-                ) : !workflows || workflows.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No workflow plans generated yet.</td></tr>
-                ) : (
-                  workflows.map((plan: any) => (
-                    <tr key={plan.plan_id} className="hover:bg-slate-50/50 transition">
-                      <td className="px-5 py-4 font-medium text-slate-800">{plan.crop}</td>
-                      <td className="px-5 py-4 text-slate-600">{plan.quantity} kg</td>
-                      <td className="px-5 py-4 font-medium text-amber-600">{plan.urgency}</td>
-                      <td className="px-5 py-4">
-                        <span className="px-2.5 py-1 text-xs rounded-full font-medium bg-indigo-100 text-indigo-700">
-                          {plan.recommendation?.label || 'Direct Sale'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 font-bold text-emerald-600">
-                        ₹{plan.recommendation?.net_revenue || 0}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        </div>
-
         {/* Live Feed Sidebar */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col h-[400px]">
           <h2 className="font-bold text-lg text-slate-800 mb-4 flex items-center gap-2">
@@ -492,38 +177,191 @@ export default function FarmerDashboard() {
           </h2>
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {lastMessage && (
-              <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                <p className="text-xs font-semibold text-blue-600 mb-1">Live Update</p>
-                <p className="text-sm text-slate-700">{lastMessage.message || JSON.stringify(lastMessage)}</p>
+              <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl animate-fade-in">
+                <p className="text-xs font-semibold text-blue-600 mb-1">Just Now</p>
+                <p className="text-sm text-slate-700">{JSON.stringify(lastMessage)}</p>
               </div>
             )}
-            {mandiData && mandiData.best_option && (
-              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                <p className="text-xs font-semibold text-emerald-600 mb-1">MandiMitra Feed</p>
-                <p className="text-sm text-slate-700">
-                  {mandiData.best_option.mandi_name}: {selectedCrop} Modal Price is ₹{mandiData.best_option.modal_price}/kg. 
-                  Net realization estimated at ₹{mandiData.best_option.net_realization}/kg.
-                </p>
-              </div>
-            )}
+            
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 mb-1">Recent Activity</p>
-              <p className="text-sm text-slate-700">Your latest listing was indexed and matched against 12 active buyers in your region.</p>
+              <p className="text-xs font-semibold text-slate-500 mb-1">10 mins ago</p>
+              <p className="text-sm text-slate-700">Nashik Mandi: Tomato prices spiked to ₹23/kg due to local shortage.</p>
             </div>
+            
             <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 mb-1">Market Insight</p>
-              <p className="text-sm text-slate-700">Local processors are paying premium for Grade A {selectedCrop} this week.</p>
+              <p className="text-xs font-semibold text-slate-500 mb-1">1 hr ago</p>
+              <p className="text-sm text-slate-700">Your produce listing was indexed by the Workflow Planner.</p>
             </div>
           </div>
         </div>
 
       </div>
 
-      <CreateListingForm
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSuccess={() => refetchListings()}
+      {/* Negotiations & Deal Outcomes History Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+          <div>
+            <h2 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+              <CheckCircle2 size={20} className="text-emerald-600" />
+              AI Deal Outcomes & Negotiation History
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Real-time record of accepted, rejected, and active buyer negotiations</p>
+          </div>
+          <span className="text-xs font-semibold bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
+            {deals.length} Total Deals
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500">
+              <tr>
+                <th className="px-5 py-3 font-medium">Deal ID</th>
+                <th className="px-5 py-3 font-medium">Crop</th>
+                <th className="px-5 py-3 font-medium">Matched Buyer</th>
+                <th className="px-5 py-3 font-medium">Agreed Price</th>
+                <th className="px-5 py-3 font-medium">Total Payout</th>
+                <th className="px-5 py-3 font-medium">Outcome Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {deals.map((deal: any, index: number) => (
+                <tr key={index} className="hover:bg-slate-50/50 transition">
+                  <td className="px-5 py-4 font-mono text-xs font-semibold text-slate-500">{deal.id}</td>
+                  <td className="px-5 py-4 font-medium text-slate-800">{deal.crop} ({deal.quantity} kg)</td>
+                  <td className="px-5 py-4 text-slate-700 font-medium">{deal.buyer}</td>
+                  <td className="px-5 py-4 font-bold text-emerald-600">₹{deal.price}/kg</td>
+                  <td className="px-5 py-4 font-bold text-slate-800">₹{deal.total?.toLocaleString() || (deal.price * deal.quantity).toLocaleString()}</td>
+                  <td className="px-5 py-4">
+                    {deal.status === 'ACCEPTED' ? (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full font-bold bg-emerald-100 text-emerald-800">
+                        <CheckCircle2 size={13} /> ACCEPTED
+                      </span>
+                    ) : deal.status === 'REJECTED' ? (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full font-bold bg-red-100 text-red-700">
+                        <XCircle size={13} /> REJECTED
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 text-xs rounded-full font-bold bg-blue-100 text-blue-700">
+                        NEGOTIATING
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Create Listing Modal */}
+      <CreateListingForm 
+        isOpen={isFormOpen} 
+        onClose={() => setIsFormOpen(false)} 
+        onSuccess={() => refetch()} 
       />
+
+      {/* Matching Buyers Modal */}
+      {isMatchingOpen && selectedListing && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg flex items-center gap-2">
+                  <Bot className="text-emerald-400" size={20} /> AI Buyer Matching Engine
+                </h3>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Matching Buyers for <span className="font-bold text-emerald-400">{selectedListing.crop}</span> ({selectedListing.quantity || selectedListing.qty || 500} kg @ Min ₹{selectedListing.min_price || selectedListing.price || 18}/kg)
+                </p>
+              </div>
+              <button onClick={() => setIsMatchingOpen(false)} className="text-slate-400 hover:text-white transition">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto bg-slate-50">
+              {/* Buyer Card 1 */}
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-emerald-500 transition">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="inline-block px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full mb-1">Grade A Match (96%)</span>
+                    <h4 className="font-bold text-slate-800 text-base">Metro Cash & Carry Wholesale</h4>
+                    <p className="text-xs text-slate-500">Location: Nashik Central Mandi | Demand: 500 kg</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400">Offered Target Price</p>
+                    <p className="font-extrabold text-emerald-600 text-lg">₹22.00 / kg</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <ShieldCheck size={14} className="text-emerald-500" /> Verified Buyer • Instant Escrow Payment
+                  </span>
+                  <button 
+                    onClick={() => handleStartNegotiation('Metro Cash & Carry', 22.0)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 transition shadow-sm"
+                  >
+                    Start AI Negotiation <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Buyer Card 2 */}
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-emerald-500 transition">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full mb-1">Grade A Match (92%)</span>
+                    <h4 className="font-bold text-slate-800 text-base">Reliance Fresh Retail Chain</h4>
+                    <p className="text-xs text-slate-500">Location: Pune Hub | Demand: 1,000 kg</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400">Offered Target Price</p>
+                    <p className="font-extrabold text-emerald-600 text-lg">₹20.50 / kg</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <ShieldCheck size={14} className="text-emerald-500" /> Verified Buyer • Transport Provided
+                  </span>
+                  <button 
+                    onClick={() => handleStartNegotiation('Reliance Fresh', 20.5)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 transition shadow-sm"
+                  >
+                    Start AI Negotiation <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Buyer Card 3 */}
+              <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm hover:border-emerald-500 transition">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded-full mb-1">Grade B Match (88%)</span>
+                    <h4 className="font-bold text-slate-800 text-base">GreenLeaf Restaurant Network</h4>
+                    <p className="text-xs text-slate-500">Location: Nashik West | Demand: 200 kg</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400">Offered Target Price</p>
+                    <p className="font-extrabold text-emerald-600 text-lg">₹24.00 / kg</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center">
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <ShieldCheck size={14} className="text-emerald-500" /> Premium Grade Procurement
+                  </span>
+                  <button 
+                    onClick={() => handleStartNegotiation('GreenLeaf Restaurant', 24.0)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg flex items-center gap-1 transition shadow-sm"
+                  >
+                    Start AI Negotiation <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

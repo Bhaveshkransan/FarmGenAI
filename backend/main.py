@@ -37,6 +37,7 @@ from .routes.recommendation_routes import router as recommendation_router
 from .routes.admin_routes import router as admin_router
 from .routes.crop_listing_routes import router as crop_listing_router
 from .routes.buyer_requirement_routes import router as buyer_req_router
+from .routes.simulation_routes import router as simulation_router
 
 # ── New routes (session 3 – full FR coverage) ──
 from .routes.profile_routes import router as profile_router
@@ -104,8 +105,11 @@ app.add_middleware(
         "http://localhost:5500",
         "http://127.0.0.1:5500",
         "http://localhost:8000",
+        "http://127.0.0.1:8000",
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:5173",
+        "http://127.0.0.1:5173",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     ],
@@ -193,6 +197,7 @@ app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])
 
 # Health check
 @app.get("/health", tags=["System"])
+
 async def health_check():
     db_ok = True
     try:
@@ -225,5 +230,7 @@ app.include_router(websocket_router, tags=["WebSockets"])
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+# Reload trigger: 2026-09-15
 
 

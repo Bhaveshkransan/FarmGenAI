@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Bell, LogOut, Sprout, Menu, X,
   LayoutDashboard, Handshake, BarChart3, User,
-  Receipt, Cpu, Settings
+  Receipt, Cpu, Settings, Truck
 } from 'lucide-react';
 
 const navItemsByRole = {
@@ -12,6 +12,7 @@ const navItemsByRole = {
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/farmer/negotiations', label: 'My Negotiations', icon: Handshake },
     { to: '/farmer/listings', label: 'My Listings', icon: BarChart3 },
+    { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
     { to: '/transactions', label: 'Transactions', icon: Receipt },
     { to: '/analytics', label: 'Market Analytics', icon: BarChart3 },
   ],
@@ -19,11 +20,13 @@ const navItemsByRole = {
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/buyer/negotiations', label: 'My Deals', icon: Handshake },
     { to: '/buyer/matches', label: 'Find Suppliers', icon: BarChart3 },
+    { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
     { to: '/transactions', label: 'Transactions', icon: Receipt },
     { to: '/analytics', label: 'Market Intel', icon: BarChart3 },
   ],
   admin: [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
     { to: '/dashboard/admin', label: 'Admin Console', icon: Cpu },
     { to: '/dashboard/ai-ops', label: 'AI Operations', icon: Cpu },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
@@ -31,16 +34,18 @@ const navItemsByRole = {
   ],
   warehouse: [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   ],
   transport: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   ],
 };
 
 const defaultNav = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/transactions', label: 'Transactions', icon: Receipt },
 ];
