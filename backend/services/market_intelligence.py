@@ -21,13 +21,11 @@ class MarketIntelligenceService:
         """
         try:
             # 1. Fetch live Agmarknet / e-NAM price (simulated via API client)
-            hist_avg = float(historical_average or 0.0)
-            live_data = await MandiAPIClient.get_live_price(crop, location, hist_avg)
+            live_data = await MandiAPIClient.get_live_price(crop, location, historical_average)
             
-            raw_live_price = live_data.get("live_modal_price") if live_data else None
-            live_price = float(raw_live_price) if raw_live_price is not None else hist_avg
-            trend = live_data.get("trend", "Stable") if live_data else "Stable"
-            volatility = live_data.get("volatility_pct", 0.0) if live_data else 0.0
+            live_price = live_data.get("live_modal_price", historical_average)
+            trend = live_data.get("trend", "Stable")
+            volatility = live_data.get("volatility_pct", 0.0)
             
             # 2. Fetch live Open-Meteo weather
             weather_data = await OpenMeteoClient.get_weather(location)
@@ -38,7 +36,7 @@ class MarketIntelligenceService:
                 precip = weather_data.get('precipitation_mm', '0.0')
                 wind = weather_data.get('wind_speed_kmh', 'N/A')
                 
-                spoilage_risk = "HIGH" if (isinstance(temp, (int, float)) and temp > 35) or (isinstance(precip, (int, float)) and precip > 10) else "NORMAL"
+                spoilage_risk = "HIGH" if (isinstance(temp, float) and temp > 35) or (isinstance(precip, float) and precip > 10) else "NORMAL"
                 
                 weather_str = (
                     f"--- LIVE WEATHER & SPOILAGE RISK ---\n"
@@ -52,7 +50,7 @@ class MarketIntelligenceService:
                 hist_line = f"Historical 30-Day Average: [UNAVAILABLE]"
             else:
                 price_line = f"Live Modal Price for {crop} in {location}: ₹{live_price:.2f}/kg"
-                hist_line = f"Historical 30-Day Average: ₹{hist_avg:.2f}/kg"
+                hist_line = f"Historical 30-Day Average: ₹{historical_average:.2f}/kg"
                 
             intelligence_str = (
                 f"--- LIVE MARKET INTELLIGENCE ---\n"
@@ -66,8 +64,7 @@ class MarketIntelligenceService:
             return intelligence_str
         except Exception as e:
             logger.error(f"MIS Error fetching market context: {e}")
-            fallback_avg = float(historical_average or 0.0)
-            if fallback_avg > 0:
-                return f"Market Intelligence unavailable. Fallback Historical Average: ₹{fallback_avg:.2f}/kg."
+            if historical_average > 0:
+                return f"Market Intelligence unavailable. Fallback Historical Average: ₹{historical_average:.2f}/kg."
             return "Market Intelligence strictly UNAVAILABLE (API offline & no local fallback)."
 

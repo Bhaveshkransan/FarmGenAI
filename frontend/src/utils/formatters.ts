@@ -10,15 +10,13 @@
  */
 export const formatCurrency = (amount) => {
   if (isNaN(amount) || amount === null) return '₹0';
-  const hasDecimals = Number(amount) % 1 !== 0;
+  
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    minimumFractionDigits: hasDecimals ? 2 : 0,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 0
   }).format(amount);
 };
-
 
 /**
  * Format an ISO date string into a localized readable format

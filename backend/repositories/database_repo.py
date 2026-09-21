@@ -50,8 +50,18 @@ class Database:
                 db_farmer = DBFarmer(id=farmer_id)
                 session.add(db_farmer)
             db_farmer.name = p.get("name")
+            db_farmer.contact_number = p.get("contact_number")
             db_farmer.location = p.get("location")
+            db_farmer.village = p.get("village")
+            db_farmer.taluka = p.get("taluka")
+            db_farmer.district = p.get("district")
+            db_farmer.state = p.get("state")
+            db_farmer.latitude = p.get("latitude")
+            db_farmer.longitude = p.get("longitude")
             db_farmer.language = p.get("language")
+            db_farmer.farm_size_acres = p.get("farm_size_acres")
+            db_farmer.farming_type = p.get("farming_type")
+            db_farmer.preferences = p.get("preferences")
             await session.commit()
         Database.farmers[farmer_id] = p
         return p
@@ -67,16 +77,16 @@ class Database:
                 session.add(db_buyer)
             
             db_buyer.user_id = p.get("user_id")
-            db_buyer.buyer_name = p.get("buyer_name")
+            db_buyer.buyer_name = p.get("buyer_name") or p.get("name")
             db_buyer.crop = p.get("crop")
-            db_buyer.min_price = p.get("min_price")
-            db_buyer.max_price = p.get("max_price")
-            db_buyer.quantity = p.get("quantity")
-            db_buyer.location = p.get("location")
-            db_buyer.urgency = p.get("urgency")
-            db_buyer.neg_mode = p.get("neg_mode")
-            db_buyer.strategy = p.get("strategy")
-            db_buyer.status = p.get("status")
+            db_buyer.min_price = p.get("min_price") or p.get("target_price")
+            db_buyer.max_price = p.get("max_price") or p.get("target_price")
+            db_buyer.quantity = p.get("quantity") or p.get("max_quantity")
+            db_buyer.location = p.get("location", "Maharashtra")
+            db_buyer.urgency = p.get("urgency", "MEDIUM")
+            db_buyer.neg_mode = p.get("neg_mode", "BALANCED")
+            db_buyer.strategy = p.get("strategy", "Standard procurement")
+            db_buyer.status = p.get("status", "ACTIVE")
             await session.commit()
         Database.buyers[buyer_id] = p
         return p
@@ -117,45 +127,74 @@ class Database:
             db_produce.user_id = p.get("user_id")
             db_produce.farmer_name = p.get("farmer_name")
             db_produce.crop = p.get("crop")
+            db_produce.crop_category = p.get("crop_category")
+            db_produce.variety = p.get("variety")
+            db_produce.grade = p.get("grade")
             db_produce.quantity = p.get("quantity")
+            db_produce.unit = p.get("unit", "kg")
+            db_produce.min_sale_quantity = p.get("min_sale_quantity")
+            db_produce.expected_price = p.get("expected_price")
             db_produce.min_price = p.get("min_price")
+            db_produce.price_unit = p.get("price_unit", "per_kg")
+            db_produce.quality_info = p.get("quality_info")
+            db_produce.harvest_date = p.get("harvest_date")
+            db_produce.availability_date = p.get("availability_date")
+            db_produce.preferred_selling_date = p.get("preferred_selling_date")
             db_produce.shelf_life = p.get("shelf_life")
             db_produce.location = p.get("location")
-            if hasattr(db_produce, "quality_info"):
-                db_produce.quality_info = p.get("quality_info") or {"quality": p.get("quality", "Good")}
-            elif hasattr(db_produce, "quality"):
-                db_produce.quality = p.get("quality")
+            db_produce.latitude = p.get("latitude")
+            db_produce.longitude = p.get("longitude")
+            db_produce.storage_info = p.get("storage_info")
+            db_produce.processing_info = p.get("processing_info")
+            db_produce.transport_reqs = p.get("transport_reqs")
+            db_produce.selected_services = p.get("selected_services")
+            db_produce.images = p.get("images")
+            db_produce.description = p.get("description")
             db_produce.language = p.get("language")
-            db_produce.status = p.get("status")
+            db_produce.status = p.get("status", "ACTIVE")
             await session.commit()
         Database.produce[produce_id] = p
         return p
-
     @classmethod
     async def list_produce_async(cls) -> list:
-        try:
-            async with AsyncSessionLocal() as session:
-                res = await session.execute(select(DBProduce))
-                rows = res.scalars().all()
-                results = []
-                for r in rows:
-                    results.append({
-                        "id": getattr(r, "id", None),
-                        "user_id": getattr(r, "user_id", None),
-                        "farmer_name": getattr(r, "farmer_name", None),
-                        "crop": getattr(r, "crop", None),
-                        "quantity": getattr(r, "quantity", 0),
-                        "min_price": getattr(r, "min_price", 0),
-                        "shelf_life": getattr(r, "shelf_life", 24),
-                        "location": getattr(r, "location", ""),
-                        "quality": getattr(r, "quality", getattr(r, "quality_info", "Good")),
-                        "language": getattr(r, "language", "en"),
-                        "status": getattr(r, "status", "ACTIVE")
-                    })
-            Database.produce = {p["id"]: p for p in results if p.get("id")}
-            return results
-        except Exception:
-            return list(Database.produce.values())
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(DBProduce))
+            rows = res.scalars().all()
+            results = []
+            for r in rows:
+                results.append({
+                    "id": r.id,
+                    "user_id": r.user_id,
+                    "farmer_name": r.farmer_name,
+                    "crop": r.crop,
+                    "crop_category": r.crop_category,
+                    "variety": r.variety,
+                    "grade": r.grade,
+                    "quantity": r.quantity,
+                    "unit": r.unit,
+                    "min_sale_quantity": r.min_sale_quantity,
+                    "expected_price": r.expected_price,
+                    "min_price": r.min_price,
+                    "price_unit": r.price_unit,
+                    "quality_info": r.quality_info,
+                    "harvest_date": r.harvest_date,
+                    "availability_date": r.availability_date,
+                    "preferred_selling_date": r.preferred_selling_date,
+                    "shelf_life": r.shelf_life,
+                    "location": r.location,
+                    "latitude": r.latitude,
+                    "longitude": r.longitude,
+                    "storage_info": r.storage_info,
+                    "processing_info": r.processing_info,
+                    "transport_reqs": r.transport_reqs,
+                    "selected_services": r.selected_services,
+                    "images": r.images,
+                    "description": r.description,
+                    "language": r.language,
+                    "status": r.status
+                })
+        Database.produce = {p["id"]: p for p in results}
+        return results
     @classmethod
     async def get_produce_async(cls, produce_id: str) -> dict | None:
         async with AsyncSessionLocal() as session:
@@ -166,11 +205,29 @@ class Database:
                     "user_id": db_produce.user_id,
                     "farmer_name": db_produce.farmer_name,
                     "crop": db_produce.crop,
+                    "crop_category": db_produce.crop_category,
+                    "variety": db_produce.variety,
+                    "grade": db_produce.grade,
                     "quantity": db_produce.quantity,
+                    "unit": db_produce.unit,
+                    "min_sale_quantity": db_produce.min_sale_quantity,
+                    "expected_price": db_produce.expected_price,
                     "min_price": db_produce.min_price,
+                    "price_unit": db_produce.price_unit,
+                    "quality_info": db_produce.quality_info,
+                    "harvest_date": db_produce.harvest_date,
+                    "availability_date": db_produce.availability_date,
+                    "preferred_selling_date": db_produce.preferred_selling_date,
                     "shelf_life": db_produce.shelf_life,
                     "location": db_produce.location,
-                    "quality": db_produce.quality,
+                    "latitude": db_produce.latitude,
+                    "longitude": db_produce.longitude,
+                    "storage_info": db_produce.storage_info,
+                    "processing_info": db_produce.processing_info,
+                    "transport_reqs": db_produce.transport_reqs,
+                    "selected_services": db_produce.selected_services,
+                    "images": db_produce.images,
+                    "description": db_produce.description,
                     "language": db_produce.language,
                     "status": db_produce.status
                 }
@@ -184,7 +241,6 @@ class Database:
                 await session.commit()
         if produce_id in Database.produce:
             Database.produce[produce_id]["status"] = "EXPIRED"
-
     @classmethod
     async def create_booking_async(cls, booking: dict):
         async with AsyncSessionLocal() as session:
@@ -208,7 +264,6 @@ class Database:
             )
             session.add(db_booking)
             await session.commit()
-
     @classmethod
     async def get_booking_async(cls, booking_id: str) -> dict | None:
         async with AsyncSessionLocal() as session:
@@ -234,7 +289,6 @@ class Database:
                     "updated_at": db_booking.updated_at
                 }
             return None
-
     @classmethod
     async def list_bookings_async(cls) -> list:
         async with AsyncSessionLocal() as session:
@@ -259,7 +313,6 @@ class Database:
                 "created_at": r.created_at,
                 "updated_at": r.updated_at
             } for r in rows]
-
     @classmethod
     async def update_booking_async(cls, booking_id: str, payload: dict):
         async with AsyncSessionLocal() as session:
@@ -268,7 +321,6 @@ class Database:
                 if "status" in payload: db_booking.status = payload["status"]
                 if "updated_at" in payload: db_booking.updated_at = payload["updated_at"]
                 await session.commit()
-
     @classmethod
     async def create_negotiation_async(cls, payload: dict) -> dict:
         p = deepcopy(payload)
@@ -289,6 +341,8 @@ class Database:
             db_neg.current_round = p.get("current_round", 0)
             db_neg.summary = p.get("summary")
             db_neg.final_price = p.get("final_price")
+            db_neg.market_price = p.get("market_price")
+            db_neg.min_price = p.get("min_price")
             tp = p.get("transport_plan")
             if isinstance(tp, dict):
                 import json
@@ -302,7 +356,6 @@ class Database:
             await session.commit()
         Database.negotiations[neg_id] = p
         return p
-
     @classmethod
     async def get_negotiation_async(cls, neg_id: str) -> dict:
         async with AsyncSessionLocal() as session:
@@ -325,10 +378,11 @@ class Database:
                     "logs": db_neg.logs or [],
                     "market_offers": db_neg.market_offers or [],
                     "selected_buyer": db_neg.selected_buyer or {},
-                    "signatures": db_neg.signatures or {}
+                    "signatures": db_neg.signatures or {},
+                    "market_price": db_neg.market_price,
+                    "min_price": db_neg.min_price
                 }
             return None
-
     @classmethod
     async def update_negotiation_async(cls, neg_id: str, payload: dict):
         payload["negotiation_id"] = neg_id
@@ -370,7 +424,7 @@ class Database:
                 id=p["id"],
                 negotiation_id=negotiation_id,
                 round_num=p.get("round", 0),
-                sender=p.get("sender"),
+                sender=p.get("sender") or p.get("agent"),
                 price=p.get("price"),
                 quantity=p.get("quantity"),
                 message=p.get("message")
@@ -379,7 +433,6 @@ class Database:
             await session.commit()
         Database.offers[p["id"]] = p
         return p
-
     @classmethod
     async def get_offers_for_negotiation_async(cls, negotiation_id: str) -> list:
         async with AsyncSessionLocal() as session:
@@ -398,7 +451,6 @@ class Database:
                 "quantity": r.quantity,
                 "message": r.message
             } for r in rows]
-
     @classmethod
     async def create_contract_async(cls, payload: dict) -> dict:
         p = deepcopy(payload)
@@ -411,14 +463,13 @@ class Database:
                 buyer_id=p.get("buyer_id"),
                 crop=p.get("crop"),
                 quantity=p.get("quantity"),
-                final_price=p.get("final_price"),
-                status=p.get("status")
+                final_price=p.get("final_price") or p.get("price"),
+                status=p.get("status") or p.get("state")
             )
             session.add(db_contract)
             await session.commit()
         Database.contracts[p["id"]] = p
         return p
-
     @classmethod
     async def add_history_async(cls, user_id: str, entry: dict):
         record_id = Database.generate_id("hist")
@@ -456,7 +507,6 @@ class Database:
         if user_id not in Database.history:
             Database.history[user_id] = []
         Database.history[user_id].append(entry)
-
     @classmethod
 
     def get_history(cls, user_id: str = "all") -> list:
@@ -649,6 +699,341 @@ class Database:
         except Exception:
             return []
 
+    # ── New methods: query DB instead of in-memory dicts ─────────────
+
+    @classmethod
+    async def list_buyers_async(cls) -> list:
+        """Return all buyer requirements from PostgreSQL."""
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(DBBuyer))
+            rows = res.scalars().all()
+        results = []
+        for r in rows:
+            results.append({
+                "id": r.id,
+                "user_id": r.user_id,
+                "buyer_name": r.buyer_name,
+                "name": r.buyer_name,
+                "crop": r.crop,
+                "min_price": r.min_price,
+                "max_price": r.max_price,
+                "target_price": r.max_price,
+                "quantity": r.quantity,
+                "max_quantity": r.quantity,
+                "location": r.location,
+                "urgency": r.urgency,
+                "neg_mode": r.neg_mode,
+                "strategy": r.strategy,
+                "status": r.status or "ACTIVE",
+                "kind": "requirement",
+            })
+        # Sync in-memory dict
+        Database.buyers = {r["id"]: r for r in results}
+        return results
+
+    @classmethod
+    async def get_buyer_requirements_async(cls, crop: str = None) -> list:
+        """Return buyer requirements, optionally filtered by crop."""
+        all_buyers = await cls.list_buyers_async()
+        if crop:
+            return [b for b in all_buyers if (b.get("crop") or "").lower() == crop.lower()]
+        return all_buyers
+
+    @classmethod
+    async def get_all_negotiations_async(
+        cls,
+        user_id: str = None,
+        status: str = None,
+        limit: int = 100
+    ) -> list:
+        """
+        Return negotiations from PostgreSQL with optional filters.
+        Fixes: list_negotiations() always returning empty dict after restart.
+        """
+        async with AsyncSessionLocal() as session:
+            query = select(DBNegotiation)
+            if user_id:
+                query = query.where(DBNegotiation.user_id == user_id)
+            if status:
+                query = query.where(DBNegotiation.status == status)
+            query = query.limit(limit)
+            res = await session.execute(query)
+            rows = res.scalars().all()
+
+        results = []
+        for r in rows:
+            results.append({
+                "negotiation_id": r.negotiation_id,
+                "crop": r.crop,
+                "quantity": r.quantity,
+                "farmer_id": r.farmer_id,
+                "buyer_id": r.buyer_id,
+                "user_id": r.user_id,
+                "farmer_name": r.farmer_name,
+                "status": r.status,
+                "current_round": r.current_round,
+                "summary": r.summary,
+                "final_price": r.final_price,
+                "market_price": r.market_price,
+                "min_price": r.min_price,
+                "transport_plan": r.transport_plan,
+                "peer_node": r.peer_node,
+                "logs": r.logs or [],
+                "market_offers": r.market_offers or [],
+                "selected_buyer": r.selected_buyer or {},
+                "signatures": r.signatures or {},
+            })
+        # Sync in-memory cache
+        for neg in results:
+            Database.negotiations[neg["negotiation_id"]] = neg
+        return results
+    @classmethod
+    def get_market_mappings(cls, district: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBMarketMapping).where(DBMarketMapping.district.ilike(district))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{"district": r.district, "market_name": r.market_name, "state": r.state} for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+    def get_crop_quality_reference(cls, crop: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBCropQualityReference).where(DBCropQualityReference.crop.ilike(crop))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "crop": r.crop,
+                    "variety": r.variety,
+                    "grade": r.grade,
+                    "min_size_mm": r.min_size_mm,
+                    "max_moisture_pct": r.max_moisture_pct,
+                    "color_standards": r.color_standards,
+                    "skin_firmness": r.skin_firmness,
+                    "common_defects_allowed": r.common_defects_allowed
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+    def get_seasonal_calendar(cls) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBSeasonalCalendar)
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "season_id": r.season_id,
+                    "event_name": r.event_name,
+                    "month_range": r.month_range,
+                    "affected_crops": r.affected_crops,
+                    "price_impact_trend": r.price_impact_trend,
+                    "market_behavior_description": r.market_behavior_description
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+    def get_trust_score(cls, user_id: str) -> dict | None:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBTrustScore).where(DBTrustScore.user_id == user_id)
+                res = await session.execute(stmt)
+                r = res.scalars().first()
+                if not r:
+                    return None
+                return {
+                    "user_id": r.user_id,
+                    "trust_score_final": r.trust_score_final
+                }
+        try:
+            return _run_async(_get())
+        except Exception:
+            return None
+    @classmethod
+
+    def get_warehouse_list(cls, district: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBWarehouse).where(DBWarehouse.district.ilike(district))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "warehouse_id": r.warehouse_id,
+                    "name": r.name,
+                    "district": r.district,
+                    "location": r.location,
+                    "type": r.type,
+                    "capacity_mt": r.capacity_mt,
+                    "available_capacity_mt": r.available_capacity_mt,
+                    "price_per_mt_per_day": r.price_per_mt_per_day,
+                    "rating": r.rating,
+                    "contact_number": r.contact_number
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+    @classmethod
+
+    def get_transporter_list(cls, current_location: str) -> list:
+        async def _get():
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBTransporter).where(DBTransporter.current_location.ilike(current_location))
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                return [{
+                    "transporter_id": r.transporter_id,
+                    "provider_name": r.provider_name,
+                    "vehicle_type": r.vehicle_type,
+                    "capacity_mt": r.capacity_mt,
+                    "rate_per_km": r.rate_per_km,
+                    "base_fare": r.base_fare,
+                    "rating": r.rating,
+                    "contact_number": r.contact_number,
+                    "current_location": r.current_location
+                } for r in rows]
+        try:
+            return _run_async(_get())
+        except Exception:
+            return []
+
+    # ── New methods: query DB instead of in-memory dicts ─────────────
+
+    @classmethod
+    async def list_buyers_async(cls) -> list:
+        """Return all buyer requirements from PostgreSQL."""
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(DBBuyer))
+            rows = res.scalars().all()
+        results = []
+        for r in rows:
+            results.append({
+                "id": r.id,
+                "user_id": r.user_id,
+                "buyer_name": r.buyer_name,
+                "name": r.buyer_name,
+                "crop": r.crop,
+                "min_price": r.min_price,
+                "max_price": r.max_price,
+                "target_price": r.max_price,
+                "quantity": r.quantity,
+                "max_quantity": r.quantity,
+                "location": r.location,
+                "urgency": r.urgency,
+                "neg_mode": r.neg_mode,
+                "strategy": r.strategy,
+                "status": r.status or "ACTIVE",
+                "kind": "requirement",
+            })
+        # Sync in-memory dict
+        Database.buyers = {r["id"]: r for r in results}
+        return results
+
+    @classmethod
+    async def get_buyer_requirements_async(cls, crop: str = None) -> list:
+        """Return buyer requirements, optionally filtered by crop."""
+        all_buyers = await cls.list_buyers_async()
+        if crop:
+            return [b for b in all_buyers if (b.get("crop") or "").lower() == crop.lower()]
+        return all_buyers
+
+    @classmethod
+    async def get_all_negotiations_async(
+        cls,
+        user_id: str = None,
+        status: str = None,
+        limit: int = 100
+    ) -> list:
+        """
+        Return negotiations from PostgreSQL with optional filters.
+        Fixes: list_negotiations() always returning empty dict after restart.
+        """
+        async with AsyncSessionLocal() as session:
+            query = select(DBNegotiation)
+            if user_id:
+                query = query.where(DBNegotiation.user_id == user_id)
+            if status:
+                query = query.where(DBNegotiation.status == status)
+            query = query.limit(limit)
+            res = await session.execute(query)
+            rows = res.scalars().all()
+
+        results = []
+        for r in rows:
+            results.append({
+                "negotiation_id": r.negotiation_id,
+                "crop": r.crop,
+                "quantity": r.quantity,
+                "farmer_id": r.farmer_id,
+                "buyer_id": r.buyer_id,
+                "user_id": r.user_id,
+                "farmer_name": r.farmer_name,
+                "status": r.status,
+                "current_round": r.current_round,
+                "summary": r.summary,
+                "final_price": r.final_price,
+                "market_price": r.market_price,
+                "min_price": r.min_price,
+                "transport_plan": r.transport_plan,
+                "peer_node": r.peer_node,
+                "logs": r.logs or [],
+                "market_offers": r.market_offers or [],
+                "selected_buyer": r.selected_buyer or {},
+                "signatures": r.signatures or {},
+            })
+        # Sync in-memory cache
+        for neg in results:
+            Database.negotiations[neg["negotiation_id"]] = neg
+        return results
+
+    @classmethod
+    async def upsert_workflow_plan_async(cls, plan_id: str, data: dict) -> dict:
+        async with AsyncSessionLocal() as session:
+            db_plan = await session.get(DBWorkflowPlan, plan_id)
+            if not db_plan:
+                db_plan = DBWorkflowPlan(plan_id=plan_id)
+                session.add(db_plan)
+            
+            db_plan.user_id = data.get("user_id")
+            db_plan.listing_id = data.get("listing_id")
+            db_plan.crop = data.get("crop")
+            db_plan.quantity = data.get("quantity")
+            db_plan.urgency = data.get("urgency")
+            db_plan.recommendation = data.get("recommendation")
+            db_plan.options = data.get("options")
+            db_plan.created_at = data.get("created_at")
+            await session.commit()
+        return data
+
+    @classmethod
+    async def get_workflow_plans_async(cls, user_id: str = None) -> list:
+        async with AsyncSessionLocal() as session:
+            query = select(DBWorkflowPlan)
+            if user_id:
+                query = query.where(DBWorkflowPlan.user_id == user_id)
+            query = query.order_by(DBWorkflowPlan.created_at.desc())
+            res = await session.execute(query)
+            rows = res.scalars().all()
+            
+            return [{
+                "plan_id": r.plan_id,
+                "user_id": r.user_id,
+                "listing_id": r.listing_id,
+                "crop": r.crop,
+                "quantity": r.quantity,
+                "urgency": r.urgency,
+                "recommendation": r.recommendation,
+                "options": r.options,
+                "created_at": r.created_at
+            } for r in rows]
+
     @classmethod
     async def save_transport_trip_async(cls, trip: dict) -> dict:
         async with AsyncSessionLocal() as session:
@@ -712,4 +1097,3 @@ class Database:
                     "created_at": db_trip.created_at
                 }
             return None
-

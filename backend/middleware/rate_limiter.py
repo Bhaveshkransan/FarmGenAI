@@ -24,8 +24,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._buckets: dict = defaultdict(deque)
 
     async def dispatch(self, request: Request, call_next):
-        # Skip rate limiting for preflight OPTIONS requests, health checks and static paths
-        if request.method == "OPTIONS" or request.url.path in ("/health", "/", "/docs", "/openapi.json"):
+        # Skip rate limiting for health checks and static paths
+        if request.url.path in ("/health", "/", "/docs", "/openapi.json"):
             return await call_next(request)
 
         ip = request.client.host if request.client else "unknown"

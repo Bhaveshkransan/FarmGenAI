@@ -37,12 +37,8 @@ async def list_crop_listings(
 async def get_my_crop_listings(current_user: dict = Depends(get_current_user)):
     """Return crop listings for the logged in user."""
     listings = await Database.list_produce_async()
-    user_sub = current_user.get("sub")
-    my_listings = [l for l in listings if l.get("user_id") == user_sub]
-    if not my_listings:
-        my_listings = listings
+    my_listings = [l for l in listings if l.get("user_id") == current_user["sub"]]
     return {"success": True, "data": my_listings, "count": len(my_listings)}
-
 
 
 @router.get("/{listing_id}")
