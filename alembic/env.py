@@ -14,13 +14,17 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-<<<<<<< HEAD
-# add your model's MetaData object here
-# for 'autogenerate' support
 from database.db import Base
 from config.settings import settings
 import psycopg2
 import re
+
+# Import models for metadata discovery
+try:
+    import backend.db.models.schema
+    import backend.db.models.transport_agent_models
+except Exception:
+    pass
 
 db_url = settings.DATABASE_URL
 is_pg = False
@@ -52,10 +56,6 @@ else:
     print("WARNING: PostgreSQL not reachable for migrations. Falling back to sync SQLite: agrinegotiator.db")
 
 config.set_main_option("sqlalchemy.url", db_url)
-=======
-from database.db import Base, db_url
-from config.settings import settings
->>>>>>> origin/feature/group-integration
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

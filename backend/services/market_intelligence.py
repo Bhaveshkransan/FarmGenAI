@@ -45,11 +45,18 @@ class MarketIntelligenceService:
                 )
             
             # 3. Format the mathematical intelligence string
+            if live_price <= 0.01:
+                price_line = f"Live Modal Price for {crop} in {location}: [UNAVAILABLE]"
+                hist_line = f"Historical 30-Day Average: [UNAVAILABLE]"
+            else:
+                price_line = f"Live Modal Price for {crop} in {location}: ₹{live_price:.2f}/kg"
+                hist_line = f"Historical 30-Day Average: ₹{historical_average:.2f}/kg"
+                
             intelligence_str = (
                 f"--- LIVE MARKET INTELLIGENCE ---\n"
                 f"Source: Agmarknet & e-NAM (Live API)\n"
-                f"Live Modal Price for {crop} in {location}: ₹{live_price:.2f}/kg\n"
-                f"Historical 30-Day Average: ₹{historical_average:.2f}/kg\n"
+                f"{price_line}\n"
+                f"{hist_line}\n"
                 f"Market Trend: {trend} (Volatility: {volatility}%)\n"
                 f"{weather_str}"
                 f"--- END LIVE INTELLIGENCE ---\n"
@@ -57,5 +64,7 @@ class MarketIntelligenceService:
             return intelligence_str
         except Exception as e:
             logger.error(f"MIS Error fetching market context: {e}")
-            return f"Market Intelligence unavailable. Fallback Historical Average: ₹{historical_average:.2f}/kg."
+            if historical_average > 0:
+                return f"Market Intelligence unavailable. Fallback Historical Average: ₹{historical_average:.2f}/kg."
+            return "Market Intelligence strictly UNAVAILABLE (API offline & no local fallback)."
 

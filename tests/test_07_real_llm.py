@@ -59,12 +59,14 @@ class TestFarmerLLM:
     @skip_ollama
     def test_farmer_prompt_returns_valid_json(self):
         from backend.agents.prompts import FARMER_PROMPT
+        from backend.core.constants import SUPPORTED_CROPS
         prompt = FARMER_PROMPT.format(
             crop="Tomato", quantity=500, min_price=20.0, location="Pune",
             shelf_life=5, market_price=22.0, buyer_offer=18.0, round=1,
             history="No rounds yet.",
             rag_context="Market stable. Tomato at Rs.22/kg.",
-            trust_context="No trust context."
+            trust_context="No trust context.",
+            supported_crops=", ".join(SUPPORTED_CROPS)
         )
         raw = LLM_CLIENT.generate(prompt, max_tokens=150, temperature=0.3)
         assert raw is not None, "LLM returned None"

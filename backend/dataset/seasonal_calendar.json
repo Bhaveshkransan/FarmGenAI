@@ -3,48 +3,56 @@
     "season_id": "sea_diwali_001",
     "event_name": "Diwali & Dussehra Festival Period",
     "month_range": "October - November",
-    "affected_crops": ["Onion", "Wheat", "Potato", "Vegetables"],
+    "affected_crops": ["Onion", "Sugarcane", "Rice", "Jowar"],
     "price_impact_trend": "High Increase / Supply Halt",
-    "market_behavior_description": "APMC mandis shut down completely for 3 to 5 days. Farmer supply deliveries halt, causing temporary acute shortages and retail price spikes. Demand for sweets and cooking crops spikes."
+    "market_behavior_description": "APMC mandis shut down completely for 3 to 5 days. Farmer supply deliveries halt, causing temporary acute shortages and retail price spikes. Demand for jaggery (from sugarcane) and cooking staples spikes during festival season."
   },
   {
     "season_id": "sea_ganesh_001",
     "event_name": "Ganesh Chaturthi Festival",
     "month_range": "August - September",
-    "affected_crops": ["Tomato", "Vegetables", "Sugarcane"],
+    "affected_crops": ["Onion", "Rice", "Sugarcane"],
     "price_impact_trend": "Moderate Increase",
-    "market_behavior_description": "Substantial rise in local vegetable demand for communal feasts and household celebrations. Mandi prices typically climb by 15-25% over a 10-day period."
+    "market_behavior_description": "Substantial rise in demand for staple commodities for communal feasts and household celebrations. Mandi prices typically climb by 10-20% over a 10-day period, especially for onion and rice."
   },
   {
     "season_id": "sea_kharif_arrivals_001",
     "event_name": "Kharif Crop Market Arrivals",
     "month_range": "October - December",
-    "affected_crops": ["Onion (Kharif)", "Soybean", "Cotton", "Rice (Paddy)"],
+    "affected_crops": ["Onion (Kharif)", "Soybean", "Cotton", "Rice (Paddy)", "Jowar", "Bajra"],
     "price_impact_trend": "Moderate Decrease / High Volume",
-    "market_behavior_description": "Primary annual harvest arrivals flood the APMC trading floors. Prices tend to touch seasonal lows due to the high volume of fresh, non-storable crop arrivals."
+    "market_behavior_description": "Primary annual harvest arrivals flood the APMC trading floors. Prices tend to touch seasonal lows due to the high volume of fresh crop arrivals. Best procurement window for buyers. Farmers with storage capacity should hold for 4-8 weeks for better prices."
   },
   {
     "season_id": "sea_rabi_arrivals_001",
-    "event_name": "Rabi Crop Market Arrivals",
+    "event_name": "Rabi Onion Market Arrivals",
     "month_range": "March - May",
-    "affected_crops": ["Wheat", "Onion (Rabi)", "Mustard"],
+    "affected_crops": ["Onion (Rabi)", "Jowar (Rabi)"],
     "price_impact_trend": "Moderate Decrease",
-    "market_behavior_description": "Massive influx of rabi onions (highly storable) and dry wheat grains. Prices stabilize at lower levels, marking the optimal period for buyers to procure and stock dry/cold storage."
+    "market_behavior_description": "Massive influx of rabi onions (highly storable) from Nashik, Ahmednagar, Solapur. Prices stabilize at lower levels, marking the optimal period for buyers to procure and stock in cold/dry storage. Rabi onion prices typically 15-30% lower than kharif onion at arrival."
   },
   {
-    "season_id": "sea_summer_drought_001",
-    "event_name": "Peak Summer Water Scarcity",
+    "season_id": "sea_summer_lean_001",
+    "event_name": "Peak Summer Lean Period",
     "month_range": "May - June",
-    "affected_crops": ["Tomato", "Vegetables"],
-    "price_impact_trend": "High Increase",
-    "market_behavior_description": "Extreme heat and water shortages in key growing districts (e.g. Pune, Ahmednagar) severely stunt vegetable growth. Supply falls short of demand, causing significant price surges."
+    "affected_crops": ["Onion", "Cotton", "Soybean"],
+    "price_impact_trend": "High Increase (Onion) / Stable (Cotton/Soybean)",
+    "market_behavior_description": "Extreme heat reduces onion supply from cold storage as stocks deplete. Onion prices spike sharply before new kharif crop arrives in August-September. Soybean prices are typically elevated due to low carry-forward stocks from previous kharif harvest."
   },
   {
     "season_id": "sea_monsoon_disruption_001",
     "event_name": "Monsoon Transport Disruption",
     "month_range": "July - August",
-    "affected_crops": ["Onion", "Tomato", "Soybean"],
+    "affected_crops": ["Onion", "Soybean", "Bajra", "Rice"],
     "price_impact_trend": "Supply Halt / Short-Term Price Spike",
-    "market_behavior_description": "Heavy monsoon rains lead to waterlogging on rural roads and highway transit delays. Mandi arrivals drop sharply, prompting temporary price spikes at urban wholesale points."
+    "market_behavior_description": "Heavy monsoon rains lead to waterlogging on rural roads and highway transit delays in key producing districts. Mandi arrivals drop sharply, prompting temporary price spikes. Cotton and soybean crops in growing stage — no arrivals expected. Onion stored from rabi season begins to face quality pressure from humidity."
+  },
+  {
+    "season_id": "sea_sugarcane_crushing_001",
+    "event_name": "Sugarcane Crushing Season",
+    "month_range": "November - March",
+    "affected_crops": ["Sugarcane"],
+    "price_impact_trend": "Stable (FRP enforced)",
+    "market_behavior_description": "Sugar mills begin crushing operations. FRP (Fair and Remunerative Price) is legally mandated — mills must pay farmers within 14 days. Peak demand for cane transport and mill procurement. Mills in Kolhapur, Satara, Pune districts are most active. Farmers should deliver promptly as sucrose content drops 0.1% per day post-harvest."
   }
 ]

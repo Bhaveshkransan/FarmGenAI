@@ -1,72 +1,51 @@
 [
   {
-    "crop": "Tomato",
-    "quality": "A",
-    "minimum_grade": "A",
-    "storage": "Cold Storage Recommended",
-    "apmc_guideline": "Must be sorted and graded before auction. Perishable category."
-  },
-  {
-    "crop": "Onion",
-    "quality": "A",
-    "minimum_grade": "B",
-    "storage": "Dry storage required to prevent fungal rot.",
-    "apmc_guideline": "Moisture content must be below 10% for bulk storage."
-  },
-  {
-    "crop": "Grapes",
-    "quality": "Export",
-    "minimum_grade": "A",
-    "storage": "Cold Storage strictly mandated.",
-    "apmc_guideline": "Residue testing mandatory for export grades."
-  },
-  {
     "crop": "Sugarcane",
     "quality": "Standard",
     "minimum_grade": "Standard",
-    "storage": "Immediate processing.",
-    "apmc_guideline": "FRP (Fair and Remunerative Price) mandated by central government."
+    "storage": "Must be processed immediately after harvest (within 48 hours). Delay causes sucrose loss.",
+    "apmc_guideline": "FRP (Fair and Remunerative Price) of Rs.340/quintal mandated by central government for 2026-27. All sugar mills must pay FRP within 14 days of delivery."
   },
   {
     "crop": "Soybean",
-    "quality": "A",
-    "minimum_grade": "B",
-    "storage": "Silo or dry godown.",
-    "apmc_guideline": "MSP applies. Moisture must be checked before procurement."
+    "quality": "Grade A",
+    "minimum_grade": "Grade B",
+    "storage": "Dry godown or silo. Moisture must be below 10% before storage to prevent fungal growth.",
+    "apmc_guideline": "MSP of Rs.5328/quintal applicable (2026-27). Moisture and foreign matter content checked before procurement by NAFED or government agencies."
   },
   {
     "crop": "Cotton",
     "quality": "Long Staple",
     "minimum_grade": "Medium Staple",
-    "storage": "Dry godown.",
-    "apmc_guideline": "CCI (Cotton Corporation of India) sets minimum support price based on staple length."
+    "storage": "Dry godown. Moisture must be below 8.5% to maintain fiber quality.",
+    "apmc_guideline": "MSP set by CCI (Cotton Corporation of India) at Rs.6620/quintal for Long Staple (2026-27). Staple length and trash content determine final grade and price premium."
   },
   {
-    "crop": "Banana",
-    "quality": "A",
-    "minimum_grade": "B",
-    "storage": "Cool Storage.",
-    "apmc_guideline": "Ethylene ripening must follow FSSAI safety norms."
+    "crop": "Jowar",
+    "quality": "Grade A",
+    "minimum_grade": "Grade B",
+    "storage": "Dry godown or metal bins. Moisture below 12%. Protected from rodents and insects.",
+    "apmc_guideline": "MSP of Rs.3699/quintal (2026-27). Grain must be clean, dry, and free of weevils. APMC markets conduct mandatory weighing and grading before auction."
   },
   {
-    "crop": "Pomegranate",
-    "quality": "Super Bhagwa",
-    "minimum_grade": "B",
-    "storage": "Cold Storage.",
-    "apmc_guideline": "Color grading required for premium export markets."
+    "crop": "Onion",
+    "quality": "Grade A",
+    "minimum_grade": "Grade B",
+    "storage": "Dry, well-ventilated farm shed or APMC shed. Moisture content must be below 10% to prevent sprouting and fungal rot.",
+    "apmc_guideline": "No MSP for onion. APMC auction is mandatory in Maharashtra. Grading (size: >55mm=Grade A, 40-55mm=Grade B) required. Export quality requires APEDA certification."
   },
   {
-    "crop": "Turmeric",
-    "quality": "Rajapuri",
-    "minimum_grade": "Standard",
-    "storage": "Dry godown.",
-    "apmc_guideline": "Curcumin content dictates premium pricing."
+    "crop": "Bajra",
+    "quality": "Grade A",
+    "minimum_grade": "Grade B",
+    "storage": "Dry godown or hermetic metal bins. Moisture below 12%. Susceptible to Aspergillus mold if wet.",
+    "apmc_guideline": "MSP of Rs.2775/quintal (2026-27). Grain must pass moisture test at APMC weighbridge. Mixing of grades is prohibited."
   },
   {
-    "crop": "Maize",
-    "quality": "A",
-    "minimum_grade": "Feed Grade",
-    "storage": "Dry godown.",
-    "apmc_guideline": "MSP applicable. Aflatoxin limits must be strictly adhered to."
+    "crop": "Rice",
+    "quality": "Grade A",
+    "minimum_grade": "Grade B",
+    "storage": "Dry godown or silo for paddy (Moisture < 14%), milled rice (<12%). FCI godown standards applicable for PDS procurement.",
+    "apmc_guideline": "MSP for Paddy (Common) is Rs.2369/quintal (2026-27). FCI and state agencies procure at MSP during procurement season (Nov-Jan). Broken grain percentage determines grade."
   }
 ]

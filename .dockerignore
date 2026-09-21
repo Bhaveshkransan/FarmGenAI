@@ -10,3 +10,12 @@ venv/
 data/
 frontend/node_modules/
 node_storage/
+# Large generated ML datasets - mount at runtime instead
+backend/dataset/mock_historical_prices.json
+# Scripts not needed in container
+scripts/
+tests/
+
+backend/venv/
+backend/models/
+backend/dataset/mock_historical_prices.json

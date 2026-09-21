@@ -16,7 +16,7 @@ class TestDataLayer(unittest.TestCase):
     def setUpClass(cls):
         import asyncio
         from database.db import init_db
-        from scripts.seed_postgres import seed_data
+        from scripts.seed_real_database import seed as seed_data
         
         async def _setup():
             await init_db()
@@ -47,10 +47,10 @@ class TestDataLayer(unittest.TestCase):
     def test_database_helpers(self):
         """Test structured facts lookups from the database."""
         # 1. MSP Price
-        wheat_msp = Database.get_msp_price("Wheat")
-        self.assertIsNotNone(wheat_msp)
-        self.assertGreater(wheat_msp, 0)
-        print(f"Verified Wheat MSP: Rs.{wheat_msp}/quintal")
+        soybean_msp = Database.get_msp_price("Soybean")
+        self.assertIsNotNone(soybean_msp)
+        self.assertGreater(soybean_msp, 0)
+        print(f"Verified Soybean MSP: Rs.{soybean_msp}/quintal")
         
         # 2. Market Mapping
         nashik_markets = Database.get_market_mappings("Nashik")
@@ -60,10 +60,10 @@ class TestDataLayer(unittest.TestCase):
         print(f"Verified Nashik APMC mappings: {[m['market_name'] for m in nashik_markets]}")
 
         # 3. Crop Quality
-        quality = Database.get_crop_quality_reference("Tomato")
+        quality = Database.get_crop_quality_reference("Soybean")
         self.assertIsInstance(quality, list)
         self.assertGreater(len(quality), 0)
-        print(f"Verified Tomato Quality reference (Grade {quality[0]['grade']}): size >= {quality[0]['min_size_mm']}mm")
+        print(f"Verified Soybean Quality reference (Grade {quality[0]['grade']})")
 
         # 4. Seasonal Calendar
         events = Database.get_seasonal_calendar()
@@ -85,7 +85,7 @@ class TestDataLayer(unittest.TestCase):
         print(f"Verified RAG Crop Knowledge retrieval: {onion_notes[0]['text'][:100]}...")
 
         # Test mandi semantic query wrapper
-        mandi_results = rag_service.query_mandi_records("Wheat market price", n_results=1)
+        mandi_results = rag_service.query_mandi_records("Soybean market price", n_results=1)
         self.assertIn("documents", mandi_results)
         self.assertGreater(len(mandi_results["documents"][0]), 0)
         raw_mandi_text = mandi_results['documents'][0][0]
@@ -96,11 +96,11 @@ class TestDataLayer(unittest.TestCase):
         """Test weather API call and E2E context building."""
         # This calls Open-Meteo live API and connects RAG
         import asyncio
-        context = asyncio.run(_build_rag_context(crop="Wheat", location="Pune"))
+        context = asyncio.run(_build_rag_context(crop="Soybean", location="Latur"))
         self.assertIsNotNone(context)
         self.assertIn("MSP", context)
         self.assertIn("Weather", context)
-        self.assertIn("Wheat", context)
+        self.assertIn("Soybean", context)
         self.assertIn("Mandi", context)
         print("Verified E2E Agent RAG Context Building successfully!")
         print("\n=== Context Snippet ===")

@@ -40,6 +40,7 @@ async def redis_pubsub_listener(redis_client):
                             "negotiation_id": neg_id,
                             "message": event_data.get("message") or f"{event_data.get('agent')}: Proposing ₹{event_data.get('price')}/kg.",
                             "agent_type": agent_type,
+                            "agent_name": str(event_data.get("agent", "")),
                             "offer": event_data.get("price"),
                         })
                     elif event_type == "agreement":
@@ -60,6 +61,16 @@ async def redis_pubsub_listener(redis_client):
                             "logs": event_data.get("logs", []),
                             "market_offers": event_data.get("market_offers", []),
                             "selected_buyer": event_data.get("selected_buyer")
+                        })
+                    elif event_type in ("market_offers_matched", "matching_completed"):
+                        await agent_update_hub.broadcast({
+                            "event": "MARKET_OFFERS_MATCHED",
+                            "negotiation_id": neg_id,
+                            "market_offers": event_data.get("market_offers", []),
+                            "crop": event_data.get("crop"),
+                            "quantity": event_data.get("quantity"),
+                            "market_price": event_data.get("market_price"),
+                            "min_price": event_data.get("min_price")
                         })
                     elif event_type == "status_update":
                         await agent_update_hub.broadcast({

@@ -65,43 +65,12 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Workflow Visualization */}
-        <div className="bg-slate-900 py-16 border-y border-emerald-900">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-2xl font-bold text-white text-center mb-12">Dynamic Supply Chain Routing</h2>
-            <div className="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-8 text-emerald-400">
-              <div className="flex flex-col items-center bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl w-48">
-                <Sprout size={32} className="mb-3" />
-                <span className="font-semibold text-white">Farmer</span>
-              </div>
-              <ArrowRight className="hidden md:block h-6 w-6 text-slate-600" />
-              <div className="flex flex-col items-center bg-slate-800 p-6 rounded-xl border border-emerald-600/30 shadow-[0_0_15px_rgba(16,185,129,0.15)] w-48 relative">
-                <div className="absolute -top-3 -right-3 bg-emerald-500 text-xs text-white px-2 py-1 rounded-full font-bold">AI</div>
-                <Bot size={32} className="mb-3" />
-                <span className="font-semibold text-white">Negotiation Hub</span>
-              </div>
-              <ArrowRight className="hidden md:block h-6 w-6 text-slate-600" />
-              <div className="flex flex-col space-y-4">
-                <div className="flex items-center space-x-4 bg-slate-800 px-6 py-3 rounded-lg border border-slate-700">
-                  <ShieldCheck size={20} /> <span className="text-white text-sm">Warehouse</span>
-                </div>
-                <div className="flex items-center space-x-4 bg-slate-800 px-6 py-3 rounded-lg border border-slate-700">
-                  <Truck size={20} /> <span className="text-white text-sm">Transport</span>
-                </div>
-              </div>
-              <ArrowRight className="hidden md:block h-6 w-6 text-slate-600" />
-              <div className="flex flex-col items-center bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-xl w-48">
-                <Zap size={32} className="mb-3" />
-                <span className="font-semibold text-white">Buyer</span>
-              </div>
-            </div>
-          </div>
-        </div>
+
 
         {/* Features Section */}
         <div className="py-20 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
               
               <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
                 <div className="bg-emerald-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
@@ -110,16 +79,6 @@ export default function LandingPage() {
                 <h3 className="text-xl font-bold text-slate-900 mb-3">Multi-Agent Negotiation</h3>
                 <p className="text-slate-600">
                   AI Copilots negotiate on your behalf using Reinforcement Learning to optimize your Best Alternative To a Negotiated Agreement (BATNA).
-                </p>
-              </div>
-
-              <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-                <div className="bg-emerald-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
-                  <Truck className="text-emerald-600 h-6 w-6" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">Flexible Supply Chain</h3>
-                <p className="text-slate-600">
-                  The system dynamically routes deals directly or integrates 3rd-party logistics and warehousing based on requirement parameters.
                 </p>
               </div>
 

@@ -36,7 +36,7 @@ class FarmerAgent(BaseAgent):
         if initial_price is not None:
             self.current_price = initial_price
         else:
-            self.current_price = min_price + random.randint(8, 12)
+            self.current_price = min_price + random.randint(2, 4)
 
         self.shelf_life = shelf_life
         self.min_sale_quantity = min_sale_quantity
@@ -46,8 +46,10 @@ class FarmerAgent(BaseAgent):
         self.has_processor_option = has_processor_option
 
     def evaluate_offer(self, offer, context=None):
-        """Unified with respond_to_offer logic for deterministic checks"""
-        return self.respond_to_offer(offer, context, force_deterministic=True)["type"]
+        target = getattr(self, "current_price", self.min_price)
+        if offer.get("price", 0) >= target * 0.98:
+            return "ACCEPT"
+        return "COUNTER"
 
     def make_offer(self, context=None):
         message = self.log_action(
@@ -84,7 +86,7 @@ class FarmerAgent(BaseAgent):
         return "OK", ""
 
     def respond_to_offer(self, offer, context=None, force_deterministic=False):
-        # 1. Strict Validation
+        # 1. Strict Validation (Level 2 & 4: Quantity & Input Protection)
         val_status, val_reason = self._validate_offer_inputs(offer)
         if val_status == "REJECT":
             return {
@@ -108,11 +110,10 @@ class FarmerAgent(BaseAgent):
         # 2. Hybrid Reasoning (LLM Proposal)
         llm_decision = None
         if llm_client and not force_deterministic:
-            # Inject context explicitly
             prompt = f"""
             You are a farmer negotiating the sale of {req_qty}kg of {self.crop}.
             - Your minimum acceptable price: ₹{self.min_price}
-            - Your target price: ₹{self.current_price}
+            - Your target/expected price: ₹{self.current_price}
             - Buyer offered price: ₹{price}
             - Market price: ₹{market_price}
             - Shelf life remaining: {self.shelf_life} days
@@ -138,20 +139,33 @@ class FarmerAgent(BaseAgent):
             counter_price = llm_decision.get("counter_price", self.current_price)
             reason = llm_decision.get("reason", "")
             
-            # Hallucination Protection: Do not accept below min_price unless desperate
+            # Hallucination Protection (Level 13: Hard Business Rules)
+            # If LLM rejects prematurely in early rounds, counter at floor instead of giving up
+            max_r = (context or {}).get("max_rounds", 5)
+            curr_r = (context or {}).get("round", 1)
+            if decision == "REJECT" and curr_r < max_r and self.shelf_life > 1:
+                decision = "COUNTER"
+                counter_price = max(self.min_price, self.current_price)
+                reason = f"Floor defense: countered at ₹{counter_price}/kg instead of walking away in round {curr_r}."
+
             if decision == "ACCEPT":
-                if price < self.min_price and self.shelf_life > 1:
+                # Strictly enforce min_price constraint
+                if price < self.min_price:
                     decision = "COUNTER"
                     counter_price = self.min_price
-                    reason = "LLM Override: Cannot accept below minimum price."
+                    reason = f"LLM Override: Cannot accept ₹{price} below strict minimum price of ₹{self.min_price}."
                     
-            # Hallucination Protection: Invalid Counter
             if decision == "COUNTER":
+                # Ensure counter price is mathematically valid
                 if not isinstance(counter_price, (int, float)) or counter_price <= price or counter_price <= 0:
                     fb = self._fallback_decision(offer, market_price)
                     decision = fb["decision"]
                     counter_price = fb["counter_price"] if fb["counter_price"] else self.min_price
                     reason = "LLM Override: Invalid counter price."
+                # Don't counter below min price
+                elif counter_price < self.min_price:
+                    counter_price = self.min_price
+                    reason += " (Adjusted to min price floor)"
 
         # 4. Final State Update
         if decision == "ACCEPT":
@@ -183,28 +197,33 @@ class FarmerAgent(BaseAgent):
     def _fallback_decision(self, offer, market_price):
         price = offer["price"]
         
-        # Level 3: Spoilage Intelligence
+        # Level 5 & 16: Urgency & Spoilage Intelligence
         if self.shelf_life <= 1:
-            if price >= self.min_price * 0.8:
-                return {"decision": "ACCEPT", "counter_price": None, "reason": "Critical spoilage risk. Accepting lower price to avoid total loss."}
-            
-            # Level 5: Processor Fallback
             processor_value = self.min_price * 0.7
             if self.has_processor_option and price < processor_value:
-                return {"decision": "REJECT", "counter_price": None, "reason": "Offer below processor salvage value."}
+                return {"decision": "REJECT", "counter_price": None, "reason": "Offer below processor salvage value. Will send to processor."}
+            if price >= self.min_price * 0.8:
+                return {"decision": "ACCEPT", "counter_price": None, "reason": "Critical spoilage risk. Accepting offer meeting 80% of minimum price."}
+            return {"decision": "REJECT", "counter_price": None, "reason": "Offer is below minimum price, even for distressed sale."}
 
         # Level 1: Normal Target Resolution
         if price >= self.current_price * 0.98:
             return {"decision": "ACCEPT", "counter_price": None, "reason": "Price meets our target expectation."}
             
         if price >= self.min_price:
+            # Level 13: Rational Counter
             gap = self.current_price - price
-            counter_price = round(price + (gap * 0.2), 2)
+            counter_price = round(price + (gap * 0.4), 2)  # Fight for higher margin
             counter_price = max(self.min_price, counter_price)
             return {"decision": "COUNTER", "counter_price": counter_price, "reason": "I can meet you part way."}
 
-        # Level 4: Storage Fallback
+        # Level 6 & 18: Storage Fallback
         if self.has_storage_option and self.shelf_life >= 10:
-             return {"decision": "REJECT", "counter_price": None, "reason": "Offer below minimum. I will store the crop."}
+             return {"decision": "REJECT", "counter_price": None, "reason": "Offer below minimum. I will store the crop and wait for better market."}
              
-        return {"decision": "REJECT", "counter_price": None, "reason": "Offer is below my sustainable minimum."}
+        # Level 20: Processor Fallback without critical spoilage
+        if self.has_processor_option and price < self.min_price * 0.8:
+            return {"decision": "REJECT", "counter_price": None, "reason": "Offer is far below minimum. I will consider processing."}
+
+        # Last resort: Counter at minimum price to protect floor
+        return {"decision": "COUNTER", "counter_price": self.min_price, "reason": "Offer is below minimum. Standing firm at my floor price."}

@@ -14,52 +14,10 @@
         "year": "2026-27"
     },
     {
-        "crop": "Maize",
-        "crop_full_name": "Maize",
-        "msp_price_per_quintal": 2400.0,
-        "msp_price_per_kg": 24.0,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Paddy",
+        "crop": "Rice",
         "crop_full_name": "Paddy(Common)",
         "msp_price_per_quintal": 2369.0,
         "msp_price_per_kg": 23.69,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Ragi",
-        "crop_full_name": "Ragi(Finger Millet)",
-        "msp_price_per_quintal": 4886.0,
-        "msp_price_per_kg": 48.86,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Wheat",
-        "crop_full_name": "Wheat",
-        "msp_price_per_quintal": 2585.0,
-        "msp_price_per_kg": 25.85,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Groundnut",
-        "crop_full_name": "Groundnut",
-        "msp_price_per_quintal": 7263.0,
-        "msp_price_per_kg": 72.63,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Mustard",
-        "crop_full_name": "Mustard",
-        "msp_price_per_quintal": 6200.0,
-        "msp_price_per_kg": 62.0,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Sesamum",
-        "crop_full_name": "Sesamum(Sesame,Gingelly,Til)",
-        "msp_price_per_quintal": 9846.0,
-        "msp_price_per_kg": 98.46,
         "year": "2026-27"
     },
     {
@@ -70,38 +28,26 @@
         "year": "2026-27"
     },
     {
-        "crop": "Bengal Gram",
-        "crop_full_name": "Bengal Gram(Gram)(Whole)",
-        "msp_price_per_quintal": 5875.0,
-        "msp_price_per_kg": 58.75,
+        "crop": "Sugarcane",
+        "crop_full_name": "Sugarcane",
+        "msp_price_per_quintal": 340.0,
+        "msp_price_per_kg": 3.4,
+        "year": "2026-27",
+        "note": "FRP set by CCEA. Legally enforced floor price for sugar mills."
+    },
+    {
+        "crop": "Cotton",
+        "crop_full_name": "Cotton (Medium/Long Staple)",
+        "msp_price_per_quintal": 6620.0,
+        "msp_price_per_kg": 66.20,
         "year": "2026-27"
     },
     {
-        "crop": "Black Gram",
-        "crop_full_name": "Black Gram(Urd Beans)(Whole)",
-        "msp_price_per_quintal": 7800.0,
-        "msp_price_per_kg": 78.0,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Green Gram",
-        "crop_full_name": "Green Gram(Moong)(Whole)",
-        "msp_price_per_quintal": 8768.0,
-        "msp_price_per_kg": 87.68,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Lentil",
-        "crop_full_name": "Lentil(Masur)(Whole)",
-        "msp_price_per_quintal": 7000.0,
-        "msp_price_per_kg": 70.0,
-        "year": "2026-27"
-    },
-    {
-        "crop": "Red gram/Arhar/Tur",
-        "crop_full_name": "Red gram/Arhar/Tur(whole)",
-        "msp_price_per_quintal": 8000.0,
-        "msp_price_per_kg": 80.0,
-        "year": "2026-27"
+        "crop": "Onion",
+        "crop_full_name": "Onion (Nashik Red/Garwa)",
+        "msp_price_per_quintal": null,
+        "msp_price_per_kg": null,
+        "year": "2026-27",
+        "note": "Perishable commodity. Governed by market arrivals and NAFED price stabilization fund (PSF), not central MSP."
     }
 ]

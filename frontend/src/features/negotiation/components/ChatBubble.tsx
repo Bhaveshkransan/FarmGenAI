@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Check, X, ArrowRightLeft } from 'lucide-react';
 
-export default function ChatBubble({ agent, price, message, reasoning, isFarmer, isInteractive, onAction }) {
+export default function ChatBubble({ agent, price, message, reasoning, isFarmer, isSystem, isInteractive, onAction }) {
   const [showReasoning, setShowReasoning] = useState(false);
+
+  if (isSystem) {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="bg-slate-100 border border-slate-200 text-slate-500 px-4 py-2 rounded-full text-xs font-medium max-w-[85%] text-center">
+          {message}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`flex flex-col ${isFarmer ? 'items-end' : 'items-start'}`}>
