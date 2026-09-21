@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from backend.db.session import AsyncSessionLocal, engine, Base, _run_async
 from backend.db.models.schema import *
+from backend.db.models.transport_agent_models import *
 
 class Database:
     @classmethod
@@ -767,4 +768,135 @@ class Database:
             return _run_async(_get())
         except Exception:
             return []
+
+    @classmethod
+    async def upsert_workflow_plan_async(cls, plan_id: str, data: dict) -> dict:
+        async with AsyncSessionLocal() as session:
+            db_plan = await session.get(DBWorkflowPlan, plan_id)
+            if not db_plan:
+                db_plan = DBWorkflowPlan(plan_id=plan_id)
+                session.add(db_plan)
+            
+            db_plan.user_id = data.get("user_id")
+            db_plan.listing_id = data.get("listing_id")
+            db_plan.crop = data.get("crop")
+            db_plan.quantity = data.get("quantity")
+            db_plan.urgency = data.get("urgency")
+            db_plan.recommendation = data.get("recommendation")
+            db_plan.options = data.get("options")
+            db_plan.created_at = data.get("created_at")
+            await session.commit()
+        return data
+
+    @classmethod
+    async def get_workflow_plans_async(cls, user_id: str = None) -> list:
+        async with AsyncSessionLocal() as session:
+            query = select(DBWorkflowPlan)
+            if user_id:
+                query = query.where(DBWorkflowPlan.user_id == user_id)
+            query = query.order_by(DBWorkflowPlan.created_at.desc())
+            res = await session.execute(query)
+            rows = res.scalars().all()
+            
+            return [{
+                "plan_id": r.plan_id,
+                "user_id": r.user_id,
+                "listing_id": r.listing_id,
+                "crop": r.crop,
+                "quantity": r.quantity,
+                "urgency": r.urgency,
+                "recommendation": r.recommendation,
+                "options": r.options,
+                "created_at": r.created_at
+            } for r in rows]
+
+    @classmethod
+    async def save_transport_trip_async(cls, trip: dict) -> dict:
+        async with AsyncSessionLocal() as session:
+            db_trip = DBTransportTrip(
+                trip_id=trip.get("trip_id") or cls.generate_id("trip"),
+                request_id=trip.get("request_id"),
+                vehicle_id=trip.get("vehicle_id", "V01"),
+                vehicle_type=trip.get("vehicle_type", "Medium Truck"),
+                crop=trip.get("crop"),
+                quantity_kg=float(trip.get("quantity_kg", 0.0)),
+                pickup_location=trip.get("pickup_location", "Ahmednagar"),
+                delivery_location=trip.get("delivery_location", "Pune"),
+                distance_km=float(trip.get("distance_km", 0.0)),
+                estimated_duration_hours=float(trip.get("estimated_duration_hours", 0.0)),
+                fuel_cost=float(trip.get("fuel_cost", 0.0)),
+                toll_cost=float(trip.get("toll_cost", 0.0)),
+                driver_cost=float(trip.get("driver_cost", 0.0)),
+                maintenance_cost=float(trip.get("maintenance_cost", 0.0)),
+                loading_cost=float(trip.get("loading_cost", 0.0)),
+                waiting_cost=float(trip.get("waiting_cost", 0.0)),
+                total_operating_cost=float(trip.get("total_operating_cost", 0.0)),
+                minimum_acceptable_price=float(trip.get("minimum_acceptable_price", 0.0)),
+                agreed_price=float(trip.get("agreed_price", 0.0)),
+                expected_profit=float(trip.get("expected_profit", 0.0)),
+                status=trip.get("status", "CONFIRMED"),
+                details_json=trip.get("details_json", {}),
+                created_at=trip.get("created_at")
+            )
+            session.add(db_trip)
+            await session.commit()
+            return trip
+
+    @classmethod
+    async def get_transport_trip_async(cls, trip_id: str) -> dict | None:
+        async with AsyncSessionLocal() as session:
+            db_trip = await session.get(DBTransportTrip, trip_id)
+            if db_trip:
+                return {
+                    "trip_id": db_trip.trip_id,
+                    "request_id": db_trip.request_id,
+                    "vehicle_id": db_trip.vehicle_id,
+                    "vehicle_type": db_trip.vehicle_type,
+                    "crop": db_trip.crop,
+                    "quantity_kg": db_trip.quantity_kg,
+                    "pickup_location": db_trip.pickup_location,
+                    "delivery_location": db_trip.delivery_location,
+                    "distance_km": db_trip.distance_km,
+                    "estimated_duration_hours": db_trip.estimated_duration_hours,
+                    "fuel_cost": db_trip.fuel_cost,
+                    "toll_cost": db_trip.toll_cost,
+                    "driver_cost": db_trip.driver_cost,
+                    "maintenance_cost": db_trip.maintenance_cost,
+                    "loading_cost": db_trip.loading_cost,
+                    "waiting_cost": db_trip.waiting_cost,
+                    "total_operating_cost": db_trip.total_operating_cost,
+                    "minimum_acceptable_price": db_trip.minimum_acceptable_price,
+                    "agreed_price": db_trip.agreed_price,
+                    "expected_profit": db_trip.expected_profit,
+                    "status": db_trip.status,
+                    "details_json": db_trip.details_json,
+                    "created_at": db_trip.created_at
+                }
+            return None
+
+    @classmethod
+    async def list_transport_trips_async(cls, limit: int = 50) -> list[dict]:
+        async with AsyncSessionLocal() as session:
+            stmt = select(DBTransportTrip).order_by(DBTransportTrip.created_at.desc()).limit(limit)
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [{
+                "trip_id": r.trip_id,
+                "request_id": r.request_id,
+                "vehicle_id": r.vehicle_id,
+                "vehicle_type": r.vehicle_type,
+                "crop": r.crop,
+                "quantity_kg": r.quantity_kg,
+                "pickup_location": r.pickup_location,
+                "delivery_location": r.delivery_location,
+                "distance_km": r.distance_km,
+                "estimated_duration_hours": r.estimated_duration_hours,
+                "fuel_cost": r.fuel_cost,
+                "toll_cost": r.toll_cost,
+                "total_operating_cost": r.total_operating_cost,
+                "agreed_price": r.agreed_price,
+                "expected_profit": r.expected_profit,
+                "status": r.status,
+                "created_at": r.created_at
+            } for r in rows]
 
