@@ -257,6 +257,13 @@ async def register_transport_vehicle(payload: VehicleRegistrationInput):
     return {"success": True, "data": v_dict}
 
 
+@router.get("/trips")
+async def list_transport_trips(limit: int = 50):
+    """List recent completed and active transport trips."""
+    trips = await Database.list_transport_trips_async(limit=limit)
+    return {"success": True, "count": len(trips), "data": trips}
+
+
 @router.get("/trips/{trip_id}")
 async def get_transport_trip_details(trip_id: str):
     """Fetch stored details of a transport trip."""

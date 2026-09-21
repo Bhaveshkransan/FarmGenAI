@@ -357,6 +357,32 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
     logs = list(state.get("logs", []))
     logs.append("📡 [Matching Engine] Querying suitable buyer profiles.")
 
+    # If direct buyer agent objects or selected buyer were explicitly provided, respect them
+    if state.get("buyer_agent_objs") and state.get("selected_buyer"):
+        sel = dict(state["selected_buyer"])
+        logs.append(f"🎯 [Matching Engine] Direct Buyer Selected: {sel.get('name', 'Buyer')}")
+        init_offer = float(sel.get("target_price") or state.get("latest_buyer_offer") or (state["min_price"] * 1.05))
+        return {
+            "active_buyers": [sel],
+            "current_offers": [{
+                "buyer_id": sel.get("id", "buyer_direct"),
+                "buyer_name": sel.get("name", "Buyer"),
+                "price": init_offer,
+                "status": "COUNTER"
+            }],
+            "best_current_offer": {
+                "buyer_id": sel.get("id", "buyer_direct"),
+                "buyer_name": sel.get("name", "Buyer"),
+                "price": init_offer,
+                "status": "COUNTER"
+            },
+            "buyer_profile": sel,
+            "selected_buyer": sel,
+            "latest_buyer_offer": init_offer,
+            "latest_farmer_ask": round(state["min_price"] * 1.2, 2),
+            "logs": logs
+        }
+
     from backend.services.matching_service import match_listing_to_buyers
     
     listing_mock = {
@@ -375,9 +401,9 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
     raw_buyers = [b if isinstance(b, dict) else {
         "id": getattr(b, "id", f"buyer_{getattr(b, 'name', 'default').lower()}"),
         "name": getattr(b, "name", "Buyer"),
-        "target_price": getattr(b, "target_price", state["min_price"]),
-        "budget": getattr(b, "budget", 100000.0),
-        "max_quantity": getattr(b, "max_quantity", state["quantity"]),
+        "target_price": float(getattr(b, "target_price", None) or state["min_price"]),
+        "budget": float(getattr(b, "budget", None) or (float(getattr(b, "target_price", None) or state["min_price"]) * float(state.get("quantity", 1000)) * 1.5)),
+        "max_quantity": float(getattr(b, "max_quantity", None) or state["quantity"]),
         "location": getattr(b, "location", "Market"),
         "strategy": getattr(b, "strategy", "default")
     } for b in db_buyers]
@@ -385,21 +411,25 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
     active_buyers = []
     current_offers = []
     for best in market_offers[:5]:  # Top 5 buyers for parallel negotiation
-        buyer = next((b for b in raw_buyers if b.get("id") == best["buyer_id"] or b.get("name") == best["buyer_name"]), None)
+        buyer = next((b for b in raw_buyers if (isinstance(b, dict) and (b.get("id") == best["buyer_id"] or b.get("name") == best["buyer_name"]))), None)
         if buyer:
-            active_buyers.append(buyer)
+            buyer_entry = dict(buyer)
+            buyer_entry["budget"] = float(best.get("budget") or buyer_entry.get("budget") or (state["min_price"] * state["quantity"] * 1.5))
+            buyer_entry["location"] = best.get("location") or buyer_entry.get("location", "Market")
+            active_buyers.append(buyer_entry)
             initial_offer = best["offered_price"]
             current_offers.append({
-                "buyer_id": buyer["id"],
-                "buyer_name": buyer.get("name", "Buyer"),
+                "buyer_id": buyer_entry["id"],
+                "buyer_name": buyer_entry.get("name", "Buyer"),
                 "price": initial_offer,
                 "status": "COUNTER"
             })
 
     if not active_buyers and raw_buyers:
-        b = raw_buyers[0]
+        b = dict(raw_buyers[0])
+        b["budget"] = float(b.get("budget") or (state["min_price"] * state["quantity"] * 1.5))
         active_buyers.append(b)
-        initial_offer = round(b.get("target_price", state["min_price"]) * 0.75, 2)
+        initial_offer = round(float(b.get("target_price") or state["min_price"]) * 0.95, 2)
         current_offers.append({
             "buyer_id": b["id"],
             "buyer_name": b.get("name", "Buyer"),
@@ -412,7 +442,7 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
             "id": "buyer_default",
             "name": "Marketplace Aggregator",
             "target_price": state["min_price"] * 1.1,
-            "budget": state["min_price"] * state["quantity"] * 1.3,
+            "budget": state["min_price"] * state["quantity"] * 1.5,
             "max_quantity": state["quantity"],
             "location": state["location"],
             "strategy": "default"
@@ -421,7 +451,7 @@ async def matching_engine_node(state: NegotiationState) -> Dict[str, Any]:
         current_offers.append({
             "buyer_id": b["id"],
             "buyer_name": b["name"],
-            "price": round(b["target_price"] * 0.75, 2),
+            "price": round(b["target_price"] * 0.95, 2),
             "status": "COUNTER"
         })
 
@@ -477,7 +507,7 @@ async def farmer_node(state: NegotiationState) -> Dict[str, Any]:
     logs.append(f"👨‍🌾 [Farmer] {decision_type} ₹{counter_price}/kg: {message}")
 
     if decision_type == "ACCEPT":
-        return {"status": "DEAL", "round": current_round, "latest_farmer_ask": buyer_offer, "logs": logs, "quantity": farmer.quantity}
+        return {"status": "DEAL", "round": current_round, "latest_farmer_ask": buyer_offer, "logs": logs, "quantity": state["quantity"]}
     elif decision_type == "REJECT":
         return {"status": "REJECT", "round": current_round, "logs": logs}
     else:
@@ -715,49 +745,112 @@ async def dynamic_routing_node(state: NegotiationState) -> Dict[str, Any]:
     deal = state.get("deal") or {}
     deal["type"] = "DIRECT"
     deal["price"] = state.get("latest_buyer_offer", 0)
-    deal["quantity"] = state["quantity"]
+    shipment_qty = float(deal.get("quantity") or state.get("quantity") or 1000.0)
+    if shipment_qty <= 0:
+        shipment_qty = 1000.0
+    deal["quantity"] = shipment_qty
     
     selected = state.get("selected_buyer", {})
     deal["buyer_name"] = selected.get("name", "Unknown Buyer")
     buyer_loc = selected.get("location", "Market")
     
     import asyncio
-    from backend.agents.prompts import TRANSPORT_PROMPT, WAREHOUSE_PROMPT
-    from backend.services.external_apis import OSRMClient
-    
-    # --- Parallel Transport Bidding ---
-    true_distance_km = await OSRMClient.get_driving_distance_km(state["location"], buyer_loc)
-    
-    if true_distance_km:
-        # Assuming ₹50 per KM for a 1000kg truck => ₹0.05 per kg per km
-        baseline_transport = max(0.5, round((true_distance_km * 0.05), 2))
-        logs.append(f"🗺️ [Logistics] OSRM Route: {state['location']} -> {buyer_loc} is {true_distance_km:.1f} KM. Calculated Rate: ₹{baseline_transport}/kg.")
-    else:
-        baseline_transport = 2.0  # ₹2/kg default
-        logs.append(f"🗺️ [Logistics] OSRM Routing unavailable. Using default baseline: ₹{baseline_transport}/kg.")
-        
-    transporters = [f"Transporter_{i}" for i in range(1, 6)]
-    
-    async def get_transport_bid(name):
-        prompt = TRANSPORT_PROMPT.format(
-            transporter_name=name, crop=state["crop"], quantity=state["quantity"],
-            from_loc=state["location"], to_loc=buyer_loc, baseline_cost=baseline_transport
-        )
-        resp = await asyncio.to_thread(llm_client.generate, prompt, max_tokens=100)
-        parsed = await _parse_json_response(resp)
-        if parsed and "bid_price" in parsed:
-            # Apply Farmer Priority: artificially penalize transporter bid by 2% for ranking
-            priority_score = parsed["bid_price"] * 1.02
-            return {"name": name, "bid": parsed["bid_price"], "score": priority_score, "reason": parsed.get("reason", "")}
-        return {"name": name, "bid": baseline_transport, "score": baseline_transport * 1.02, "reason": "Fallback bid"}
+    from backend.agents.prompts import WAREHOUSE_PROMPT
+    from backend.agents.transport_agent.graph import run_transport_workflow
+    from database.db import Database
 
-    t_tasks = [get_transport_bid(t) for t in transporters]
-    t_bids = await asyncio.gather(*t_tasks)
-    
-    # Select best (lowest score)
-    best_transport = min(t_bids, key=lambda x: x["score"])
-    logs.append(f"🚛 [Transport] {len(t_bids)} bids received. Selected {best_transport['name']} at ₹{best_transport['bid']}/kg (Farmer Priority Enforced). Reason: {best_transport['reason']}")
-    deal["transport_plan"] = best_transport
+    # --- Real Transport Agent Workflow (Fleet & OSRM Engine) ---
+    is_perishable = state.get("crop", "").lower() in ["tomato", "strawberry", "grape", "spinach", "lettuce", "flowers", "milk"]
+    refrigerated_req = is_perishable and (state.get("spoilage_days", 7) <= 2)
+
+    transport_input = {
+        "request_id": f"TR-NEG-{random.randint(1000, 9999)}",
+        "crop": state.get("crop", "Produce"),
+        "quantity_kg": shipment_qty,
+        "pickup_location": state.get("location", "Ahmednagar"),
+        "delivery_location": buyer_loc,
+        "delivery_deadline_hours": float(max(6, state.get("spoilage_days", 5) * 24)),
+        "shelf_life_hours": float(state.get("spoilage_days", 5) * 24),
+        "refrigerated_required": refrigerated_req,
+        "urgency": "HIGH" if state.get("spoilage_days", 5) <= 2 else "NORMAL",
+        "buyer_offer": None
+    }
+
+    try:
+        t_result = await run_transport_workflow(transport_input)
+        plan = t_result.get("final_transport_plan")
+        if plan and t_result.get("selected_vehicle"):
+            sel_veh = t_result["selected_vehicle"]
+            freight_cost = plan.get("agreed_price") or plan.get("initial_quote") or 1500.0
+            
+            deal["transport_plan"] = {
+                "agent": sel_veh.get("carrier_name") or sel_veh.get("vehicle_name", "Transport Fleet"),
+                "vehicle_id": sel_veh.get("vehicle_id"),
+                "vehicle_name": sel_veh.get("vehicle_name"),
+                "vehicle_type": sel_veh.get("vehicle_type"),
+                "capacity": sel_veh.get("capacity_kg"),
+                "fuel_type": sel_veh.get("fuel_type"),
+                "distance": t_result.get("distance_km", 50.0),
+                "duration_hours": t_result.get("estimated_duration_hours", 2.0),
+                "cost": freight_cost,
+                "total_operating_cost": t_result.get("total_operating_cost", 0.0),
+                "cost_breakdown": t_result.get("cost_breakdown", {}),
+                "routing_source": t_result.get("routing_source", "OSRM"),
+                "status": "CONFIRMED"
+            }
+
+            logs.append(
+                f"🚛 [Transport Agent] Autonomous vehicle assigned: {sel_veh.get('vehicle_name')} ({sel_veh.get('vehicle_type')}, "
+                f"Cap: {sel_veh.get('capacity_kg')}kg) for {t_result.get('distance_km')} km at ₹{freight_cost} freight "
+                f"(Operating Cost: ₹{t_result.get('total_operating_cost')}, Est. Duration: {t_result.get('estimated_duration_hours')} hrs via {t_result.get('routing_source', 'OSRM')})."
+            )
+
+            # Persist trip into PostgreSQL transport_trips table
+            try:
+                await Database.save_transport_trip_async({
+                    "request_id": plan.get("request_id"),
+                    "vehicle_id": sel_veh.get("vehicle_id"),
+                    "vehicle_type": sel_veh.get("vehicle_type"),
+                    "crop": state["crop"],
+                    "quantity_kg": float(state["quantity"]),
+                    "pickup_location": state["location"],
+                    "delivery_location": buyer_loc,
+                    "distance_km": t_result.get("distance_km"),
+                    "estimated_duration_hours": t_result.get("estimated_duration_hours"),
+                    "fuel_cost": t_result.get("cost_breakdown", {}).get("fuel_cost", 0.0),
+                    "toll_cost": t_result.get("cost_breakdown", {}).get("toll_cost", 0.0),
+                    "driver_cost": t_result.get("cost_breakdown", {}).get("driver_cost", 0.0),
+                    "maintenance_cost": t_result.get("cost_breakdown", {}).get("maintenance_cost", 0.0),
+                    "loading_cost": t_result.get("cost_breakdown", {}).get("loading_cost", 0.0),
+                    "waiting_cost": t_result.get("cost_breakdown", {}).get("waiting_cost", 0.0),
+                    "total_operating_cost": t_result.get("total_operating_cost"),
+                    "minimum_acceptable_price": t_result.get("minimum_acceptable_price"),
+                    "agreed_price": freight_cost,
+                    "expected_profit": plan.get("expected_profit"),
+                    "status": "CONFIRMED",
+                    "details_json": plan,
+                })
+            except Exception as trip_err:
+                logger.warning(f"Could not save transport trip record: {trip_err}")
+        else:
+            # Fallback baseline if no candidate vehicle fit shipment size
+            deal["transport_plan"] = {
+                "agent": "Regional AgriTransport Co.",
+                "cost": round(float(state.get("quantity", 1000)) * 1.8, 2),
+                "distance": 85.0,
+                "status": "CONFIRMED"
+            }
+            logs.append(f"🚛 [Transport Agent] No dedicated single vehicle fit {state['quantity']}kg load. Assigned regional pooled freight at ₹{deal['transport_plan']['cost']}.")
+    except Exception as e:
+        logger.error(f"Error running Transport Agent in dynamic_routing_node: {e}", exc_info=True)
+        deal["transport_plan"] = {
+            "agent": "Fastrack Logistics",
+            "cost": round(float(state.get("quantity", 1000)) * 1.5, 2),
+            "distance": 60.0,
+            "status": "CONFIRMED"
+        }
+        logs.append(f"🚛 [Transport Agent] Fallback transport assigned at ₹{deal['transport_plan']['cost']}.")
+
     
     # --- Parallel Warehouse Bidding (If needed) ---
     if state["spoilage_days"] <= 5:

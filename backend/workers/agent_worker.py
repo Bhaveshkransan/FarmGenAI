@@ -124,6 +124,7 @@ async def _serialize_result(final_state: dict, neg_id: str) -> dict:
         "status": final_state.get("status", "UNKNOWN"),
         "final_price": final_price,
         "deal": deal,
+        "transport_plan": deal.get("transport_plan"),
         "selected_buyer": final_state.get("selected_buyer"),
         "market_offers": final_state.get("market_offers", []),
         "logs": final_state.get("logs", []),
@@ -323,16 +324,23 @@ async def run_worker():
                         "round": 3,
                         "buyer_name": market_offers[0]["buyer_name"] if market_offers else "AgriMart Aggregator"
                     }
-                    
-                    from backend.services.negotiation_service import NegotiationService
-                    service = NegotiationService(db=None)
-                    market_offers = await service._generate_market_offers(payload)
+                    transport_plan = {
+                        "agent": "Regional AgriExpress Logistics",
+                        "vehicle_id": "V02",
+                        "vehicle_name": "Tata Ace Gold",
+                        "vehicle_type": "Mini Truck",
+                        "distance": 120.0,
+                        "cost": round(float(payload.get("quantity", 1000)) * 1.8, 2),
+                        "status": "CONFIRMED"
+                    }
+                    deal["transport_plan"] = transport_plan
                     
                     result = {
                         "negotiation_id": neg_id,
                         "status": "DEAL",
                         "final_price": final_price,
                         "deal": deal,
+                        "transport_plan": transport_plan,
                         "summary": f"Deal at ₹{final_price}/kg with AgriMart Aggregator",
                         "logs": [f"📋 [Planner] {crop} negotiation strategy set.", f"✅ Deal reached at ₹{final_price}/kg!"],
                         "history": history,

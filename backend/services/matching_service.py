@@ -109,9 +109,9 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
     results = []
     for req in all_requirements:
         # Crop must match (case-insensitive)
-        req_crop = req.get("crop", "")
-        list_crop = listing.get("crop", "")
-        if req_crop and list_crop and req_crop.lower() != list_crop.lower():
+        req_crop = (req.get("crop") or "").strip()
+        list_crop = (listing.get("crop") or "").strip()
+        if not req_crop or (list_crop and req_crop.lower() != list_crop.lower()):
             continue
 
         buyer_user = await UserRepository.get_by_id(req.get("user_id", "")) or {}

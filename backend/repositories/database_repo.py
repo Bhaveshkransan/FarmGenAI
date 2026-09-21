@@ -361,6 +361,13 @@ class Database:
         async with AsyncSessionLocal() as session:
             db_neg = await session.get(DBNegotiation, neg_id)
             if db_neg:
+                tp = db_neg.transport_plan
+                if isinstance(tp, str) and (tp.strip().startswith("{") or tp.strip().startswith("[")):
+                    try:
+                        import json
+                        tp = json.loads(tp)
+                    except Exception:
+                        pass
                 return {
                     "negotiation_id": db_neg.negotiation_id,
                     "crop": db_neg.crop,
@@ -373,7 +380,7 @@ class Database:
                     "current_round": db_neg.current_round,
                     "summary": db_neg.summary,
                     "final_price": db_neg.final_price,
-                    "transport_plan": db_neg.transport_plan,
+                    "transport_plan": tp,
                     "peer_node": db_neg.peer_node,
                     "logs": db_neg.logs or [],
                     "market_offers": db_neg.market_offers or [],
@@ -403,7 +410,12 @@ class Database:
             if "final_price" in payload and payload["final_price"] is not None: db_neg.final_price = payload["final_price"]
             if "market_price" in payload and payload["market_price"] is not None: db_neg.market_price = payload["market_price"]
             if "min_price" in payload and payload["min_price"] is not None: db_neg.min_price = payload["min_price"]
-            if "transport_plan" in payload and payload["transport_plan"] is not None: db_neg.transport_plan = payload["transport_plan"]
+            if "transport_plan" in payload and payload["transport_plan"] is not None:
+                tp = payload["transport_plan"]
+                if isinstance(tp, (dict, list)):
+                    import json
+                    tp = json.dumps(tp)
+                db_neg.transport_plan = tp
             if "peer_node" in payload and payload["peer_node"] is not None: db_neg.peer_node = payload["peer_node"]
             if "logs" in payload and payload["logs"]: db_neg.logs = payload["logs"]
             if "market_offers" in payload and payload["market_offers"]: db_neg.market_offers = payload["market_offers"]
@@ -762,6 +774,13 @@ class Database:
 
         results = []
         for r in rows:
+            tp = r.transport_plan
+            if isinstance(tp, str) and (tp.strip().startswith("{") or tp.strip().startswith("[")):
+                try:
+                    import json
+                    tp = json.loads(tp)
+                except Exception:
+                    pass
             results.append({
                 "negotiation_id": r.negotiation_id,
                 "crop": r.crop,
@@ -776,7 +795,7 @@ class Database:
                 "final_price": r.final_price,
                 "market_price": r.market_price,
                 "min_price": r.min_price,
-                "transport_plan": r.transport_plan,
+                "transport_plan": tp,
                 "peer_node": r.peer_node,
                 "logs": r.logs or [],
                 "market_offers": r.market_offers or [],
@@ -1097,3 +1116,30 @@ class Database:
                     "created_at": db_trip.created_at
                 }
             return None
+
+    @classmethod
+    async def list_transport_trips_async(cls, limit: int = 50) -> list[dict]:
+        async with AsyncSessionLocal() as session:
+            stmt = select(DBTransportTrip).order_by(DBTransportTrip.created_at.desc()).limit(limit)
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [{
+                "trip_id": r.trip_id,
+                "request_id": r.request_id,
+                "vehicle_id": r.vehicle_id,
+                "vehicle_type": r.vehicle_type,
+                "crop": r.crop,
+                "quantity_kg": r.quantity_kg,
+                "pickup_location": r.pickup_location,
+                "delivery_location": r.delivery_location,
+                "distance_km": r.distance_km,
+                "estimated_duration_hours": r.estimated_duration_hours,
+                "fuel_cost": r.fuel_cost,
+                "toll_cost": r.toll_cost,
+                "total_operating_cost": r.total_operating_cost,
+                "agreed_price": r.agreed_price,
+                "expected_profit": r.expected_profit,
+                "status": r.status,
+                "created_at": r.created_at
+            } for r in rows]
+

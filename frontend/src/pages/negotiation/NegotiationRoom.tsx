@@ -73,6 +73,7 @@ export default function NegotiationRoom() {
         let parsedAgent = 'System';
         if (log.includes('[Farmer]')) parsedAgent = 'Your AI (Farmer)';
         else if (log.includes('[Buyer]')) parsedAgent = 'Buyer Agent';
+        else if (log.includes('[Transport') || log.includes('[Logistics]')) parsedAgent = 'Transport Agent';
         historicMessages.push({ agent: parsedAgent, message: log, type: 'text' });
       }
     });
@@ -129,6 +130,7 @@ export default function NegotiationRoom() {
               let parsedAgent = 'System';
               if (log.includes('[Farmer]')) parsedAgent = 'Your AI (Farmer)';
               else if (log.includes('[Buyer]')) parsedAgent = 'Buyer Agent';
+              else if (log.includes('[Transport') || log.includes('[Logistics]')) parsedAgent = 'Transport Agent';
               return { agent: parsedAgent, message: log, type: 'text' };
             }
             return log;
@@ -278,7 +280,16 @@ export default function NegotiationRoom() {
               </div>
               <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
                 <p className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">🚚 TRANSPORT</p>
-                <p className="text-sm text-slate-600">Estimated cost: ₹1,850<br/>Availability: Good</p>
+                <p className="text-sm text-slate-600">
+                  {(() => {
+                    const rawTp = negState?.transport_plan;
+                    const tp = typeof rawTp === 'string' && rawTp.startsWith('{') ? JSON.parse(rawTp) : rawTp;
+                    if (tp && tp.cost) {
+                      return `${tp.vehicle_name || tp.agent || 'Fleet'} (₹${Number(tp.cost).toLocaleString()}) • ${tp.distance || 50}km`;
+                    }
+                    return 'Calculated via OSRM Fleet • Available ✓';
+                  })()}
+                </p>
               </div>
               <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
                 <p className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">📈 MARKET TREND</p>
@@ -431,7 +442,10 @@ export default function NegotiationRoom() {
                 });
                 const bestDeal = allBuyers.sort((a, b) => b.latestPrice - a.latestPrice)[0];
                 const gross = bestDeal.latestPrice * (negState.quantity || 500);
-                const net = gross - 1850; // Mock transport cost
+                const rawTp = negState?.transport_plan;
+                const tp = typeof rawTp === 'string' && rawTp.startsWith('{') ? JSON.parse(rawTp) : rawTp;
+                const transportCost = tp && tp.cost ? Number(tp.cost) : Math.round((negState.quantity || 500) * 1.5);
+                const net = gross - transportCost;
 
                 return (
                   <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-4 shadow-lg text-white">
@@ -446,7 +460,9 @@ export default function NegotiationRoom() {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-emerald-100 mb-1">Gross: ₹{gross.toLocaleString()} — Transport: ₹1,850</p>
+                        <p className="text-xs text-emerald-100 mb-1">
+                          Gross: ₹{gross.toLocaleString()} — Transport: ₹{transportCost.toLocaleString()} {tp?.vehicle_name ? `(${tp.vehicle_name})` : ''}
+                        </p>
                         <p className="font-bold text-xl">Net: ₹{net.toLocaleString()}</p>
                       </div>
                     </div>

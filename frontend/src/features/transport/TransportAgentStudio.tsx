@@ -97,22 +97,22 @@ export default function TransportAgentStudio() {
   const breakdown = plan?.cost_breakdown || state?.cost_breakdown;
 
   // Reusable crisp input style to prevent invisible/light text
-  const inputStyle = "w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none shadow-sm transition";
+  const inputStyle = "w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 bg-white placeholder-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-sm transition";
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
       {/* Header */}
-      <div className="bg-gradient-to-r from-amber-900 via-amber-800 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-amber-700/30 flex justify-between items-center flex-wrap gap-4">
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white p-6 rounded-2xl shadow-lg border border-emerald-900/40 flex justify-between items-center flex-wrap gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-300 text-xs font-semibold rounded-full border border-amber-500/30 mb-2">
-            <ShieldCheck size={14} /> Autonomous Module — LangGraph + OSRM
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-full border border-emerald-500/30 mb-2">
+            <ShieldCheck size={14} className="text-emerald-400" /> Autonomous Module — LangGraph + OSRM
           </div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Truck className="text-amber-400" /> Independent Transport Agent Studio
+            <Truck className="text-emerald-400" /> Independent Transport Agent Studio
           </h2>
-          <p className="text-amber-200/80 text-sm mt-1">
-            Feasibility checking, OSRM road distance, deterministic financial logic & AI freight negotiation.
+          <p className="text-slate-300 text-sm mt-1">
+            Real vehicle fleet matching, OSRM road distance, deterministic financial logic & autonomous freight negotiation.
           </p>
         </div>
       </div>
@@ -204,7 +204,7 @@ export default function TransportAgentStudio() {
               id="reefer"
               checked={refrigeratedRequired}
               onChange={(e) => setRefrigeratedRequired(e.target.checked)}
-              className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300"
+              className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
             />
             <label htmlFor="reefer" className="text-xs font-semibold text-slate-700 cursor-pointer">
               Refrigeration / Temperature Control Required
@@ -225,7 +225,7 @@ export default function TransportAgentStudio() {
           <button
             onClick={handleRunWorkflow}
             disabled={loading}
-            className="w-full py-3 bg-amber-500 hover:bg-amber-600 active:scale-[0.99] text-white font-bold rounded-xl transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-bold rounded-xl transition shadow-md shadow-emerald-900/10 flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? (
               <>
@@ -274,7 +274,7 @@ export default function TransportAgentStudio() {
           {state && (
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Navigation className="text-amber-600" size={20} /> OSRM Road Route & Vehicle Selection
+                <Navigation className="text-emerald-600" size={20} /> OSRM Road Route & Vehicle Selection
               </h3>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl text-center">
