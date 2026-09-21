@@ -4,12 +4,21 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Bell, LogOut, Sprout, Menu, X,
   LayoutDashboard, Handshake, BarChart3, User,
-  Receipt, Cpu, Settings, Truck
+  Receipt, Cpu, Settings, Truck, Warehouse, Factory, Bot
 } from 'lucide-react';
+
+const agentDashboards = [
+  { to: '/dashboard/farmer', label: 'Farmer Agent', icon: Sprout, role: 'farmer' },
+  { to: '/dashboard/transport', label: 'Transport Logistics Hub', icon: Truck, role: 'transport' },
+  { to: '/dashboard/buyer', label: 'Buyer Agent', icon: Handshake, role: 'buyer' },
+  { to: '/dashboard/warehouse', label: 'Warehouse Agent', icon: Warehouse, role: 'warehouse' },
+  { to: '/dashboard/processor', label: 'Processor Agent', icon: Factory, role: 'processor' },
+  { to: '/dashboard/ai-ops', label: 'AI Operations Center', icon: Cpu, role: 'admin' },
+];
 
 const navItemsByRole = {
   farmer: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/farmer', label: 'Farmer Overview', icon: LayoutDashboard },
     { to: '/farmer/negotiations', label: 'My Negotiations', icon: Handshake },
     { to: '/farmer/listings', label: 'My Listings', icon: BarChart3 },
     { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
@@ -17,7 +26,7 @@ const navItemsByRole = {
     { to: '/analytics', label: 'Market Analytics', icon: BarChart3 },
   ],
   buyer: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/buyer', label: 'Buyer Overview', icon: LayoutDashboard },
     { to: '/buyer/negotiations', label: 'My Deals', icon: Handshake },
     { to: '/buyer/matches', label: 'Find Suppliers', icon: BarChart3 },
     { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
@@ -25,7 +34,7 @@ const navItemsByRole = {
     { to: '/analytics', label: 'Market Intel', icon: BarChart3 },
   ],
   admin: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/farmer', label: 'Farmer Agent', icon: Sprout },
     { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
     { to: '/dashboard/admin', label: 'Admin Console', icon: Cpu },
     { to: '/dashboard/ai-ops', label: 'AI Operations', icon: Cpu },
@@ -33,18 +42,19 @@ const navItemsByRole = {
     { to: '/dashboard/settings', label: 'Settings', icon: Settings },
   ],
   warehouse: [
-    { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { to: '/dashboard/warehouse', label: 'Warehouse Overview', icon: LayoutDashboard },
     { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   ],
   transport: [
     { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
+    { to: '/dashboard/farmer', label: 'Farmer Consignments', icon: Sprout },
     { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   ],
 };
 
 const defaultNav = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/dashboard/farmer', label: 'Farmer Dashboard', icon: Sprout },
   { to: '/dashboard/transport', label: 'Transport Logistics', icon: Truck },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/transactions', label: 'Transactions', icon: Receipt },
@@ -57,7 +67,7 @@ export default function DashboardLayout() {
 
   const navItems = navItemsByRole[user?.role] || defaultNav;
 
-  const isActive = (path) => location.pathname === path ||
+  const isActive = (path: string) => location.pathname === path ||
     (path !== '/dashboard' && location.pathname.startsWith(path));
 
   return (
@@ -85,7 +95,10 @@ export default function DashboardLayout() {
             <div className="bg-emerald-700/50 p-2 rounded-xl">
               <Sprout size={22} className="text-emerald-300" />
             </div>
-            <h1 className="text-lg font-bold tracking-tight">AgriNegotiator</h1>
+            <div>
+              <h1 className="text-lg font-bold tracking-tight">FarmGenAI</h1>
+              <p className="text-[10px] text-emerald-400 font-semibold tracking-wider uppercase">Autonomous Agri System</p>
+            </div>
           </div>
           <button
             className="md:hidden text-emerald-300 hover:text-white p-1 rounded-lg hover:bg-emerald-800 transition"
@@ -96,18 +109,39 @@ export default function DashboardLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {navItems.map(({ to, label, icon: Icon }) => (
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-300/60 px-3 py-1 mb-1">
+            Agent Dashboards
+          </div>
+          {agentDashboards.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
               to={to}
               onClick={() => setIsMobileMenuOpen(false)}
-              className={`nav-link ${isActive(to) ? 'nav-link-active' : ''}`}
+              className={`nav-link ${location.pathname === to ? 'nav-link-active' : ''}`}
             >
               <Icon size={18} className="flex-shrink-0" />
               <span>{label}</span>
             </Link>
           ))}
+
+          {/* Core Menu */}
+          <div className="pt-4 mt-3 border-t border-emerald-800/40">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-300/60 px-3 py-1 mb-1">
+              Workspaces & Analytics
+            </div>
+            {navItems.filter(n => !agentDashboards.some(a => a.to === n.to)).map(({ to, label, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`nav-link ${isActive(to) ? 'nav-link-active' : ''}`}
+              >
+                <Icon size={17} className="flex-shrink-0" />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </div>
           
           {/* Profile Link */}
           <Link
@@ -157,9 +191,14 @@ export default function DashboardLayout() {
           </button>
 
           {/* Breadcrumb on desktop */}
-          <div className="hidden md:flex items-center text-sm text-slate-400">
-            <span className="text-slate-700 font-medium">
-              {navItems.find(n => isActive(n.to))?.label || 'Dashboard'}
+          <div className="hidden md:flex items-center text-sm text-slate-400 gap-2">
+            <span className="text-slate-800 font-bold">
+              {agentDashboards.find(a => location.pathname === a.to)?.label || navItems.find(n => isActive(n.to))?.label || 'Dashboard'}
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Autonomous Multi-Agent System
             </span>
           </div>
 

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/services/api';
 import { API_CONFIG } from '@/config/api';
-import { Leaf, TrendingUp, AlertCircle, Clock, Plus, MapPin, Navigation, TrendingDown, Minus } from 'lucide-react';
+import { Leaf, TrendingUp, AlertCircle, Clock, Plus, MapPin, Navigation, TrendingDown, Minus, Truck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '@/components/ui/StatCard';
 import CreateListingForm from '@/components/forms/CreateListingForm';
@@ -402,37 +402,66 @@ export default function FarmerDashboard() {
                   <th className="px-5 py-3 font-medium">Crop</th>
                   <th className="px-5 py-3 font-medium">Volume</th>
                   <th className="px-5 py-3 font-medium">Latest Price</th>
+                  <th className="px-5 py-3 font-medium">Logistics / Carrier</th>
                   <th className="px-5 py-3 font-medium">Status</th>
                   <th className="px-5 py-3 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {negLoading ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">Loading negotiations...</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">Loading negotiations...</td></tr>
                 ) : !negotiations || negotiations.length === 0 ? (
-                  <tr><td colSpan={5} className="p-8 text-center text-slate-400">No active negotiations found.</td></tr>
+                  <tr><td colSpan={6} className="p-8 text-center text-slate-400">No active negotiations found.</td></tr>
                 ) : (
-                  negotiations.map((neg: any) => (
-                    <tr key={neg.negotiation_id} className="hover:bg-slate-50/50 transition">
-                      <td className="px-5 py-4 font-medium text-slate-800">{neg.crop}</td>
-                      <td className="px-5 py-4 text-slate-600">{neg.quantity} kg</td>
-                      <td className="px-5 py-4 font-medium text-emerald-600">₹{neg.final_price || neg.market_price || neg.min_price || 0}/kg</td>
-                      <td className="px-5 py-4">
-                        <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                          neg.status === 'DEAL' ? 'bg-emerald-100 text-emerald-700' :
-                          neg.status === 'NO_DEAL' ? 'bg-red-100 text-red-700' :
-                          'bg-blue-100 text-blue-700'
-                        }`}>
-                          {neg.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <button onClick={() => navigate(`/negotiations/${neg.negotiation_id}`)} className="text-blue-600 font-medium hover:underline">
-                          View Room
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                  negotiations.map((neg: any) => {
+                    const tp = typeof neg.transport_plan === 'string' && neg.transport_plan.startsWith('{')
+                      ? JSON.parse(neg.transport_plan)
+                      : neg.transport_plan;
+
+                    return (
+                      <tr key={neg.negotiation_id} className="hover:bg-slate-50/50 transition">
+                        <td className="px-5 py-4 font-medium text-slate-800">{neg.crop}</td>
+                        <td className="px-5 py-4 text-slate-600">{neg.quantity} kg</td>
+                        <td className="px-5 py-4 font-medium text-emerald-600">₹{neg.final_price || neg.market_price || neg.min_price || 0}/kg</td>
+                        <td className="px-5 py-4">
+                          {tp ? (
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-800 text-xs flex items-center gap-1">
+                                <Truck size={12} className="text-emerald-600" />
+                                {tp.vehicle_name || tp.agent || 'Assigned Carrier'}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                ₹{(tp.cost || tp.agreed_price || 0).toLocaleString()} • {tp.distance || '0'} km
+                              </span>
+                            </div>
+                          ) : neg.status === 'DEAL' ? (
+                            <span className="text-[11px] text-slate-400 italic">Dispatch Scheduled</span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">Coordinating...</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
+                          <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+                            neg.status === 'DEAL' ? 'bg-emerald-100 text-emerald-700' :
+                            neg.status === 'NO_DEAL' ? 'bg-red-100 text-red-700' :
+                            'bg-blue-100 text-blue-700'
+                          }`}>
+                            {neg.status}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 flex items-center gap-2">
+                          <button onClick={() => navigate(`/negotiations/${neg.negotiation_id}`)} className="text-blue-600 font-medium hover:underline text-xs">
+                            View Room
+                          </button>
+                          {tp && (
+                            <button onClick={() => navigate('/dashboard/transport')} className="text-emerald-600 font-semibold hover:underline text-xs flex items-center gap-0.5 ml-1">
+                              <Truck size={11} /> Fleet
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

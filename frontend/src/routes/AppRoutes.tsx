@@ -68,26 +68,16 @@ export default function AppRoutes() {
             <Route path="/buyer/transactions" element={<Navigate to="/transactions" replace />} />
           </Route>
 
-          {/* Role-Gated Dashboards */}
-          <Route element={<ProtectedRoute allowedRoles={['farmer', 'admin']} />}>
-            <Route path="/dashboard/farmer" element={<FarmerDashboard />} />
-          </Route>
-          <Route element={<ProtectedRoute allowedRoles={['buyer', 'admin']} />}>
-            <Route path="/dashboard/buyer" element={<BuyerDashboard />} />
-          </Route>
-          <Route element={<ProtectedRoute allowedRoles={['warehouse', 'admin']} />}>
-            <Route path="/dashboard/warehouse" element={<WarehouseDashboard />} />
-          </Route>
+          {/* Agent Dashboards — Open to all authenticated users for complete multi-agent transparency */}
           <Route element={<ProtectedRoute allowedRoles={['farmer', 'buyer', 'warehouse', 'transport', 'processor', 'admin']} />}>
+            <Route path="/dashboard/farmer" element={<FarmerDashboard />} />
+            <Route path="/dashboard/buyer" element={<BuyerDashboard />} />
+            <Route path="/dashboard/warehouse" element={<WarehouseDashboard />} />
             <Route path="/dashboard/transport" element={<TransportDashboard />} />
-          </Route>
-          <Route element={<ProtectedRoute allowedRoles={['processor', 'admin']} />}>
             <Route path="/dashboard/processor" element={<ProcessorDashboard />} />
-          </Route>
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route path="dashboard/admin" element={<AdminDashboard />} />
-            <Route path="dashboard/ai-ops" element={<AIOperationsCenter />} />
-            <Route path="dashboard/settings" element={<SettingsDashboard />} />
+            <Route path="/dashboard/ai-ops" element={<AIOperationsCenter />} />
+            <Route path="/dashboard/admin" element={<AdminDashboard />} />
+            <Route path="/dashboard/settings" element={<SettingsDashboard />} />
           </Route>
 
           {/* Shared Features */}

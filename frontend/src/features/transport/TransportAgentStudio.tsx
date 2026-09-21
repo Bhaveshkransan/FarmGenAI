@@ -102,18 +102,24 @@ export default function TransportAgentStudio() {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white p-6 rounded-2xl shadow-lg border border-emerald-900/40 flex justify-between items-center flex-wrap gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/20 text-emerald-300 text-xs font-semibold rounded-full border border-emerald-500/30 mb-2">
-            <ShieldCheck size={14} className="text-emerald-400" /> Autonomous Module — LangGraph + OSRM
+      {/* Header — Aligned with MandiMitra & Farmer Dashboard */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center flex-wrap gap-4"
+        style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)' }}>
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-md text-white">
+            <Truck size={24} />
           </div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Truck className="text-emerald-400" /> Independent Transport Agent Studio
-          </h2>
-          <p className="text-slate-300 text-sm mt-1">
-            Real vehicle fleet matching, OSRM road distance, deterministic financial logic & autonomous freight negotiation.
-          </p>
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[11px] font-bold rounded-full mb-1">
+              <ShieldCheck size={12} className="text-emerald-700" /> Gayatri's 11-Node Autonomous LangGraph Engine
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              Transport Agent Studio
+            </h2>
+            <p className="text-slate-600 text-xs mt-0.5">
+              Real vehicle fleet matching, OSRM road distance, deterministic fuel & toll engine, and multi-round autonomous freight negotiation.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -122,8 +128,42 @@ export default function TransportAgentStudio() {
         
         {/* Left Column: Request Form */}
         <div className="lg:col-span-5 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <Calculator className="text-amber-600" size={20} /> Transport Requirement Input
+          
+          {/* Quick Presets from Farmer Agent */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+              ⚡ Quick Presets from Farmer Agent
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Nashik → Pune (Onion 1.5 MT)', crop: 'Onion', qty: 1500, from: 'Nashik', to: 'Pune', deadline: 12, reefer: false, offer: '8000' },
+                { label: 'Ahmednagar → Pune (Tomato 2 MT)', crop: 'Tomato', qty: 2000, from: 'Ahmednagar', to: 'Pune', deadline: 8, reefer: true, offer: '7200' },
+                { label: 'Akola → Amravati (Cotton 3 MT)', crop: 'Cotton', qty: 3000, from: 'Akola', to: 'Amravati', deadline: 24, reefer: false, offer: '14000' },
+                { label: 'Latur → Latur (Soybean 2 MT)', crop: 'Soybean', qty: 2000, from: 'Latur', to: 'Latur', deadline: 48, reefer: false, offer: '6000' },
+              ].map((p, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setCrop(p.crop);
+                    setQuantityKg(p.qty);
+                    setPickupLocation(p.from);
+                    setDeliveryLocation(p.to);
+                    setDeadlineHours(p.deadline);
+                    setRefrigeratedRequired(p.reefer);
+                    setBuyerOffer(p.offer);
+                  }}
+                  className="p-2 text-left bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 transition"
+                >
+                  <p className="font-bold text-slate-800 truncate">{p.label}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{p.reefer ? '❄️ Reefer' : '📦 Dry'} • ₹{p.offer} target</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 pt-2 border-t border-slate-100">
+            <Calculator className="text-amber-600" size={16} /> Transport Requirement Parameters
           </h3>
 
           <div className="grid grid-cols-2 gap-4">
