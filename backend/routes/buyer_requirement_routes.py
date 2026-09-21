@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, validator
-from backend.services.security import get_current_user
+from backend.services.security import get_current_user, get_current_user_optional
 from database.db import Database
 
 router = APIRouter(tags=["Buyer Requirements"])
@@ -137,7 +137,7 @@ def crops_match(req_c: str, prod_c: str) -> bool:
 async def list_requirements(
     crop: str = None,
     location: str = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Return all active buyer requirements, optionally filtered."""
     buyers = await Database.list_buyers_async()
@@ -230,11 +230,12 @@ async def get_requirement(requirement_id: str, current_user: dict = Depends(get_
 @router.post("/")
 async def create_requirement(
     payload: BuyerRequirementCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Post a new buyer requirement."""
     req_id = f"req_{str(uuid.uuid4())[:8]}"
     data = payload.dict()
+    user_info = current_user or {"sub": "buyer_enterprise", "name": "Buyer Enterprise", "role": "buyer"}
     
     # Normalize fields across frontend schemas
     loc = data.get("location") or data.get("preferredLocation") or "Maharashtra"
@@ -248,8 +249,8 @@ async def create_requirement(
         "id": req_id,
         "requirement_id": req_id,
         "kind": "requirement",
-        "user_id": current_user["sub"],
-        "buyer_name": current_user.get("name", "Buyer"),
+        "user_id": user_info.get("sub", "buyer_enterprise"),
+        "buyer_name": user_info.get("name") or user_info.get("businessName") or "Buyer Enterprise",
         "status": "ACTIVE",
         "crop": data.get("crop", "Produce"),
         "quantity": qty,

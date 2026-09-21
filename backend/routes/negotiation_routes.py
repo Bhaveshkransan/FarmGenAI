@@ -75,14 +75,66 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
     try:
         status_data = await controller.get_negotiation_status(negotiation_id) or {}
         p_price = payload.get("price") if isinstance(payload, dict) else None
-        final_p = p_price or status_data.get("final_price") or status_data.get("price") or 15.0
+        final_p_raw = p_price or status_data.get("final_price") or status_data.get("price") or 15.0
         p_qty = payload.get("quantity") if isinstance(payload, dict) else None
-        qty = p_qty or status_data.get("quantity") or 3000.0
+        qty_raw = p_qty or status_data.get("quantity") or 3000.0
         p_farmer = payload.get("farmer") if isinstance(payload, dict) else None
         farmer = p_farmer or status_data.get("farmer_name") or status_data.get("farmer") or "Maharashtra Farmer Network"
         p_buyer = payload.get("buyer") if isinstance(payload, dict) else None
         buyer = p_buyer or status_data.get("buyer_name") or status_data.get("buyer") or "Buyer Enterprise"
-        crop = (payload.get("crop") if isinstance(payload, dict) else None) or status_data.get("crop") or "Produce"
+        crop = (payload.get("crop") if isinstance(payload, dict) else None) or status_data.get("crop") or "Soybean"
+
+        # 1. Entry Details Type & Sanity Validation
+        try:
+            final_p = float(final_p_raw)
+            qty = float(qty_raw)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid entry details: Deal price and procurement volume must be valid numeric numbers."
+            )
+
+        if qty <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid entry volume ({qty} kg): Quantity must be strictly positive (greater than 0 kg)."
+            )
+
+        if final_p <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid entry price (₹{final_p}/kg): Settlement price must be strictly greater than zero."
+            )
+
+        # 2. Statutory Benchmark & Ceiling/Floor Guardrails
+        from backend.services.negotiation_service import STATUTORY_BENCHMARKS
+        crop_norm = "Soybean"
+        for k in STATUTORY_BENCHMARKS:
+            if k.lower() in crop.lower():
+                crop_norm = k
+                break
+        bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 50.0})
+        statutory_bench = float(bench_info.get("benchmark", 50.0))
+        target_p = float(status_data.get("target_price") or status_data.get("price") or statutory_bench)
+        max_buyer_ceiling = round(max(target_p * 1.35, statutory_bench * 1.40), 2)
+        min_floor_price = round(statutory_bench * 0.35, 2)
+
+        if final_p > max_buyer_ceiling:
+            raise HTTPException(
+                status_code=400,
+                detail=f"🛡️ [Buyer Guardrail] Price ₹{final_p:,.2f}/kg exceeds statutory ceiling (₹{max_buyer_ceiling:,.2f}/kg for {crop_norm}). Finalizing deal is strictly rejected."
+            )
+
+        if final_p < min_floor_price:
+            raise HTTPException(
+                status_code=400,
+                detail=f"🛡️ [Buyer Guardrail] Price ₹{final_p:,.2f}/kg is below the statutory APMC floor threshold (₹{min_floor_price:,.2f}/kg for {crop_norm}). Absurd or predatory low pricing is strictly rejected."
+            )
+
+        # 3. Party Identification Hygiene
+        farmer = str(farmer).strip() or "Maharashtra APMC Registered Producer"
+        buyer = str(buyer).strip() or "Registered Buyer Enterprise"
+
         clean_id = str(negotiation_id).replace("neg_", "").upper()
         txn_id = f"TXN-MH-2026-{clean_id}"
         
@@ -144,6 +196,8 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
             "data": txn_record,
             "contract": txn_record
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -207,4 +261,14 @@ async def feedback_deal(negotiation_id: str, payload: dict = None):
         return {"status": "success", "message": "Feedback recorded", "negotiation_id": negotiation_id}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{negotiation_id}/parallel-procure")
+async def parallel_procure_route(negotiation_id: str, payload: dict = None):
+    try:
+        return await controller.run_parallel_procurement(negotiation_id, payload or {})
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 

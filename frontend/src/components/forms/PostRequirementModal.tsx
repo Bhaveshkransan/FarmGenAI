@@ -1,23 +1,30 @@
 import React, { useState, useEffect } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
 import { 
   X, 
   Target, 
-  ChevronRight, 
-  ChevronLeft, 
-  Sparkles, 
+  Loader2, 
+  CheckCircle2, 
+  TrendingUp, 
+  BrainCircuit, 
+  MapPin, 
+  Building2, 
+  Layers, 
   Truck, 
   Warehouse, 
-  Building2, 
-  TrendingUp, 
-  Bot, 
-  CheckCircle2,
   ShieldCheck,
-  Layers,
-  MapPin
+  Bot
 } from 'lucide-react';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
 import { useNotification } from '@/contexts/NotificationContext';
-import { CANONICAL_7_CROPS, MAHARASHTRA_BUYER_HUBS } from '@/pages/buyer/BuyerDashboard';
+import ChartCard from '../ui/ChartCard';
+
+const CROP_CATEGORIES = ['Grains', 'Oilseeds', 'Cash Crops', 'Vegetables', 'Pulses', 'Fruits', 'Spices'];
+const QUALITY_GRADES = ['Premium (A+)', 'Grade A', 'Grade B', 'Grade C (Processing)', 'Any Grade (Best Value)'];
 
 const PROCUREMENT_PURPOSES = [
   { id: 'food_processing', label: '🏭 Food Processing & Milling' },
@@ -29,12 +36,69 @@ const PROCUREMENT_PURPOSES = [
   { id: 'institutional', label: '🏫 Institutional & Govt Supply' },
 ];
 
-const QUALITY_GRADES = [
-  { id: 'Grade A', label: 'Grade A (Premium / Export Quality)' },
-  { id: 'Grade B', label: 'Grade B (Standard Commercial)' },
-  { id: 'Grade C', label: 'Grade C (Industrial Processing Grade)' },
-  { id: 'ANY', label: 'Any Quality Grade (Best Value)' },
+const CROP_DEFAULT_CATEGORY: Record<string, string> = {
+  'Sugarcane': 'Cash Crops',
+  'Soybean': 'Oilseeds',
+  'Cotton': 'Cash Crops',
+  'Jowar': 'Grains',
+  'Onion': 'Vegetables',
+  'Bajra': 'Grains',
+  'Rice': 'Grains'
+};
+
+const MAHARASHTRA_CROPS = [
+  { name: 'Sugarcane', image: '/crops/sugarcane.jpg', benchmark: '₹3.40/kg FRP' },
+  { name: 'Soybean', image: '/crops/soybean.jpg', benchmark: '₹48.92/kg MSP' },
+  { name: 'Cotton', image: '/crops/cotton.jpg', benchmark: '₹71.21/kg MSP' },
+  { name: 'Jowar', image: '/crops/jowar.jpg', benchmark: '₹33.71/kg MSP' },
+  { name: 'Onion', image: '/crops/onion.jpg', benchmark: '₹25.00/kg Modal' },
+  { name: 'Bajra', image: '/crops/bajra.jpg', benchmark: '₹26.25/kg MSP' },
+  { name: 'Rice', image: '/crops/rice.jpg', benchmark: '₹23.00/kg MSP' }
 ];
+
+const MAHARASHTRA_DISTRICTS = [
+  'Ahmednagar', 'Akola', 'Amravati', 'Aurangabad', 'Beed', 'Bhandara', 'Buldhana', 
+  'Chandrapur', 'Dhule', 'Gadchiroli', 'Gondia', 'Hingoli', 'Jalgaon', 'Jalna', 
+  'Kolhapur', 'Latur', 'Mumbai City', 'Mumbai Suburban', 'Nagpur', 'Nanded', 
+  'Nandurbar', 'Nashik', 'Osmanabad', 'Palghar', 'Parbhani', 'Pune', 'Raigad', 
+  'Ratnagiri', 'Sangli', 'Satara', 'Sindhudurg', 'Solapur', 'Thane', 'Wardha', 
+  'Washim', 'Yavatmal'
+];
+
+const procurementSchema = z.object({
+  crop: z.enum(['Sugarcane', 'Soybean', 'Cotton', 'Jowar', 'Onion', 'Bajra', 'Rice']),
+  crop_category: z.string(),
+  variety: z.string().min(1, 'Variety is required'),
+  purpose: z.string(),
+  grade: z.string(),
+  quantity: z.number().positive('Quantity must be greater than 0'),
+  unit: z.string(),
+  min_batch_size: z.number().positive('Minimum batch size must be greater than 0'),
+  expected_price: z.number().positive('Expected target price must be greater than 0'),
+  max_price: z.number().positive('Maximum acceptable price must be greater than 0'),
+  price_unit: z.string(),
+  isOrganic: z.boolean(),
+  moisture: z.number().min(0).max(100).optional(),
+  delivery_deadline: z.string().optional(),
+  earliest_delivery: z.string().optional(),
+  shelf_life: z.number().positive('Shelf life / urgency must be valid').optional(),
+  delivery_hub: z.string().min(1, 'Hub / locality is required'),
+  taluka: z.string().min(1, 'Taluka is required'),
+  district: z.string().min(1, 'District is required'),
+  state: z.string(),
+  req_full_logistics: z.boolean(),
+  req_farmer_match: z.boolean(),
+  req_transport: z.boolean(),
+  req_warehouse: z.boolean(),
+  req_quality: z.boolean(),
+  description: z.string().optional()
+}).refine(data => data.min_batch_size <= data.quantity, {
+  message: "Minimum batch size cannot exceed total procurement quantity",
+  path: ["min_batch_size"]
+}).refine(data => data.expected_price <= data.max_price, {
+  message: "Target price cannot exceed maximum reservation budget",
+  path: ["max_price"]
+});
 
 interface PostRequirementModalProps {
   isOpen: boolean;
@@ -49,186 +113,245 @@ export default function PostRequirementModal({
   onSuccess,
   initialCrop = 'Soybean'
 }: PostRequirementModalProps) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const { addNotification } = useNotification();
-  const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [insight, setInsight] = useState<any>(null);
+  const [isInsightLoading, setIsInsightLoading] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
-  // Form State
-  const [crop, setCrop] = useState(initialCrop);
-  const [variety, setVariety] = useState('');
-  const [purpose, setPurpose] = useState('food_processing');
-  const [quantity, setQuantity] = useState<number | string>(5000);
-  const [unit, setUnit] = useState('kg');
-  const [minBatchSize, setMinBatchSize] = useState<number | string>(500);
-  const [qualityGrade, setQualityGrade] = useState('Grade A');
-  const [maxMoisture, setMaxMoisture] = useState(10);
-  const [isOrganic, setIsOrganic] = useState(false);
-  const [deliveryLocation, setDeliveryLocation] = useState('Pune');
-  const [villageTaluka, setVillageTaluka] = useState('Hadapsar MIDC');
-  const [transportRequired, setTransportRequired] = useState(true);
-  const [warehouseRequired, setWarehouseRequired] = useState(false);
-  const [targetPrice, setTargetPrice] = useState(45);
-  const [maxCeilingPrice, setMaxCeilingPrice] = useState(52);
-  const [aiIntel, setAiIntel] = useState<any>(null);
-  const [isLoadingIntel, setIsLoadingIntel] = useState(false);
-
-  // Reset step & sync crop whenever modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setCurrentStep(1);
-      if (initialCrop) setCrop(initialCrop);
+  const methods = useForm({
+    resolver: zodResolver(procurementSchema),
+    defaultValues: {
+      crop: (initialCrop as any) || 'Soybean',
+      crop_category: CROP_DEFAULT_CATEGORY[initialCrop] || 'Oilseeds',
+      variety: 'Commercial Lot',
+      purpose: 'food_processing',
+      grade: 'Grade A',
+      quantity: 5000,
+      unit: 'kg',
+      min_batch_size: 500,
+      expected_price: 48,
+      max_price: 52,
+      price_unit: 'per_kg',
+      isOrganic: false,
+      moisture: 10,
+      delivery_deadline: '',
+      earliest_delivery: '',
+      shelf_life: 30,
+      delivery_hub: 'Hadapsar Processing Center',
+      taluka: 'Haveli',
+      district: 'Pune',
+      state: 'Maharashtra',
+      req_full_logistics: false,
+      req_farmer_match: true,
+      req_transport: true,
+      req_warehouse: false,
+      req_quality: true,
+      description: ''
     }
-  }, [isOpen, initialCrop]);
+  });
 
-  // Handle quantity input with auto-batch adjustment
-  const handleQuantityChange = (val: string) => {
-    setQuantity(val);
-    const num = Number(val);
-    if (!isNaN(num) && num > 0) {
-      const curBatch = Number(minBatchSize) || 0;
-      if (curBatch > num || curBatch === 0) {
-        setMinBatchSize(Math.min(num, Math.max(10, Math.floor(num / 2))));
-      }
-    }
-  };
+  const { register, handleSubmit, formState: { errors }, watch, reset, setValue } = methods;
+  const formData = watch();
+  const selectedCrop = watch('crop');
+  const selectedDistrict = watch('district');
+  const currentQuantity = watch('quantity');
 
-  const handleUnitChange = (newUnit: string) => {
-    const oldUnit = unit;
-    setUnit(newUnit);
-    const num = Number(quantity);
-    if (!num || num <= 0) return;
-
-    if (oldUnit === 'kg' && newUnit === 'quintal') {
-      const q = Math.max(1, Math.round(num / 100));
-      setQuantity(q);
-      setMinBatchSize(Math.max(1, Math.floor(q / 2)));
-    } else if (oldUnit === 'kg' && newUnit === 'ton') {
-      const t = Math.max(1, Math.round(num / 1000));
-      setQuantity(t);
-      setMinBatchSize(Math.max(1, Math.floor(t / 2)));
-    } else if (oldUnit === 'quintal' && newUnit === 'kg') {
-      setQuantity(num * 100);
-      setMinBatchSize(Math.max(50, Math.floor((num * 100) / 2)));
-    } else if (oldUnit === 'quintal' && newUnit === 'ton') {
-      const t = Math.max(1, Math.round(num / 10));
-      setQuantity(t);
-      setMinBatchSize(Math.max(1, Math.floor(t / 2)));
-    } else if (oldUnit === 'ton' && newUnit === 'kg') {
-      setQuantity(num * 1000);
-      setMinBatchSize(Math.max(100, Math.floor((num * 1000) / 2)));
-    } else if (oldUnit === 'ton' && newUnit === 'quintal') {
-      setQuantity(num * 10);
-      setMinBatchSize(Math.max(1, Math.floor((num * 10) / 2)));
-    }
-  };
-
-  const setPresetQuantity = (qty: number) => {
-    setQuantity(qty);
-    setMinBatchSize(Math.min(qty, Math.max(10, Math.floor(qty / 2))));
-  };
-
-  // Fetch ML Market Intel when crop changes
-  useEffect(() => {
-    if (!isOpen) return;
-    let isMounted = true;
-    setIsLoadingIntel(true);
-    api.get(`/buyers/price-forecast?crop=${encodeURIComponent(crop)}&location=${encodeURIComponent(deliveryLocation)}`)
-      .then(res => {
-        if (isMounted && res.data) {
-          setAiIntel(res.data);
-          const livePrice = res.data.current_price || 40;
-          const predPrice = res.data.predicted_modal_price || livePrice;
-          setTargetPrice(Math.round(predPrice * 0.95 * 10) / 10);
-          setMaxCeilingPrice(Math.round(predPrice * 1.06 * 10) / 10);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (isMounted) setIsLoadingIntel(false);
-      });
-    return () => { isMounted = false; };
-  }, [crop, deliveryLocation, isOpen]);
-
-  if (!isOpen) return null;
-
-  const totalSteps = 5;
-
-  const handleNext = () => {
-    if (currentStep === 1 && !crop) {
-      addNotification('Please select a commodity crop', 'error');
+  // Live GPS Geolocation Detection via HTML5 Geolocation + OpenStreetMap Nominatim
+  const handleFetchLocation = () => {
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      addNotification('Geolocation is not supported by your browser', 'error');
+      setIsLocating(false);
       return;
     }
-    if (currentStep === 2) {
-      const numQty = Number(quantity);
-      if (!numQty || numQty <= 0) {
-        addNotification('Please enter a valid procurement quantity greater than 0', 'error');
-        return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10`
+          );
+          const data = await response.json();
+          
+          if (data && data.address) {
+            const state = data.address.state || 'Maharashtra';
+            let district = data.address.state_district || data.address.county || 'Pune';
+            district = district.replace(' District', '').trim();
+            const taluka = data.address.county || data.address.suburb || data.address.city_district || 'Haveli';
+            const village = data.address.village || data.address.town || data.address.suburb || data.address.city || 'Central Procurement Facility';
+
+            if (!MAHARASHTRA_DISTRICTS.includes(district)) {
+              district = MAHARASHTRA_DISTRICTS.find(d => district.includes(d)) || 'Pune';
+            }
+
+            setValue('state', state, { shouldValidate: true });
+            setValue('district', district, { shouldValidate: true });
+            setValue('taluka', taluka, { shouldValidate: true });
+            setValue('delivery_hub', village, { shouldValidate: true });
+            
+            addNotification('Live GPS location detected successfully!', 'success');
+          }
+        } catch (error) {
+          console.error("Geocoding failed:", error);
+          addNotification('Failed to detect precise address. Please select district manually.', 'error');
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        addNotification('Location access denied or unavailable. Using default Maharashtra hub.', 'info');
+        setIsLocating(false);
       }
-      let numBatch = Number(minBatchSize);
-      if (!numBatch || numBatch <= 0 || numBatch > numQty) {
-        numBatch = Math.min(numQty, Math.max(10, Math.floor(numQty / 2)));
-        setMinBatchSize(numBatch);
-      }
-    }
-    setCurrentStep(p => Math.min(p + 1, totalSteps));
+    );
   };
 
-  const handlePrev = () => setCurrentStep(p => Math.max(p - 1, 1));
+  // Automatically request permission and fetch location as soon as modal is opened!
+  useEffect(() => {
+    if (isOpen) {
+      handleFetchLocation();
+    }
+  }, [isOpen]);
 
-  const handleSubmit = async () => {
+  // Auto-adapt Category whenever selected Crop changes
+  useEffect(() => {
+    if (selectedCrop && CROP_DEFAULT_CATEGORY[selectedCrop]) {
+      setValue('crop_category', CROP_DEFAULT_CATEGORY[selectedCrop], { shouldValidate: true });
+    }
+  }, [selectedCrop, setValue]);
+
+  // Fetch real AI Market Intelligence insights & 7-day forecast chart
+  useEffect(() => {
+    if (!selectedCrop || !isOpen) return;
+    
+    const fetchInsight = async () => {
+      setIsInsightLoading(true);
+      try {
+        const res = await api.get(`/market-intelligence/insights?crop=${selectedCrop}&location=${selectedDistrict || 'Maharashtra'}`);
+        if (res.data?.success) {
+          setInsight(res.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch market insight", err);
+      } finally {
+        setIsInsightLoading(false);
+      }
+    };
+    
+    const timer = setTimeout(fetchInsight, 600);
+    return () => clearTimeout(timer);
+  }, [selectedCrop, selectedDistrict, isOpen]);
+
+  // Auto-update price defaults when real market intelligence price loads
+  useEffect(() => {
+    if (insight && insight.live_price > 0) {
+      const live = Number(insight.live_price);
+      // For buyer: Target price is 4% under market, Max acceptable ceiling is 8% over market
+      setValue('expected_price', Number((live * 0.96).toFixed(1)), { shouldValidate: true });
+      setValue('max_price', Number((live * 1.08).toFixed(1)), { shouldValidate: true });
+    }
+  }, [insight?.crop, insight?.live_price, setValue]);
+
+  const setPresetQuantity = (qty: number) => {
+    setValue('quantity', qty, { shouldValidate: true });
+    setValue('min_batch_size', Math.min(qty, Math.max(10, Math.floor(qty / 2))), { shouldValidate: true });
+  };
+
+  const onSubmit = async (data: any) => {
     setIsSubmitting(true);
     try {
+      const selected_services = {
+        market_intelligence: true,
+        negotiation: true,
+        quality_inspection: data.req_full_logistics || data.req_quality,
+        farmer_matching: data.req_full_logistics || data.req_farmer_match,
+        transport: data.req_full_logistics || data.req_transport,
+        warehouse: data.req_full_logistics || data.req_warehouse
+      };
+
       const payload = {
-        crop,
-        variety: variety || 'Commercial Lot',
-        purpose,
-        quantity: Number(quantity),
-        unit,
-        min_batch_size: Number(minBatchSize),
-        quality_grade: qualityGrade,
-        quality: qualityGrade,
-        max_moisture: Number(maxMoisture),
-        is_organic: isOrganic,
-        location: `${villageTaluka}, ${deliveryLocation}, Maharashtra`,
-        preferredLocation: `${deliveryLocation}, Maharashtra`,
-        transport_required: transportRequired,
-        transportRequired: transportRequired,
-        warehouse_required: warehouseRequired,
-        storageRequired: warehouseRequired,
-        target_price: Number(targetPrice),
-        buyer_target_price: Number(targetPrice),
-        max_price: Number(maxCeilingPrice),
-        maxBudget: Number(maxCeilingPrice),
-        budget: Number(quantity) * Number(maxCeilingPrice),
+        crop: data.crop,
+        crop_category: data.crop_category,
+        variety: data.variety,
+        purpose: data.purpose,
+        grade: data.grade,
+        quality_grade: data.grade,
+        quality: data.grade,
+        quantity: data.quantity,
+        unit: data.unit,
+        min_sale_quantity: data.min_batch_size,
+        min_batch_size: data.min_batch_size,
+        target_price: data.expected_price,
+        expected_price: data.expected_price,
+        max_price: data.max_price,
+        maxBudget: data.max_price,
+        budget: data.quantity * data.max_price,
+        price_unit: data.price_unit,
+        isOrganic: data.isOrganic,
+        is_organic: data.isOrganic,
+        moisture: data.moisture,
+        max_moisture: data.moisture,
+        delivery_deadline: data.delivery_deadline,
+        deliveryDate: data.delivery_deadline,
+        earliest_delivery: data.earliest_delivery,
+        shelf_life: data.shelf_life || 30,
+        location: `${data.delivery_hub}, ${data.taluka}, ${data.district}, Maharashtra`,
+        preferredLocation: `${data.district}, Maharashtra`,
+        selected_services,
+        transport_required: data.req_full_logistics || data.req_transport,
+        transportRequired: data.req_full_logistics || data.req_transport,
+        warehouse_required: data.req_full_logistics || data.req_warehouse,
+        storageRequired: data.req_full_logistics || data.req_warehouse,
         buyer_mode: true,
         max_rounds: 5,
-        timestamp: new Date().toISOString()
+        description: data.description || '',
+        notes: data.description || ''
       };
 
-      // 1. Save to requirements database
-      const reqRes = await api.post('/requirements', payload);
-      const reqId = reqRes.data?.data?.id || reqRes.data?.requirement_id || `req_${Date.now()}`;
+      const res = await api.post('/requirements', payload);
+      const reqData = res.data?.data || res.data;
+      const reqId = reqData?.id || reqData?.requirement_id;
 
-      // 2. Start Autonomous Matching & Multi-Agent Negotiation
-      const startPayload = {
-        ...payload,
-        requirement_id: reqId,
-        min_price: targetPrice,
-        shelf_life: 60,
-        farmer_name: 'Maharashtra Farmer Network',
-        buyer_name: 'Procurement Buyer',
-        buyer_budget: payload.budget,
-        buyer_max_quantity: payload.quantity,
-        buyer_strategy: purpose,
-        buyer_persona: purpose
-      };
+      // Automatically launch the Autonomous AI Negotiation session for this requirement
+      let negId: string | null = null;
+      try {
+        const startNegPayload = {
+          crop: data.crop,
+          quantity: Number(data.quantity) || 1000,
+          min_price: Number(data.expected_price) || 20,
+          shelf_life: Number(data.shelf_life) || 30,
+          location: `${data.delivery_hub || data.district}, Maharashtra`,
+          quality: data.grade || 'Grade A',
+          buyer_mode: true,
+          buyer_name: user?.businessName || user?.name || user?.full_name || 'Buyer Enterprise',
+          buyer_budget: Number(data.quantity) * Number(data.max_price || data.expected_price * 1.08),
+          buyer_max_quantity: Number(data.quantity) || 1000,
+          buyer_target_price: Number(data.expected_price),
+          buyer_location: `${data.district}, Maharashtra`,
+          buyer_strategy: data.purpose || 'Balanced',
+          buyer_persona: data.purpose ? `Commercial ${data.purpose}` : 'Balanced Corporate Buyer',
+          max_rounds: 5,
+          requirement_id: reqId
+        };
 
-      const negRes = await api.post('/negotiations/start-negotiation', startPayload);
-      const negId = negRes.data?.negotiation_id || negRes.data?.id;
+        const negRes = await api.post('/negotiations/start-negotiation', startNegPayload);
+        negId = negRes.data?.negotiation_id || negRes.data?.id;
+      } catch (negErr) {
+        console.warn('Auto start negotiation error:', negErr);
+      }
 
-      addNotification(`Requirement posted & AI Matching initiated! ID: ${negId || reqId}`, 'success');
-      onSuccess?.({ reqId, negId, ...payload });
+      addNotification('Procurement requirement published! Directing to AI Negotiation Room...', 'success');
+      reset();
+      onSuccess?.({ ...reqData, negId });
       onClose();
+
+      if (negId) {
+        navigate(`/negotiations/${negId}`);
+      }
     } catch (err: any) {
       addNotification(err.response?.data?.detail || 'Failed to submit procurement requirement', 'error');
     } finally {
@@ -236,506 +359,474 @@ export default function PostRequirementModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
         
-        {/* Modal Header */}
+        {/* Header */}
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-sm">
-              <Target size={20} />
-            </div>
-            <div>
-              <h3 className="font-bold text-slate-900 text-base">
-                Post Procurement Requirement
-              </h3>
-              <p className="text-xs text-slate-500">
-                Step {currentStep} of {totalSteps} • AI matching & autonomous price discovery
-              </p>
-            </div>
+          <div>
+            <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg">
+              <Target size={20} className="text-blue-600" /> New Procurement Requirement
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Publish your commercial demand across Maharashtra APMC mandis & direct farmer networks
+            </p>
           </div>
           <button 
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition"
+            onClick={onClose} 
+            className="text-slate-400 hover:text-slate-600 transition bg-white p-2 rounded-full shadow-sm border border-slate-100 cursor-pointer"
           >
             <X size={20} />
           </button>
         </div>
-
-        {/* Stepper Indicator Bar */}
-        <div className="bg-slate-100/80 px-6 py-2.5 flex justify-between items-center border-b border-slate-200/60 text-xs">
-          {[
-            { num: 1, label: 'Commodity' },
-            { num: 2, label: 'Quantity' },
-            { num: 3, label: 'Quality' },
-            { num: 4, label: 'Logistics' },
-            { num: 5, label: 'ML Strategy' },
-          ].map((s) => (
-            <div key={s.num} className="flex items-center gap-1.5">
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                currentStep === s.num 
-                  ? 'bg-emerald-600 text-white ring-2 ring-emerald-400/30' 
-                  : currentStep > s.num 
-                  ? 'bg-emerald-100 text-emerald-800' 
-                  : 'bg-slate-200 text-slate-600'
-              }`}>
-                {currentStep > s.num ? '✓' : s.num}
-              </span>
-              <span className={`hidden sm:inline font-medium ${currentStep === s.num ? 'text-slate-900 font-bold' : 'text-slate-500'}`}>
-                {s.label}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* Modal Scrollable Body */}
-        <div className="overflow-y-auto flex-1 p-6 text-xs">
-          
-          {/* ── STEP 1: Commodity Needs & Industry Purpose ── */}
-          {currentStep === 1 && (
-            <div className="space-y-5 animate-in slide-in-from-right-3 duration-200">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 mb-1">1. Select Commodity Crop & Industry Purpose</h4>
-                <p className="text-slate-500">Strictly grounded in the 7 statutory Maharashtra crops.</p>
-              </div>
-
-              {/* Crop Grid */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-2">Select Crop *</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {CANONICAL_7_CROPS.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setCrop(c.id)}
-                      className={`p-3 rounded-xl border text-left flex items-center gap-2.5 transition ${
-                        crop === c.id 
-                          ? 'border-emerald-600 bg-emerald-50/80 text-emerald-950 font-bold ring-2 ring-emerald-500/20' 
-                          : 'border-slate-200 hover:border-slate-300 text-slate-700 bg-white'
-                      }`}
-                    >
-                      <span className="text-2xl">{c.emoji}</span>
-                      <div>
-                        <p className="text-xs font-bold">{c.name}</p>
-                        <p className="text-[10px] text-slate-400">{c.desc}</p>
+        
+        {/* Scrollable Form Body */}
+        <div className="overflow-y-auto flex-1 p-6 sm:p-8 bg-white">
+          <FormProvider {...methods}>
+            <form id="procurement-form" onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+              
+              {/* 1. Visual Crop Selection */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <h4 className="text-lg font-bold text-slate-800">1. Select Commodity Crop</h4>
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
+                    7 Maharashtra Canonical Crops
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {MAHARASHTRA_CROPS.map(c => {
+                    const isSelected = selectedCrop === c.name;
+                    return (
+                      <div 
+                        key={c.name}
+                        onClick={() => {
+                          setValue('crop', c.name as any, { shouldValidate: true });
+                          if (CROP_DEFAULT_CATEGORY[c.name]) {
+                            setValue('crop_category', CROP_DEFAULT_CATEGORY[c.name], { shouldValidate: true });
+                          }
+                        }}
+                        className={`cursor-pointer rounded-xl overflow-hidden border-2 transition-all duration-200 ${
+                          isSelected 
+                            ? 'border-emerald-500 ring-2 ring-emerald-200 shadow-md scale-105' 
+                            : 'border-slate-200 hover:border-emerald-400 opacity-100 shadow-sm hover:shadow'
+                        }`}
+                      >
+                        <div className="h-24 w-full bg-slate-100 relative overflow-hidden">
+                          <img 
+                            src={c.image} 
+                            alt={c.name} 
+                            className="w-full h-full object-cover transition-transform duration-200 hover:scale-105" 
+                          />
+                          {isSelected && (
+                            <div className="absolute top-1 right-1 bg-emerald-500 text-white rounded-full p-0.5 shadow">
+                              <CheckCircle2 size={16} />
+                            </div>
+                          )}
+                        </div>
+                        <div className={`p-2 text-center text-xs font-semibold ${isSelected ? 'bg-emerald-50 text-emerald-800 font-bold' : 'bg-white text-slate-700'}`}>
+                          <div>{c.name}</div>
+                          <span className="text-[10px] text-slate-400 block font-normal">{c.benchmark}</span>
+                        </div>
                       </div>
-                    </button>
-                  ))}
+                    );
+                  })}
+                </div>
+                {errors.crop && <p className="text-red-500 text-xs mt-1">{errors.crop.message as string}</p>}
+              </div>
+
+              {/* 2. Procurement Specifications */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">2. Procurement Specifications</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category *</label>
+                    <select {...register('crop_category')} className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                      {CROP_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Commercial Variety *</label>
+                    <input 
+                      {...register('variety')} 
+                      placeholder="e.g. Nashik Red, Shriram, Commercial Grade" 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    {errors.variety && <p className="text-red-500 text-xs mt-1">{errors.variety.message as string}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Commercial Purpose / Sector *</label>
+                    <select {...register('purpose')} className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                      {PROCUREMENT_PURPOSES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Specific Variety */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Preferred Variety (Optional)</label>
-                <input
-                  type="text"
-                  value={variety}
-                  onChange={(e) => setVariety(e.target.value)}
-                  placeholder="e.g. Indrayani, JS-335, Maldandi M-35-1, Lasalgaon Red..."
-                  className="w-full form-input text-xs rounded-xl bg-slate-50 border-slate-200 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Procurement Purpose */}
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Procurement Purpose / Industry Sector *</label>
-                <select
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  className="w-full form-select text-xs rounded-xl bg-slate-50 border-slate-200 focus:ring-emerald-500 font-medium text-slate-800"
-                >
-                  {PROCUREMENT_PURPOSES.map((p) => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 2: Quantity Details ── */}
-          {currentStep === 2 && (
-            <div className="space-y-5 animate-in slide-in-from-right-3 duration-200">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 mb-1">2. Quantity & Batch Details</h4>
-                <p className="text-slate-500">Specify procurement volume and fulfillment batch sizing.</p>
-              </div>
-
-              {/* Quick Presets */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Quick Volume Presets
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {unit === 'kg' && [
+              {/* 3. Quantity Details */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">3. Volume & Lot Batching</h4>
+                
+                {/* Volume Quick Presets */}
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="text-xs font-semibold text-slate-500 mr-1">Quick Presets:</span>
+                  {[
                     { label: '120 kg (Kitchen/Sample)', val: 120 },
-                    { label: '500 kg', val: 500 },
-                    { label: '1,000 kg (1 MT)', val: 1000 },
-                    { label: '5,000 kg (Commercial)', val: 5000 },
-                    { label: '10,000 kg (Bulk)', val: 10000 },
-                  ].map((p) => (
+                    { label: '500 kg (Micro Lot)', val: 500 },
+                    { label: '1,000 kg (1 Ton)', val: 1000 },
+                    { label: '5,000 kg (5 Tons)', val: 5000 },
+                    { label: '10,000 kg (10 Tons)', val: 10000 }
+                  ].map(p => (
                     <button
                       key={p.val}
                       type="button"
                       onClick={() => setPresetQuantity(p.val)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
-                        Number(quantity) === p.val
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                  {unit === 'quintal' && [
-                    { label: '5 Quintals', val: 5 },
-                    { label: '10 Quintals', val: 10 },
-                    { label: '50 Quintals', val: 50 },
-                    { label: '100 Quintals', val: 100 },
-                  ].map((p) => (
-                    <button
-                      key={p.val}
-                      type="button"
-                      onClick={() => setPresetQuantity(p.val)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
-                        Number(quantity) === p.val
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                  {unit === 'ton' && [
-                    { label: '1 Ton', val: 1 },
-                    { label: '5 Tons', val: 5 },
-                    { label: '10 Tons', val: 10 },
-                    { label: '25 Tons', val: 25 },
-                  ].map((p) => (
-                    <button
-                      key={p.val}
-                      type="button"
-                      onClick={() => setPresetQuantity(p.val)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
-                        Number(quantity) === p.val
-                          ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                        Number(currentQuantity) === p.val 
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       {p.label}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Total Quantity Required *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    step={unit === 'ton' ? '0.5' : unit === 'quintal' ? '1' : '10'}
-                    value={quantity}
-                    onChange={(e) => handleQuantityChange(e.target.value)}
-                    placeholder="Enter total quantity"
-                    className="w-full form-input text-xs rounded-xl bg-slate-50 border-slate-200 font-bold text-slate-900 focus:ring-emerald-500"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Procurement demand in {unit === 'kg' ? 'kilograms' : unit === 'quintal' ? 'quintals (100 kg)' : 'metric tons'}.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Measurement Unit *</label>
-                  <select
-                    value={unit}
-                    onChange={(e) => handleUnitChange(e.target.value)}
-                    className="w-full form-select text-xs rounded-xl bg-slate-50 border-slate-200 focus:ring-emerald-500 font-semibold text-slate-800"
-                  >
-                    <option value="kg">Kilograms (kg)</option>
-                    <option value="quintal">Quintals (100 kg)</option>
-                    <option value="ton">Metric Tons (MT)</option>
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block font-semibold text-slate-700">Minimum Batch Acceptance Size *</label>
-                    <span className="text-[10px] text-slate-400 font-mono">Max allowable: {quantity} {unit}</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Total Required Volume *</label>
+                    <input 
+                      type="number" 
+                      {...register('quantity', { valueAsNumber: true })} 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    {errors.quantity && <p className="text-red-500 text-xs mt-1">{errors.quantity.message as string}</p>}
                   </div>
-                  <input
-                    type="number"
-                    min="1"
-                    max={Number(quantity) || 999999}
-                    step={unit === 'ton' ? '0.1' : unit === 'quintal' ? '1' : '10'}
-                    value={minBatchSize}
-                    onChange={(e) => setMinBatchSize(e.target.value)}
-                    className="w-full form-input text-xs rounded-xl bg-slate-50 border-slate-200 font-medium text-slate-800 focus:ring-emerald-500"
-                  />
-                  {Number(minBatchSize) > Number(quantity) ? (
-                    <p className="text-[11px] text-amber-600 font-semibold mt-1 flex items-center gap-1">
-                      ⚠️ Batch size ({minBatchSize} {unit}) cannot exceed total quantity ({quantity} {unit}). It will be auto-clamped.
-                    </p>
-                  ) : (
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      Smallest lot size you will accept from an individual farmer/FPO dispatch.
-                    </p>
-                  )}
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Measurement Unit *</label>
+                    <select {...register('unit')} className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                      <option value="kg">Kilograms (kg)</option>
+                      <option value="quintal">Quintals (100 kg)</option>
+                      <option value="ton">Metric Tons (MT)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Minimum Batch Acceptance Size *</label>
+                    <input 
+                      type="number" 
+                      {...register('min_batch_size', { valueAsNumber: true })} 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">Smallest consignment accepted from an individual seller</p>
+                    {errors.min_batch_size && <p className="text-red-500 text-xs mt-1">{errors.min_batch_size.message as string}</p>}
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* ── STEP 3: Quality Parameters ── */}
-          {currentStep === 3 && (
-            <div className="space-y-5 animate-in slide-in-from-right-3 duration-200">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 mb-1">3. Quality Parameters & Inspection Standards</h4>
-                <p className="text-slate-500">Define the physical quality and moisture constraints required for processing.</p>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Required Quality Grade *</label>
-                <select
-                  value={qualityGrade}
-                  onChange={(e) => setQualityGrade(e.target.value)}
-                  className="w-full form-select text-xs rounded-xl bg-slate-50 border-slate-200 focus:ring-emerald-500 font-semibold text-slate-800"
-                >
-                  {QUALITY_GRADES.map((g) => (
-                    <option key={g.id} value={g.id}>{g.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Maximum Moisture Content (%)</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="5"
-                    max="25"
-                    step="1"
-                    value={maxMoisture}
-                    onChange={(e) => setMaxMoisture(Number(e.target.value))}
-                    className="flex-1 accent-emerald-600"
-                  />
-                  <span className="font-bold text-slate-800 w-12 text-center bg-slate-100 py-1 rounded-lg">
-                    {maxMoisture}%
-                  </span>
+              {/* 4. Quality Parameters */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">4. Quality Parameters</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Acceptable Quality Grade *</label>
+                    <select {...register('grade')} className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                      {QUALITY_GRADES.map(g => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Maximum Moisture Content (%)</label>
+                    <input 
+                      type="number" 
+                      {...register('moisture', { valueAsNumber: true })} 
+                      placeholder="e.g. 10" 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                  </div>
+                  <div className="md:col-span-2 flex items-center gap-3 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <input 
+                      type="checkbox" 
+                      id="procure-organic" 
+                      {...register('isOrganic')} 
+                      className="w-5 h-5 text-emerald-600 rounded cursor-pointer" 
+                    />
+                    <label htmlFor="procure-organic" className="font-medium text-emerald-900 cursor-pointer text-sm">
+                      Require Certified Organic Produce (Verified APMC/PGS-India Certification)
+                    </label>
+                  </div>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Grain & oilseed lots exceeding this moisture will require artificial drying deduction.
+              </div>
+
+              {/* 5. Pricing Strategy & AI Market Intelligence */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">5. Pricing Strategy & Market Intelligence</h4>
+                
+                {/* AI Market Intelligence Box */}
+                <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-4 mb-4">
+                  <div className="flex items-center gap-2 text-emerald-800 font-bold mb-2">
+                    <BrainCircuit size={18} />
+                    <h3>AI Market Intelligence (MandiMitra)</h3>
+                    {isInsightLoading && <Loader2 size={14} className="animate-spin ml-2 text-emerald-600" />}
+                  </div>
+                  {!isInsightLoading && insight ? (
+                    <div className="text-sm text-slate-700 space-y-3">
+                      {/* Price Row */}
+                      <div className="flex items-center flex-wrap gap-2">
+                        <span className="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-md font-semibold text-xs">
+                          Live APMC Modal: ₹{insight.live_price}/kg
+                        </span>
+                        <span className="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1">
+                          <TrendingUp size={12} /> Trend: {insight.trend}
+                        </span>
+                        {insight.ml_forecast_price && (
+                          <span className={`px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1 ${
+                            insight.ml_forecast_direction === 'up' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {insight.ml_forecast_direction === 'up' ? '▲' : '▼'} 7-Day Forecast: ₹{insight.ml_forecast_price}/kg
+                          </span>
+                        )}
+                      </div>
+                      {/* LLM Recommendation */}
+                      <p className="bg-white/70 p-3 rounded-lg border border-emerald-100 font-medium text-xs leading-relaxed">
+                        <span className="text-emerald-700 font-bold mr-1">AI Buyer Advice:</span> 
+                        {insight.recommendation}
+                      </p>
+                      
+                      {/* Price Trend Chart */}
+                      {insight.chart_data && insight.chart_data.length > 0 && (
+                        <div className="mt-4 bg-white p-3 rounded-xl border border-emerald-100 shadow-sm">
+                          <ChartCard 
+                            title={`${selectedCrop} Wholesale Price Forecast (Next 7 Days)`} 
+                            subtitle="AI projected modal price in ₹/kg based on historical APMC data and market arrivals."
+                            data={insight.chart_data} 
+                            xKey="date" 
+                            yKey="price" 
+                            color={insight.ml_forecast_direction === 'up' ? '#10b981' : '#ef4444'}
+                            height={160} 
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ) : isInsightLoading ? (
+                    <p className="text-xs text-slate-500 animate-pulse">
+                      Analyzing historical APMC auction records, arrival velocities, and ML price predictions for {selectedCrop}...
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Expected Target Price (₹) *</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      {...register('expected_price', { valueAsNumber: true })} 
+                      className="w-full form-input bg-slate-50 border border-blue-200 focus:ring-blue-500 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">Ideal negotiation target price</p>
+                    {errors.expected_price && <p className="text-red-500 text-xs mt-1">{errors.expected_price.message as string}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Reservation Ceiling (₹) *</label>
+                    <input 
+                      type="number" 
+                      step="any" 
+                      {...register('max_price', { valueAsNumber: true })} 
+                      className="w-full form-input bg-slate-50 border border-red-200 focus:ring-red-500 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">Hard buyer cutoff (deals above this are blocked)</p>
+                    {errors.max_price && <p className="text-red-500 text-xs mt-1">{errors.max_price.message as string}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Pricing Unit *</label>
+                    <select {...register('price_unit')} className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                      <option value="per_kg">Per kg (₹/kg)</option>
+                      <option value="per_quintal">Per quintal (₹/quintal)</option>
+                      <option value="per_ton">Per ton (₹/MT)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* 6. Delivery & Procurement Hub Location */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <h4 className="text-lg font-bold text-slate-800">6. Delivery & Procurement Hub Location</h4>
+                  <button 
+                    type="button" 
+                    onClick={handleFetchLocation}
+                    disabled={isLocating}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition disabled:opacity-50 cursor-pointer shadow-sm border border-blue-200"
+                  >
+                    {isLocating ? <Loader2 size={15} className="animate-spin" /> : <MapPin size={15} />}
+                    {isLocating ? 'Locating via GPS...' : 'Detect Location (Live GPS)'}
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Delivery Facility / Locality *</label>
+                    <input 
+                      {...register('delivery_hub')} 
+                      placeholder="e.g. Hadapsar Processing Hub, MIDC Yard"
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    {errors.delivery_hub && <p className="text-red-500 text-xs mt-1">{errors.delivery_hub.message as string}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Taluka *</label>
+                    <input 
+                      {...register('taluka')} 
+                      placeholder="e.g. Haveli, Baramati"
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    {errors.taluka && <p className="text-red-500 text-xs mt-1">{errors.taluka.message as string}</p>}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">District *</label>
+                    <select {...register('district')} className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                      {MAHARASHTRA_DISTRICTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">State *</label>
+                    <input 
+                      {...register('state')} 
+                      placeholder="e.g. Maharashtra" 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800" 
+                    />
+                    {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state.message as string}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {/* 7. Fulfillment Schedule & Timeline */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">7. Fulfillment Schedule & Timeline</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Required Delivery Deadline</label>
+                    <input 
+                      type="date" 
+                      {...register('delivery_deadline')} 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Earliest Acceptable Inflow</label>
+                    <input 
+                      type="date" 
+                      {...register('earliest_delivery')} 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 mb-1.5">Shelf Life Expectation (Days) *</label>
+                    <input 
+                      type="number" 
+                      {...register('shelf_life', { valueAsNumber: true })} 
+                      className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
+                    />
+                    {errors.shelf_life && <p className="text-red-500 text-xs mt-1">{errors.shelf_life.message as string}</p>}
+                  </div>
+                </div>
+              </div>
+
+              {/* 8. Supply Chain & Logistics Assistance */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-bold text-slate-800 border-b pb-2">8. Optional Logistics & Supply Chain Assistance</h4>
+                
+                <p className="text-xs text-slate-600 mb-3">
+                  AI Multi-Agent Negotiation and Statutory MSP/FRP Verification are enabled by default. Select additional ecosystem services:
                 </p>
-              </div>
 
-              <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="organic_check"
-                  checked={isOrganic}
-                  onChange={(e) => setIsOrganic(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
-                />
-                <label htmlFor="organic_check" className="font-semibold text-emerald-950 cursor-pointer">
-                  Certified Organic Produce Required
-                  <p className="text-[10px] text-emerald-800 font-normal mt-0.5">
-                    Requires NPOP / APEDA organic traceability certificate from supplier.
-                  </p>
+                <label className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200 cursor-pointer mb-4">
+                  <input 
+                    type="checkbox" 
+                    {...register('req_full_logistics')} 
+                    className="w-5 h-5 text-blue-600 rounded cursor-pointer" 
+                  />
+                  <div>
+                    <p className="font-bold text-blue-900 text-sm">Full Turnkey Logistics Dispatch</p>
+                    <p className="text-xs text-blue-700">Autonomous multi-agent dispatch: Inbound freight haulage, APMC assaying, and buffer warehousing.</p>
+                  </div>
                 </label>
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 4: Facility Location & Logistics ── */}
-          {currentStep === 4 && (
-            <div className="space-y-5 animate-in slide-in-from-right-3 duration-200">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 mb-1">4. Delivery Facility & Logistics Requirements</h4>
-                <p className="text-slate-500">Set destination processing center and transport logistics assistance.</p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Buyer Hub District (Maharashtra) *</label>
-                  <select
-                    value={deliveryLocation}
-                    onChange={(e) => setDeliveryLocation(e.target.value)}
-                    className="w-full form-select text-xs rounded-xl bg-slate-50 border-slate-200 focus:ring-emerald-500 font-semibold text-slate-800"
-                  >
-                    {MAHARASHTRA_BUYER_HUBS.map((hub) => (
-                      <option key={hub} value={hub}>{hub}, Maharashtra</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Facility Locality / MIDC Area *</label>
-                  <input
-                    type="text"
-                    value={villageTaluka}
-                    onChange={(e) => setVillageTaluka(e.target.value)}
-                    placeholder="e.g. Hadapsar Industrial Area, Chakan MIDC..."
-                    className="w-full form-input text-xs rounded-xl bg-slate-50 border-slate-200 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              {/* Logistics Checkboxes */}
-              <div className="space-y-2.5">
-                <div className="p-3.5 bg-blue-50/60 border border-blue-200/70 rounded-xl flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="transport_req"
-                    checked={transportRequired}
-                    onChange={(e) => setTransportRequired(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 mt-0.5"
-                  />
-                  <label htmlFor="transport_req" className="font-semibold text-blue-950 cursor-pointer">
-                    <span className="flex items-center gap-1.5"><Truck size={14} className="text-blue-600" /> Inbound Logistics Dispatch Required</span>
-                    <p className="text-[10px] text-blue-800 font-normal mt-0.5">
-                      Platform TransporterAgent will coordinate multi-modal freight from farm gate to your facility.
-                    </p>
-                  </label>
-                </div>
-
-                <div className="p-3.5 bg-purple-50/60 border border-purple-200/70 rounded-xl flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="warehouse_req"
-                    checked={warehouseRequired}
-                    onChange={(e) => setWarehouseRequired(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500 mt-0.5"
-                  />
-                  <label htmlFor="warehouse_req" className="font-semibold text-purple-950 cursor-pointer">
-                    <span className="flex items-center gap-1.5"><Warehouse size={14} className="text-purple-600" /> Cold Storage / Buffer Warehousing Required</span>
-                    <p className="text-[10px] text-purple-800 font-normal mt-0.5">
-                      Temporary WDRA-accredited warehousing space for staged processing delivery.
-                    </p>
-                  </label>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ── STEP 5: Pricing Strategy & AI Market Intelligence ── */}
-          {currentStep === 5 && (
-            <div className="space-y-5 animate-in slide-in-from-right-3 duration-200">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 mb-1">5. Pricing Strategy & AI Market Intelligence</h4>
-                <p className="text-slate-500">Autonomous ML valuation and economic guardrails for your Buyer Agent.</p>
-              </div>
-
-              {/* AI Market Intel Banner */}
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-emerald-950 flex items-center gap-1.5">
-                    <Bot size={16} className="text-emerald-700" /> AI Market Intelligence ({crop})
-                  </span>
-                  <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 rounded font-bold text-[10px]">
-                    {aiIntel?.trend || 'Stable'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                  <div className="p-2.5 bg-white rounded-lg border border-emerald-100">
-                    <span className="text-slate-400 text-[10px]">Live APMC Modal Price:</span>
-                    <p className="text-sm font-bold text-slate-900">₹{aiIntel?.current_price || '--'}/kg</p>
+                
+                {!formData.req_full_logistics && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
+                      <input 
+                        type="checkbox" 
+                        {...register('req_farmer_match')} 
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
+                      /> 
+                      <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <Bot size={14} className="text-emerald-600" /> Farmer Sourcing & Seller Matching
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
+                      <input 
+                        type="checkbox" 
+                        {...register('req_transport')} 
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
+                      /> 
+                      <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <Truck size={14} className="text-blue-600" /> Transport Agent (Highway Haulage)
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
+                      <input 
+                        type="checkbox" 
+                        {...register('req_warehouse')} 
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
+                      /> 
+                      <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <Warehouse size={14} className="text-amber-600" /> Warehouse Allocation & Storage
+                      </span>
+                    </label>
+                    <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
+                      <input 
+                        type="checkbox" 
+                        {...register('req_quality')} 
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
+                      /> 
+                      <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                        <ShieldCheck size={14} className="text-purple-600" /> APMC Quality Assaying & Inspection
+                      </span>
+                    </label>
                   </div>
-                  <div className="p-2.5 bg-white rounded-lg border border-emerald-100">
-                    <span className="text-slate-400 text-[10px]">7-Day ML Forecast:</span>
-                    <p className="text-sm font-bold text-emerald-700">₹{aiIntel?.forecast_7day || '--'}/kg</p>
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-emerald-900 mt-2.5 leading-relaxed font-medium">
-                  {aiIntel?.ai_advice || 'Loading XGBoost pricing forecast...'}
-                </p>
+                )}
               </div>
 
-              {/* Target & Ceiling Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Buyer Target Purchase Price (₹/kg) *
-                  </label>
-                  <p className="text-[10px] text-slate-400 mb-1.5">Target opening settlement benchmark</p>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={targetPrice}
-                    onChange={(e) => setTargetPrice(Number(e.target.value))}
-                    className="w-full form-input text-xs rounded-xl bg-emerald-50/40 border-emerald-300 font-bold text-slate-900 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Maximum Ceiling Price (₹/kg) *
-                  </label>
-                  <p className="text-[10px] text-slate-400 mb-1.5">Strict walk-away ceiling safeguard</p>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={maxCeilingPrice}
-                    onChange={(e) => setMaxCeilingPrice(Number(e.target.value))}
-                    className="w-full form-input text-xs rounded-xl bg-slate-50 border-slate-300 font-bold text-slate-900 focus:ring-slate-500"
-                  />
-                </div>
-              </div>
-
-              {/* Total Budget Preview */}
-              <div className="p-3 bg-slate-100 rounded-xl flex justify-between items-center text-slate-700">
-                <span>Maximum Total Budget Commitment:</span>
-                <span className="font-bold text-slate-900 text-sm">
-                  ₹{(quantity * maxCeilingPrice).toLocaleString()}
-                </span>
-              </div>
-            </div>
-          )}
-
+            </form>
+          </FormProvider>
         </div>
 
-        {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-          {currentStep > 1 ? (
-            <button
-              onClick={handlePrev}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 flex items-center gap-1"
-            >
-              <ChevronLeft size={16} /> Back
-            </button>
-          ) : (
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700"
-            >
-              Cancel
-            </button>
-          )}
-
-          {currentStep < totalSteps ? (
-            <button
-              onClick={handleNext}
-              className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm flex items-center gap-1 transition"
-            >
-              Next <ChevronRight size={16} />
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="px-6 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md flex items-center gap-2 transition disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <>Submitting...</>
-              ) : (
-                <>
-                  <Sparkles size={14} className="text-amber-300" />
-                  Submit to AI Matcher & Validator
-                </>
-              )}
-            </button>
-          )}
+        {/* Footer Actions */}
+        <div className="p-5 border-t border-slate-100 flex justify-between bg-slate-50 sticky bottom-0 z-10">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            disabled={isSubmitting}
+            className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl transition disabled:opacity-30 flex items-center gap-2 shadow-sm text-sm cursor-pointer"
+          >
+            Cancel
+          </button>
+          
+          <button 
+            type="submit" 
+            form="procurement-form"
+            disabled={isSubmitting} 
+            className="px-8 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md text-sm cursor-pointer active:scale-95"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" /> Submitting to Matching Engine...
+              </>
+            ) : (
+              'Submit to AI Procurement Engine'
+            )}
+          </button>
         </div>
 
       </div>

@@ -6,6 +6,7 @@ from backend.core.security import (
     create_access_token,
     verify_token,
     get_current_user,
+    get_current_user_optional,
     require_role,
     require_any_role,
     security_bearer

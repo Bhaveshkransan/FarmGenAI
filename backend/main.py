@@ -37,6 +37,9 @@ from .routes.recommendation_routes import router as recommendation_router
 from .routes.admin_routes import router as admin_router
 from .routes.crop_listing_routes import router as crop_listing_router
 from .routes.buyer_requirement_routes import router as buyer_req_router
+from .routes.market_routes import router as market_router
+from .routes.simulation_routes import router as simulation_router
+from .routes.rag_routes import router as rag_router
 
 # ── New routes (session 3 – full FR coverage) ──
 from .routes.profile_routes import router as profile_router
@@ -134,12 +137,14 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(farmer_router, prefix="/api/v1/farmers", tags=["Farmers"])
 app.include_router(buyer_router, prefix="/api/v1/buyers", tags=["Buyers"])
 
-# Crop Listings & Buyer Requirements
+# Crop Listings & Buyer Requirements & Market Intelligence
 app.include_router(crop_listing_router, prefix="/api/v1/listings", tags=["Crop Listings"])
 app.include_router(buyer_req_router, prefix="/api/v1/requirements", tags=["Buyer Requirements"])
+app.include_router(market_router, prefix="/api/v1", tags=["Market Intelligence"])
 
 # Negotiation
 app.include_router(negotiation_router, prefix="/api/v1/negotiations", tags=["Negotiations"])
+app.include_router(negotiation_router, prefix="/api/v1/negotiation", tags=["Negotiations (Alias)"])
 
 # Legacy route compatibility
 app.include_router(farmer_router, prefix="/api/farmer", tags=["Farmers (Legacy)"])
@@ -199,6 +204,12 @@ app.include_router(dashboard_router, prefix="/api/v1/dashboards", tags=["Dashboa
 
 # Integrations (Object Storage, Mandi feeds)
 app.include_router(integrations_router, prefix="/api/v1/integrations", tags=["Integrations"])
+
+# Simulation
+app.include_router(simulation_router, prefix="/api/v1/simulation", tags=["Simulation"])
+
+# RAG Knowledge Base
+app.include_router(rag_router, prefix="/api/v1/rag", tags=["RAG"])
 
 # Agents Telemetry
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])

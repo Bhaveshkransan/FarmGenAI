@@ -152,7 +152,7 @@ export default function BuyerDashboard() {
   });
 
   // 5. Fetch Active Negotiations
-  const { data: negotiationsData } = useQuery({
+  const { data: negotiationsData, refetch: refetchNegotiations } = useQuery({
     queryKey: ['active_negotiations'],
     queryFn: async () => {
       try {
@@ -242,6 +242,57 @@ export default function BuyerDashboard() {
       addNotification(`Autonomous Buyer Agent dispatched! Room: ${negId || 'Active'}`, 'success');
       setSelectedListing(null);
 
+      if (negId) {
+        navigate(`/negotiations/${negId}`);
+      }
+    } catch (err: any) {
+      addNotification(err.response?.data?.detail || 'Failed to dispatch Buyer Agent', 'error');
+    } finally {
+      setIsStartingNeg(false);
+    }
+  };
+
+  // Launch or Re-enter Autonomous Negotiation for a Requirement
+  const handleLaunchNegotiationForRequirement = async (req: any) => {
+    const reqId = req.id || req._id;
+    const existingNeg = (negotiationsData || []).find((n: any) => 
+      (n.requirement_id && reqId && n.requirement_id === reqId) ||
+      (matchCrops(n.crop, req.crop) && (n.status === 'ACTIVE' || n.status === 'IN_PROGRESS'))
+    );
+
+    if (existingNeg) {
+      const existingId = existingNeg.id || existingNeg.negotiation_id;
+      addNotification(`Opening active AI negotiation room for ${req.crop}...`, 'info');
+      navigate(`/negotiations/${existingId}`);
+      return;
+    }
+
+    setIsStartingNeg(true);
+    try {
+      const payload = {
+        crop: req.crop,
+        quantity: Number(req.quantity) || 1000,
+        min_price: Number(req.target_price || req.expected_price || 40),
+        shelf_life: Number(req.shelf_life) || 30,
+        location: req.location || req.preferredLocation || 'Maharashtra',
+        quality: req.quality_grade || req.quality || 'Grade A',
+        buyer_mode: true,
+        buyer_name: storedUser?.businessName || user?.name || user?.full_name || 'Buyer Enterprise',
+        buyer_budget: Number(req.quantity) * Number(req.max_price || req.maxBudget || 60),
+        buyer_max_quantity: Number(req.quantity) || 1000,
+        buyer_target_price: Number(req.target_price || req.expected_price || 45),
+        buyer_location: req.location || req.preferredLocation || 'Maharashtra',
+        buyer_strategy: activeBuyerPersona,
+        buyer_persona: activeBuyerPersona,
+        max_rounds: 5,
+        requirement_id: reqId
+      };
+
+      const res = await api.post('/negotiations/start-negotiation', payload);
+      const negId = res.data?.negotiation_id || res.data?.id;
+
+      addNotification(`Autonomous Buyer Agent dispatched! Room: ${negId || 'Active'}`, 'success');
+      refetchNegotiations?.();
       if (negId) {
         navigate(`/negotiations/${negId}`);
       }
@@ -853,15 +904,25 @@ export default function BuyerDashboard() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <button
-                              onClick={() => {
-                                setSelectedCrop(req.crop);
-                                setActiveTab('lots');
-                              }}
-                              className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg font-bold text-xs transition"
-                            >
-                              Match Suppliers →
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleLaunchNegotiationForRequirement(req)}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                                title="Launch or Enter AI Negotiation Room"
+                              >
+                                <Zap size={13} className="fill-amber-300 text-amber-300" />
+                                <span>Negotiate with AI</span>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedCrop(req.crop);
+                                  setActiveTab('lots');
+                                }}
+                                className="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-semibold text-xs transition cursor-pointer"
+                              >
+                                Lots →
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -899,29 +960,34 @@ export default function BuyerDashboard() {
                   No active negotiations found.<br />Click "Negotiate with AI" on any lot above to launch.
                 </div>
               ) : (
-                negotiationsData.slice(0, 5).map((neg: any) => (
-                  <div 
-                    key={neg.id} 
-                    className="p-3 bg-slate-50 hover:bg-slate-100/80 rounded-xl border border-slate-200/60 transition cursor-pointer flex justify-between items-center"
-                    onClick={() => navigate(`/negotiations/${neg.id}`)}
-                  >
-                    <div>
-                      <p className="font-bold text-xs text-slate-900">{neg.crop || 'Produce Lot'}</p>
-                      <p className="text-[11px] text-slate-500">{neg.quantity || 1000} kg • {neg.location || 'Maharashtra'}</p>
+                negotiationsData.slice(0, 5).map((neg: any, idx: number) => {
+                  const negId = neg.id || neg.negotiation_id;
+                  return (
+                    <div 
+                      key={negId || idx} 
+                      className="p-3 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-200/70 transition cursor-pointer flex justify-between items-center group"
+                      onClick={() => navigate(`/negotiations/${negId}`)}
+                    >
+                      <div>
+                        <p className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition">{neg.crop || 'Produce Lot'}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {neg.quantity ? `${Number(neg.quantity).toLocaleString()} kg` : '1,000 kg'} • {neg.location || 'Maharashtra'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
+                          neg.status === 'ACTIVE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {neg.status || 'ACTIVE'}
+                        </span>
+                        <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-0.5 justify-end group-hover:underline">
+                          Enter Room <ChevronRight size={12} />
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        neg.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
-                        neg.status === 'ACTIVE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {neg.status || 'ACTIVE'}
-                      </span>
-                      <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-0.5 justify-end">
-                        View Room <ChevronRight size={12} />
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -1091,6 +1157,7 @@ export default function BuyerDashboard() {
         initialCrop={selectedCrop}
         onSuccess={(data) => {
           refetchRequirements();
+          refetchNegotiations();
           if (data?.negId) {
             navigate(`/negotiations/${data.negId}`);
           }

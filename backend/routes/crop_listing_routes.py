@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from backend.services.security import get_current_user
+from backend.services.security import get_current_user, get_current_user_optional
 from database.db import Database
 
 router = APIRouter(tags=["Crop Listings"])
@@ -99,7 +99,7 @@ class CropListingUpdate(BaseModel):
 async def list_crop_listings(
     crop: str = None,
     location: str = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
     """Return all active crop listings, optionally filtered."""
     listings = await Database.list_produce_async()

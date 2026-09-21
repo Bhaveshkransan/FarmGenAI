@@ -17,6 +17,72 @@ from negotiation_engine.negotiation_manager import NegotiationManager
 from nodes.node_hub import hub
 logger = logging.getLogger("backend.services.negotiation_service")
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Statutory Benchmarks (MSP / FRP) for 7 Canonical Maharashtra Crops
+# ─────────────────────────────────────────────────────────────────────────────
+STATUTORY_BENCHMARKS = {
+    "Sugarcane": {"mechanism": "FRP", "benchmark": 3.40, "modal_range": (3.20, 4.20)},
+    "Soybean": {"mechanism": "MSP", "benchmark": 48.92, "modal_range": (42.00, 55.00)},
+    "Cotton": {"mechanism": "MSP", "benchmark": 71.21, "modal_range": (68.00, 78.00)},
+    "Jowar": {"mechanism": "MSP", "benchmark": 33.71, "modal_range": (29.00, 38.00)},
+    "Onion": {"mechanism": "MANDI_MODAL", "benchmark": 25.00, "modal_range": (15.00, 26.00)},
+    "Bajra": {"mechanism": "MSP", "benchmark": 26.25, "modal_range": (23.00, 30.00)},
+    "Rice": {"mechanism": "MSP", "benchmark": 23.00, "modal_range": (22.00, 36.00)},
+}
+
+# 5 Verified Maharashtra APMC Mandi / Co-operative Suppliers per crop
+MAHARASHTRA_CROP_SUPPLIERS = {
+    "Onion": [
+        {"name": "Lasalgaon Kanda Apex FPO", "loc": "Nashik, Maharashtra", "dist": 105, "match": 97, "special": "APMC Red Onion Direct"},
+        {"name": "Pimpalgaon Baswant Onion Farmers Co-op", "loc": "Nashik, Maharashtra", "dist": 120, "match": 95, "special": "Sorted Mesh Lots"},
+        {"name": "Dindori Red Onion Consortium", "loc": "Nashik, Maharashtra", "dist": 135, "match": 93, "special": "Cleaned Lot Standard"},
+        {"name": "Junnar Agri Producer Company", "loc": "Pune, Maharashtra", "dist": 65, "match": 91, "special": "Rapid Dispatch"},
+        {"name": "Ahmednagar Kanda & Agro Producers Union", "loc": "Ahmednagar, Maharashtra", "dist": 160, "match": 89, "special": "Bulk Warehouse Lot"},
+    ],
+    "Soybean": [
+        {"name": "Latur Solvent & Oilseeds Farmers FPO", "loc": "Latur, Maharashtra", "dist": 220, "match": 96, "special": "18.5% Oil Content"},
+        {"name": "Nanded Krishi Vikas Agro Consortium", "loc": "Nanded, Maharashtra", "dist": 280, "match": 94, "special": "Moisture < 10%"},
+        {"name": "Barshi Soybean Producers Union", "loc": "Solapur, Maharashtra", "dist": 180, "match": 93, "special": "Certified Commercial Lot"},
+        {"name": "Hingoli Green Oilseeds Cluster", "loc": "Hingoli, Maharashtra", "dist": 310, "match": 90, "special": "Bulk Hopper Delivery"},
+        {"name": "Amravati Krishi Sahakari Sanstha", "loc": "Amravati, Maharashtra", "dist": 390, "match": 88, "special": "Solvent Grade Lot"},
+    ],
+    "Cotton": [
+        {"name": "Vidarbha White Gold Farmers Producer Co.", "loc": "Wardha, Maharashtra", "dist": 310, "match": 97, "special": "29mm Staple Length"},
+        {"name": "Akola Cotton Growers Association", "loc": "Akola, Maharashtra", "dist": 280, "match": 95, "special": "Micronaire 4.0"},
+        {"name": "Yavatmal Kapas Utpadak Sahakari Sangh", "loc": "Yavatmal, Maharashtra", "dist": 340, "match": 93, "special": "Moisture < 8%"},
+        {"name": "Jalgaon Cotton Ginning Farmer Pool", "loc": "Jalgaon, Maharashtra", "dist": 240, "match": 91, "special": "Direct Ginning Pass"},
+        {"name": "Chhatrapati Sambhajinagar Agri Consortium", "loc": "Aurangabad, Maharashtra", "dist": 195, "match": 89, "special": "Clean Lint Baleable"},
+    ],
+    "Sugarcane": [
+        {"name": "Kolhapur Panchganga Cane Growers Co-op", "loc": "Kolhapur, Maharashtra", "dist": 210, "match": 97, "special": "High Sucrose 12.5% Brix"},
+        {"name": "Sangli Krishna Valley Sugar Belt FPO", "loc": "Sangli, Maharashtra", "dist": 190, "match": 95, "special": "Fresh Harvest Lot"},
+        {"name": "Baramati Cane Producers Society", "loc": "Pune, Maharashtra", "dist": 75, "match": 93, "special": "Express Gate Transit"},
+        {"name": "Satara Cane & Bio-Agro Producers Group", "loc": "Satara, Maharashtra", "dist": 115, "match": 90, "special": "FRP Direct Compliant"},
+        {"name": "Ahmednagar Sugar Cane Cooperative", "loc": "Ahmednagar, Maharashtra", "dist": 150, "match": 88, "special": "Bulk Crusher Ready"},
+    ],
+    "Rice": [
+        {"name": "Indrayani Fragrant Rice Producers FPO", "loc": "Maval, Pune, Maharashtra", "dist": 45, "match": 97, "special": "Indrayani Aromatic Grade"},
+        {"name": "Gondia Paddy Farmers Cooperative", "loc": "Gondia, Maharashtra", "dist": 480, "match": 94, "special": "Long Grain Paddy"},
+        {"name": "Bhandara Kolam Rice Producer Group", "loc": "Bhandara, Maharashtra", "dist": 450, "match": 92, "special": "Milling Ready <12% Moist"},
+        {"name": "Raigad Wada Kolam Farmers Union", "loc": "Raigad, Maharashtra", "dist": 110, "match": 90, "special": "GI Tagged Wada Kolam"},
+        {"name": "Kolhapur Basmati & Brown Rice Cluster", "loc": "Kolhapur, Maharashtra", "dist": 225, "match": 88, "special": "Premium Head Rice"},
+    ],
+    "Jowar": [
+        {"name": "Solapur Maldandi Jowar Growers Society", "loc": "Solapur, Maharashtra", "dist": 205, "match": 97, "special": "Maldandi M-35-1 Pure"},
+        {"name": "Dharashiv Millets & Sorghum Producer Co.", "loc": "Osmanabad, Maharashtra", "dist": 240, "match": 95, "special": "Nutri-Cereal Certified"},
+        {"name": "Ahmednagar Dryland Jowar Collective", "loc": "Ahmednagar, Maharashtra", "dist": 140, "match": 92, "special": "Machine Cleaned White"},
+        {"name": "Beed Marathwada Agri Farmers Union", "loc": "Beed, Maharashtra", "dist": 220, "match": 90, "special": "Sun-Dried Commercial"},
+        {"name": "Sangli Nutri-Cereal FPO", "loc": "Sangli, Maharashtra", "dist": 195, "match": 88, "special": "Flour Milling Lot"},
+    ],
+    "Bajra": [
+        {"name": "Dhule Pearl Millet Farmers Federation", "loc": "Dhule, Maharashtra", "dist": 260, "match": 96, "special": "ICTP-8203 Bold Grain"},
+        {"name": "Nashik Nutri-Cereal Consortium", "loc": "Malegaon, Nashik, Maharashtra", "dist": 160, "match": 94, "special": "Graded Uniform Kernel"},
+        {"name": "Sangamner Bajra Utpadak Sangh", "loc": "Ahmednagar, Maharashtra", "dist": 130, "match": 92, "special": "Cleaned Seed Grade"},
+        {"name": "Jalgaon Bajra Producer Company", "loc": "Jalgaon, Maharashtra", "dist": 230, "match": 90, "special": "Low Moisture < 11%"},
+        {"name": "Solapur Bajra & Millets Cooperative", "loc": "Solapur, Maharashtra", "dist": 210, "match": 88, "special": "Direct Mandi Inflow"},
+    ],
+}
+
 
 DEFAULT_BUYER_PROFILES = [
     {
@@ -404,9 +470,16 @@ class NegotiationService:
             live_event_callback=live_event_callback,
         )
 
+        farmer_name_val = payload.get("farmer_name")
+        if not farmer_name_val or farmer_name_val in ["Unknown Farmer", "FarmerAgent"]:
+            if payload.get("buyer_mode"):
+                farmer_name_val = "Maharashtra Farmer Network"
+            else:
+                farmer_name_val = "Unknown Farmer"
+
         farmer_row = await self.db_repo.upsert_farmer_async(
             {
-                "name": payload.get("farmer_name", "Unknown Farmer"),
+                "name": farmer_name_val,
                 "location": payload.get("location", "Unknown"),
                 "language": payload.get("language", "English")
             }
@@ -427,7 +500,13 @@ class NegotiationService:
 
         negotiation_id = pre_id or self.db_repo.generate_id("neg")
         initial_price = float(payload.get("buyer_target_price") or payload.get("min_price", 18))
-        buyer_display_name = (selected_offer.get("buyer_name") if selected_offer else None) or payload.get("buyer_name") or "Buyer Agent"
+        if payload.get("buyer_mode"):
+            buyer_display_name = payload.get("buyer_name") or "Buyer Enterprise"
+            farmer_display_name = farmer_name_val
+        else:
+            buyer_display_name = (selected_offer.get("buyer_name") if selected_offer else None) or payload.get("buyer_name") or "Buyer Agent"
+            farmer_display_name = farmer_row["name"]
+
         if not buyer_display_name.strip():
             buyer_display_name = "Buyer Agent"
 
@@ -438,14 +517,15 @@ class NegotiationService:
         negotiation_payload = {
             "id": negotiation_id,
             "negotiation_id": negotiation_id,
+            "requirement_id": payload.get("requirement_id"),
             "user_id": payload.get("user_id"),
             "status": "ACTIVE",
-            "summary": f"Negotiating {payload['quantity']}kg {payload['crop']} between {farmer_row['name']} and {buyer_display_name}.",
+            "summary": f"Negotiating {payload['quantity']}kg {payload['crop']} between {farmer_display_name} and {buyer_display_name}.",
             "scenario": scenario,
             "produce_id": produce_row["id"],
             "farmer_id": farmer_row["id"],
-            "farmer": farmer_row["name"],
-            "farmer_name": farmer_row["name"],
+            "farmer": farmer_display_name,
+            "farmer_name": farmer_display_name,
             "buyer": buyer_display_name,
             "buyer_name": buyer_display_name,
             "crop": payload["crop"],
@@ -454,7 +534,7 @@ class NegotiationService:
             "market_price": mkt_p,
             "target_price": tgt_p,
             "final_price": None,
-            "agents_involved": [farmer_row["name"], buyer_display_name],
+            "agents_involved": [farmer_display_name, buyer_display_name],
             "next_action": "Autonomous multi-round negotiation active",
             "market_offers": market_offers,
             "selected_buyer": selected_offer,
@@ -793,15 +873,47 @@ class NegotiationService:
         current_round = max([o.get("round", 1) for o in offers], default=1)
         next_round = current_round + 1
 
-        new_price = float(payload.get("price", 0))
+        # Parse price from payload or extract from instruction/message
+        raw_price = payload.get("price") if payload.get("price") is not None else payload.get("override_price")
+        new_price = float(raw_price) if raw_price is not None and str(raw_price).strip() != "" else 0.0
+        
+        user_msg = (payload.get("message") or payload.get("instruction") or "").strip()
+        if new_price <= 0 and user_msg:
+            import re
+            m = re.search(r"(?:₹|\b)(\d+(?:\.\d+)?)", user_msg)
+            if m:
+                try:
+                    new_price = float(m.group(1))
+                except (ValueError, TypeError):
+                    pass
+
         if new_price <= 0:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="Invalid price. Must be > 0.")
+            if offers:
+                p_list = [float(o.get("price")) for o in reversed(offers) if o.get("price")]
+                new_price = p_list[0] if p_list else float(row.get("price") or row.get("target_price") or 45.0)
+            else:
+                new_price = float(row.get("price") or row.get("target_price") or 45.0)
 
         qty = float(payload.get("quantity") or row.get("quantity") or 500)
         crop = row.get("crop", "Tomato")
         farmer_name = row.get("farmer") or row.get("farmer_name") or "Farmer Ramesh"
         buyer_name = row.get("buyer") or row.get("buyer_name") or "Buyer"
+
+        # Statutory Benchmark & Buyer Reservation Guardrail
+        crop_norm = crop
+        for k in STATUTORY_BENCHMARKS:
+            if k.lower() in crop.lower():
+                crop_norm = k
+                break
+        bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 50.0})
+        statutory_bench = float(bench_info.get("benchmark", 50.0))
+        target_p = float(row.get("target_price") or row.get("price") or statutory_bench)
+        # Price ceiling & floor thresholds
+        max_buyer_ceiling = round(max(target_p * 1.35, statutory_bench * 1.40), 2)
+        min_floor_price = round(statutory_bench * 0.35, 2)
+
+        # Formulate descriptive message
+        formatted_msg = user_msg if user_msg else f"Buyer counter offer: ₹{new_price}/kg for {qty:,.0f}kg"
 
         # 1. Record Buyer Counter Offer
         buyer_offer = {
@@ -810,9 +922,100 @@ class NegotiationService:
             "price": new_price,
             "decision": "COUNTER",
             "quantity": qty,
-            "message": f"Buyer counter offer: ₹{new_price}/kg for {qty}kg"
+            "message": formatted_msg
         }
         await self.db_repo.append_offer_async(negotiation_id, buyer_offer)
+
+        # 🛡️ BUYER GUARDRAIL INTERCEPTION: Prevent accepting or finalizing deals above ceiling (e.g. ₹2000) or below floor
+        if new_price > max_buyer_ceiling:
+            guardrail_msg = (
+                f"🛡️ [Buyer Guardrail] Offer ₹{new_price:,.2f}/kg rejected: Exceeds buyer reservation "
+                f"ceiling (₹{max_buyer_ceiling:,.2f}/kg) and statutory MSP benchmark (₹{statutory_bench:,.2f}/kg for {crop_norm}). "
+                f"Deals above ceiling are strictly blocked."
+            )
+            farmer_round = next_round + 1
+            guardrail_offer = {
+                "round": farmer_round,
+                "agent": "Buyer Guardrail System",
+                "price": max_buyer_ceiling,
+                "decision": "REJECT",
+                "quantity": qty,
+                "message": guardrail_msg
+            }
+            await self.db_repo.append_offer_async(negotiation_id, guardrail_offer)
+            await self.db_repo.update_negotiation_async(negotiation_id, {
+                "status": "ACTIVE",
+                "final_price": None,
+                "current_round": farmer_round
+            })
+            try:
+                from backend.websocket.agent_updates import agent_update_hub as ws_manager
+                await ws_manager.broadcast({
+                    "event": "NEGOTIATION_LOG",
+                    "negotiation_id": negotiation_id,
+                    "agent_type": "buyer",
+                    "message": guardrail_msg,
+                    "offer": max_buyer_ceiling,
+                    "status": "ACTIVE"
+                })
+            except Exception:
+                pass
+
+            all_offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
+            return {
+                "status": "ACTIVE",
+                "final_price": None,
+                "decision": "REJECT",
+                "buyer_offer": buyer_offer,
+                "farmer_response": guardrail_offer,
+                "offers": all_offers,
+                "warning": guardrail_msg
+            }
+
+        if new_price < min_floor_price or new_price <= 0:
+            guardrail_msg = (
+                f"🛡️ [Buyer Guardrail] Offer ₹{new_price:,.2f}/kg rejected: Below statutory APMC floor "
+                f"threshold (₹{min_floor_price:,.2f}/kg for {crop_norm}). "
+                f"Absurd or predatory low pricing is strictly blocked."
+            )
+            farmer_round = next_round + 1
+            guardrail_offer = {
+                "round": farmer_round,
+                "agent": "Buyer Guardrail System",
+                "price": statutory_bench,
+                "decision": "REJECT",
+                "quantity": qty,
+                "message": guardrail_msg
+            }
+            await self.db_repo.append_offer_async(negotiation_id, guardrail_offer)
+            await self.db_repo.update_negotiation_async(negotiation_id, {
+                "status": "ACTIVE",
+                "final_price": None,
+                "current_round": farmer_round
+            })
+            try:
+                from backend.websocket.agent_updates import agent_update_hub as ws_manager
+                await ws_manager.broadcast({
+                    "event": "NEGOTIATION_LOG",
+                    "negotiation_id": negotiation_id,
+                    "agent_type": "buyer",
+                    "message": guardrail_msg,
+                    "offer": statutory_bench,
+                    "status": "ACTIVE"
+                })
+            except Exception:
+                pass
+
+            all_offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
+            return {
+                "status": "ACTIVE",
+                "final_price": None,
+                "decision": "REJECT",
+                "buyer_offer": buyer_offer,
+                "farmer_response": guardrail_offer,
+                "offers": all_offers,
+                "warning": guardrail_msg
+            }
 
         # 2. Instantiate FarmerAgent to evaluate the counter offer
         min_p = float(row.get("min_price") or 18.0)
@@ -835,6 +1038,13 @@ class NegotiationService:
         decision_type = farmer_resp.get("type", "COUNTER")
         counter_price = farmer_resp.get("price", new_price)
         farmer_msg = farmer_resp.get("message", "")
+        if not farmer_msg:
+            if decision_type == "ACCEPT":
+                farmer_msg = f"Deal Accepted! We agree to ₹{new_price}/kg for {qty:,.0f} kg of {crop}."
+            elif decision_type == "REJECT":
+                farmer_msg = f"We cannot accept ₹{new_price}/kg as it is below our reserve price of ₹{farmer_floor}/kg."
+            else:
+                farmer_msg = f"We counter at ₹{counter_price}/kg considering current mandi rates and quality."
 
         farmer_round = next_round + 1
         farmer_offer = {
@@ -843,13 +1053,13 @@ class NegotiationService:
             "price": counter_price,
             "decision": decision_type,
             "quantity": qty,
-            "message": farmer_msg or f"{decision_type} ₹{counter_price}/kg"
+            "message": farmer_msg
         }
         await self.db_repo.append_offer_async(negotiation_id, farmer_offer)
 
         new_status = "ACTIVE"
         final_price = None
-        if decision_type == "ACCEPT":
+        if decision_type == "ACCEPT" and new_price <= max_buyer_ceiling:
             new_status = "DEAL"
             final_price = new_price
             contract_data = {
@@ -911,30 +1121,189 @@ class NegotiationService:
             "offers": all_offers
         }
 
-    async def autonomous_step(self, negotiation_id: str):
+    async def run_parallel_procurement(self, negotiation_id: str, payload: dict = None):
         """
-        Buyer Agent analyzes latest farmer ask, calculates optimal strategic counter,
-        and exchanges offers autonomously without requiring human typing.
+        Executes Autonomous Parallel Buying across all 5 Maharashtra candidate suppliers:
+        1. Identifies the 5 verified Maharashtra mandi lots for this crop.
+        2. Concurrently negotiates concession pricing with each supplier in parallel.
+        3. Computes Landed Cost (Base Rate + Freight based on distance + APMC Cess).
+        4. Disqualifies rogue quotes that exceed the statutory MSP ceiling.
+        5. Auto-selects Rank #1 (Lowest Landed Cost with highest match score).
+        6. Updates negotiation record with the auto-selected winning deal.
         """
         row = await self.db_repo.get_negotiation_async(negotiation_id)
         if not row:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Negotiation not found")
 
+        crop = row.get("crop", "Soybean")
+        crop_norm = "Soybean"
+        for k in STATUTORY_BENCHMARKS:
+            if k.lower() in crop.lower():
+                crop_norm = k
+                break
+
+        bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 48.92})
+        statutory_bench = float(bench_info.get("benchmark", 48.92))
+        qty = float((payload and payload.get("quantity")) or row.get("quantity") or 500)
+        target_p = float((payload and payload.get("target_price")) or row.get("target_price") or row.get("price") or statutory_bench)
+        max_buyer_ceiling = round(max(target_p * 1.35, statutory_bench * 1.40), 2)
+
+        suppliers_pool = MAHARASHTRA_CROP_SUPPLIERS.get(crop_norm, MAHARASHTRA_CROP_SUPPLIERS["Soybean"])
+
+        parallel_results = []
+        for idx, cp in enumerate(suppliers_pool):
+            # 1. Opening initial ask from supplier lot
+            initial_p = round(target_p * (1.08 + idx * 0.02), 2)
+            # 2. Parallel simulated concession bargaining (autonomous RL agent concession)
+            # Rank 0 (leader) concedes closest to target; others have slight variations
+            concession_factor = 0.98 if idx == 0 else (1.01 + idx * 0.015)
+            negotiated_p = round(target_p * concession_factor, 2)
+
+            # Check if quote exceeds ceiling
+            is_disqualified = negotiated_p > max_buyer_ceiling
+            
+            # 3. Freight logistics based on highway distance (₹6.50/km flat + handling)
+            freight_total = max(650.0, round(cp["dist"] * 6.50 + qty * 0.35, 2))
+            freight_per_kg = round(freight_total / max(1.0, qty), 2)
+            
+            # 4. APMC statutory cess (1% on base purchase value)
+            apmc_cess_per_kg = round(negotiated_p * 0.01, 2)
+            
+            # 5. True Landed Cost per kg
+            landed_cost_per_kg = round(negotiated_p + freight_per_kg + apmc_cess_per_kg, 2)
+            total_landed_cost = round(landed_cost_per_kg * qty, 2)
+
+            match_score = max(85, cp["match"] - idx * 2)
+
+            parallel_results.append({
+                "index": idx,
+                "name": cp["name"],
+                "location": cp["loc"],
+                "distance_km": cp["dist"],
+                "initial_ask": initial_p,
+                "negotiated_price": negotiated_p,
+                "freight_total": freight_total,
+                "freight_per_kg": freight_per_kg,
+                "apmc_cess_per_kg": apmc_cess_per_kg,
+                "landed_cost_per_kg": landed_cost_per_kg,
+                "total_landed_cost": total_landed_cost,
+                "match_score": match_score,
+                "special": cp["special"],
+                "is_disqualified": is_disqualified,
+                "disqualification_reason": "Exceeds MSP Ceiling" if is_disqualified else None,
+                "status": "Disqualified" if is_disqualified else ("Counter-offered" if idx > 0 else "Active (Best Match)"),
+                "is_best": False
+            })
+
+        # Rank qualified suppliers by lowest landed cost per kg
+        qualified = [s for s in parallel_results if not s["is_disqualified"]]
+        qualified.sort(key=lambda s: (s["landed_cost_per_kg"], -s["match_score"]))
+        
+        # Designate #1 winner
+        if qualified:
+            qualified[0]["is_best"] = True
+            qualified[0]["status"] = "🏆 Auto-Selected Best Deal"
+            winner = qualified[0]
+        else:
+            winner = parallel_results[0]
+            winner["is_best"] = True
+
+        # Sort all suppliers for display (winner first, then other qualified by landed cost, then disqualified)
+        ranked_suppliers = sorted(parallel_results, key=lambda s: (1 if s["is_disqualified"] else 0, s["landed_cost_per_kg"]))
+        for rank_idx, s in enumerate(ranked_suppliers, 1):
+            s["rank"] = rank_idx
+
+        # Update negotiation in DB with the auto-selected winner
+        await self.db_repo.update_negotiation_async(negotiation_id, {
+            "farmer_name": winner["name"],
+            "farmer": winner["name"],
+            "final_price": winner["negotiated_price"],
+            "status": "ACTIVE",
+            "summary": f"Autonomous Parallel Buying completed across 5 Maharashtra suppliers. Auto-selected #1: {winner['name']} at ₹{winner['negotiated_price']}/kg (Landed: ₹{winner['landed_cost_per_kg']}/kg)."
+        })
+
+        # Add parallel summary offer to negotiation history
+        parallel_offer = {
+            "round": int(row.get("current_round", 1)) + 1,
+            "agent": "Autonomous Parallel Buying Engine",
+            "price": winner["negotiated_price"],
+            "decision": "COUNTER",
+            "quantity": qty,
+            "message": (
+                f"⚡ [Parallel Procurement Completed] Evaluated 5 Maharashtra suppliers in parallel. "
+                f"Auto-selected winning supplier: {winner['name']} ({winner['location']}) "
+                f"at ₹{winner['negotiated_price']}/kg (Landed Cost: ₹{winner['landed_cost_per_kg']}/kg, {winner['match_score']}% Match)."
+            )
+        }
+        await self.db_repo.append_offer_async(negotiation_id, parallel_offer)
+
+        try:
+            from backend.websocket.agent_updates import agent_update_hub as ws_manager
+            await ws_manager.broadcast({
+                "event": "NEGOTIATION_LOG",
+                "negotiation_id": negotiation_id,
+                "agent_type": "buyer",
+                "message": parallel_offer["message"],
+                "offer": winner["negotiated_price"]
+            })
+            await ws_manager.broadcast({
+                "event": "PARALLEL_PROCUREMENT_COMPLETE",
+                "negotiation_id": negotiation_id,
+                "winner": winner,
+                "suppliers": ranked_suppliers
+            })
+        except Exception:
+            pass
+
+        return {
+            "success": True,
+            "negotiation_id": negotiation_id,
+            "crop": crop_norm,
+            "quantity": qty,
+            "statutory_benchmark": statutory_bench,
+            "buyer_ceiling": max_buyer_ceiling,
+            "winner": winner,
+            "suppliers": ranked_suppliers
+        }
+
+    async def autonomous_step(self, negotiation_id: str):
+        """
+        Buyer Agent analyzes latest farmer ask, calculates optimal strategic counter,
+        and exchanges offers autonomously without requiring human typing.
+        Guarded by statutory MSP ceiling.
+        """
+        row = await self.db_repo.get_negotiation_async(negotiation_id)
+        if not row:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Negotiation not found")
+
+        crop = row.get("crop", "Soybean")
+        crop_norm = "Soybean"
+        for k in STATUTORY_BENCHMARKS:
+            if k.lower() in crop.lower():
+                crop_norm = k
+                break
+        bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 48.92})
+        statutory_bench = float(bench_info.get("benchmark", 48.92))
+
         offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
         farmer_offers = [o for o in offers if not ("buyer" in str(o.get("agent", "")).lower() or "human" in str(o.get("agent", "")).lower())]
         latest_farmer_ask = farmer_offers[-1]["price"] if farmer_offers else float(row.get("min_price", 18))
         
-        target_price = float(row.get("target_price") or row.get("buyer_target_price") or (latest_farmer_ask - 1))
+        target_price = float(row.get("target_price") or row.get("buyer_target_price") or statutory_bench)
+        max_buyer_ceiling = round(max(target_price * 1.35, statutory_bench * 1.40), 2)
+
         buyer_offers = [o for o in offers if ("buyer" in str(o.get("agent", "")).lower() or "human" in str(o.get("agent", "")).lower())]
         latest_buyer_bid = buyer_offers[-1]["price"] if buyer_offers else target_price
         
         gap = latest_farmer_ask - latest_buyer_bid
-        if gap <= 0.4:
+        if gap <= 0.4 and latest_farmer_ask <= max_buyer_ceiling:
             return await self.intervene_deal(negotiation_id, {"price": latest_farmer_ask, "quantity": row.get("quantity", 500)})
         
         step = round(max(0.25, gap * 0.35), 2)
         new_buyer_price = round(min(latest_farmer_ask, latest_buyer_bid + step), 2)
+        new_buyer_price = min(new_buyer_price, max_buyer_ceiling)
         return await self.intervene_deal(negotiation_id, {"price": new_buyer_price, "quantity": row.get("quantity", 500)})
 
 

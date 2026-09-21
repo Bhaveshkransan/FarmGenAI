@@ -26,6 +26,8 @@ services:
       - ACCESS_TOKEN_EXPIRE_MINUTES=1440
       - ENVIRONMENT=production
     volumes:
+      - ./backend:/app/backend
+      - ./shared:/app/shared
       - ./data:/app/data
       - ./node_storage:/app/node_storage
     depends_on:
@@ -34,7 +36,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -62,6 +64,8 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeyforagrinegotiatorsigningtokens12345}
       - JWT_ALGORITHM=HS256
     volumes:
+      - ./backend:/app/backend
+      - ./shared:/app/shared
       - ./data:/app/data
       - ./node_storage:/app/node_storage
     depends_on:

@@ -9,6 +9,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # Setup Bearer security scheme
 security_bearer = HTTPBearer()
+security_bearer_optional = HTTPBearer(auto_error=False)
 
 
 class AwaitableStr(str):
@@ -91,6 +92,18 @@ async def get_current_user(
             pass
 
     return payload
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer_optional),
+) -> Optional[dict]:
+    """FastAPI Dependency for optional authentication. Returns None if credentials missing/invalid."""
+    if not credentials or not credentials.credentials:
+        return None
+    try:
+        return await verify_token(credentials.credentials)
+    except Exception:
+        return None
 
 
 def require_role(*allowed_roles: str):
