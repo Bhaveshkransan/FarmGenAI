@@ -1,63 +1,38 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useWebSocket } from '@/hooks/useWebSocket';
 import { 
   ArrowLeft, 
+  MessageSquare, 
+  Briefcase, 
   Zap, 
-  Check, 
   ShieldCheck, 
-  RefreshCw, 
-  Terminal as TerminalIcon, 
-  Layers, 
-  TrendingDown, 
-  MapPin, 
-  Award, 
+  Database, 
+  CloudRain, 
   Truck, 
+  Terminal as TerminalIcon, 
+  RefreshCw, 
+  Check, 
+  Layers, 
+  TrendingUp, 
+  MapPin, 
+  Calendar, 
   CheckCircle2, 
-  ChevronRight, 
-  Activity, 
-  Database,
-  Building,
-  Scale,
-  Play,
-  Pause,
-  FastForward
+  Clock,
+  Sparkles,
+  Play
 } from 'lucide-react';
+import ChatBubble from '@/features/negotiation/components/ChatBubble';
+import OfferCard from '@/features/negotiation/components/OfferCard';
+import AgreementPreview from '@/features/negotiation/components/AgreementPreview';
+import AgentWorkflowStepper from '@/features/negotiation/components/AgentWorkflowStepper';
+import RagContextViewer from '@/features/negotiation/components/RagContextViewer';
+import PriceChart from '@/features/negotiation/components/PriceChart';
 import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
-import { useWebSocket } from '@/hooks/useWebSocket';
-import { getMatchingCounterparties, Counterparty } from '@/constants/maharashtraMarkets';
-
-interface TerminalLog {
-  time: string;
-  tag: string;
-  text: string;
-  color?: string;
-  round?: number;
-}
-
-interface SupplierLiveState {
-  index: number;
-  rank: number;
-  name: string;
-  location: string;
-  distance_km: number;
-  initial_ask: number;
-  current_price: number;
-  negotiated_price: number;
-  concession: number;
-  freight_total: number;
-  freight_per_kg: number;
-  apmc_cess_per_kg: number;
-  landed_cost_per_kg: number;
-  total_landed_cost: number;
-  match_score: number;
-  special: string;
-  is_best: boolean;
-  is_active_turn: boolean;
-  status: string;
-}
+import { STATUTORY_BENCHMARKS } from '@/constants/crops';
 
 export default function NegotiationRoom() {
   const { id } = useParams();
@@ -65,17 +40,23 @@ export default function NegotiationRoom() {
   const { user } = useAuth();
   const isBuyer = user?.role === 'buyer';
 
-  const [isParallelRunning, setIsParallelRunning] = useState(false);
-  const [selectedWinnerIdx, setSelectedWinnerIdx] = useState(0);
-  const [showValidationModal, setShowValidationModal] = useState(false);
-  const [agreementData, setAgreementData] = useState<any>(null);
-  const [liveTerminalLogs, setLiveTerminalLogs] = useState<TerminalLog[]>([]);
-  const [currentRound, setCurrentRound] = useState<number>(0);
-  const [liveSpeed, setLiveSpeed] = useState<number>(1); // 1 = normal (~500ms), 2 = fast (~250ms)
-  const [isPaused, setIsPaused] = useState<boolean>(false);
-  
+  const token = localStorage.getItem('agri_token');
+  const wsUrl = import.meta.env.VITE_WS_URL || '/api/v1/ws';
+  const { isConnected, lastMessage } = useWebSocket(wsUrl);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+
+  // States
+  const [messages, setMessages] = useState<any[]>([]);
+  const [isRagOpen, setIsRagOpen] = useState(false);
+  const [showAgreement, setShowAgreement] = useState(false);
+  const [agreementData, setAgreementData] = useState<any>(null);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'timeline' | 'terminal'>('timeline');
+  const [isParallelRunning, setIsParallelRunning] = useState(false);
+  const [liveTerminalLogs, setLiveTerminalLogs] = useState<Array<{ time: string; tag: string; text: string; color?: string }>>([]);
+  const [manualPrice, setManualPrice] = useState<string>('');
 
   // 1. Fetch negotiation session state from database
   const { data: negState, isLoading, refetch: refetchNeg } = useQuery({
@@ -92,7 +73,7 @@ export default function NegotiationRoom() {
   const currentFloor = Number(negState?.min_price) || 45.0;
   const targetPrice = Number(negState?.target_price || negState?.buyer_target_price || 47.0);
   const marketPrice = Number(negState?.market_price || Math.round(targetPrice * 1.04 * 10) / 10);
-  const activeSector = negState?.buyer_strategy || negState?.purpose || 'food_processing';
+  const activeAgent = isParallelRunning ? 'Negotiator' : (lastMessage?.data?.agent || 'Negotiator');
 
   // Statutory Benchmarks for 7 Canonical Maharashtra Crops
   const statutoryBench = useMemo(() => {
@@ -111,750 +92,612 @@ export default function NegotiationRoom() {
     return Math.round(Math.max(Number(targetPrice) * 1.35, statutoryBench * 1.40) * 10) / 10;
   }, [targetPrice, statutoryBench]);
 
-  // 2. Generate 5 Verified Maharashtra APMC Mandi Counterparties
-  const matchedCounterparties: Counterparty[] = useMemo(() => {
-    return getMatchingCounterparties(
-      cropName,
-      true,
-      Number(currentFloor) || 45.0,
-      cropQty,
-      activeSector
-    );
-  }, [cropName, currentFloor, cropQty, activeSector]);
+  const minAllowedFloor = useMemo(() => {
+    return Math.round(statutoryBench * 0.35 * 100) / 100;
+  }, [statutoryBench]);
 
-  // 3. Dynamic Supplier State (Updates Live as Negotiation Progresses)
-  const initialSuppliers = useMemo<SupplierLiveState[]>(() => {
-    return matchedCounterparties.slice(0, 5).map((cp, idx) => {
-      const baseNegP = idx === 0 
-        ? Math.round(Number(targetPrice) * 0.98 * 10) / 10 
-        : Math.round(Number(targetPrice) * (1.01 + idx * 0.018) * 10) / 10;
-      
-      const distFreight = Math.max(650, Math.round(cp.dist * 6.5 + cropQty * 0.35));
-      const freightKg = Math.round((distFreight / Math.max(1, cropQty)) * 10) / 10;
-      const cessKg = Math.round(baseNegP * 0.01 * 100) / 100;
-      const landed = Math.round((baseNegP + freightKg + cessKg) * 10) / 10;
-      const concessionAmount = Math.round((cp.initial - baseNegP) * 10) / 10;
-
-      return {
-        index: idx,
-        rank: idx + 1,
-        name: cp.name,
-        location: cp.loc,
-        distance_km: cp.dist,
-        initial_ask: cp.initial,
-        current_price: cp.initial, // starts at initial ask, drops live
-        negotiated_price: baseNegP,
-        concession: concessionAmount > 0 ? concessionAmount : 2.5,
-        freight_total: distFreight,
-        freight_per_kg: freightKg,
-        apmc_cess_per_kg: cessKg,
-        landed_cost_per_kg: landed,
-        total_landed_cost: Math.round(landed * cropQty),
-        match_score: cp.match,
-        special: cp.special,
-        is_best: idx === 0,
-        is_active_turn: false,
-        status: 'Connecting to APMC...'
-      };
-    });
-  }, [matchedCounterparties, targetPrice, cropQty]);
-
-  const [liveSuppliers, setLiveSuppliers] = useState<SupplierLiveState[]>(initialSuppliers);
-
-  // Keep live suppliers in sync when parameters change
+  // Sync initial history from database into messages
   useEffect(() => {
-    setLiveSuppliers(initialSuppliers);
-  }, [initialSuppliers]);
-
-  const activeWinner = liveSuppliers[selectedWinnerIdx] || liveSuppliers[0];
-
-  // Auto-scroll terminal to bottom
-  useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [liveTerminalLogs]);
-
-  // Connect to Live WebSocket Broadcasts
-  const { lastMessage } = useWebSocket('/api/v1/ws');
-  useEffect(() => {
-    if (lastMessage && typeof lastMessage === 'object') {
-      if (lastMessage.negotiation_id === id && lastMessage.event === 'NEGOTIATION_LOG') {
-        setLiveTerminalLogs(prev => [
-          ...prev,
+    if (negState && messages.length === 0) {
+      const rawOffers = negState.offers || negState.history || [];
+      if (rawOffers.length > 0) {
+        const mapped = rawOffers.map((o: any) => ({
+          agent: o.agent || o.sender || (o.sender?.includes('Buyer') ? 'Buyer Agent' : 'Farmer Agent'),
+          message: o.message || `Offered ₹${o.price}/kg for ${o.quantity || cropQty}kg`,
+          type: o.price ? 'offer' : 'text',
+          price: o.price,
+          quantity: o.quantity || cropQty,
+          quality: 'A',
+          deliveryDate: 'ASAP',
+          transportIncluded: true,
+          warehouseIncluded: false,
+          validity: '24 Hours',
+          reasoning: [
+            `APMC Modal Benchmark: ₹${marketPrice}/kg`,
+            `Statutory MSP: ₹${statutoryBench}/kg`,
+            `Landed freight computed for Maharashtra highway transit`
+          ]
+        }));
+        setMessages(mapped);
+      } else {
+        // Default opening conversation
+        setMessages([
           {
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            tag: 'WS-STREAM',
-            color: 'text-cyan-400',
-            text: lastMessage.message || `Counter-offer: ₹${lastMessage.offer}/kg`
+            agent: isBuyer ? 'Farmer Agent (Latur Mandi)' : 'Buyer Agent (Procurement)',
+            message: `Namaste! Initializing APMC session for ${cropQty.toLocaleString()}kg ${cropName}. Opening offer based on current mandi arrival rates.`,
+            type: 'text'
+          },
+          {
+            agent: isBuyer ? 'Farmer Agent (Latur Mandi)' : 'Buyer Agent (Procurement)',
+            price: Math.round(targetPrice * 1.06 * 10) / 10,
+            quantity: cropQty,
+            quality: 'A',
+            deliveryDate: '3-4 Business Days',
+            transportIncluded: true,
+            warehouseIncluded: false,
+            validity: '24 Hours',
+            type: 'offer',
+            message: `Offering Grade-A lot at ₹${(Math.round(targetPrice * 1.06 * 10) / 10)}/kg.`,
+            reasoning: [
+              `APMC Modal Price: ₹${marketPrice}/kg`,
+              `Moisture content tested < 10%`,
+              `Transit distance: 180 km via NH-65`
+            ]
           }
         ]);
       }
     }
-  }, [lastMessage, id]);
+  }, [negState, messages.length, cropQty, cropName, targetPrice, marketPrice, statutoryBench, isBuyer]);
 
-  // Clear pending timeouts helper
-  const clearAllTimeouts = useCallback(() => {
-    timeoutsRef.current.forEach(t => clearTimeout(t));
-    timeoutsRef.current = [];
-  }, []);
+  // Handle incoming WS messages
+  useEffect(() => {
+    if (lastMessage && String(lastMessage.negotiation_id) === String(id)) {
+      if (lastMessage.event === 'NEGOTIATION_LOG') {
+        const isFarmerSender = lastMessage.agent_type === 'farmer';
+        const msgObj = {
+          agent: isFarmerSender ? 'Farmer Agent' : 'Buyer Agent',
+          message: lastMessage.message,
+          type: lastMessage.offer ? 'offer' : 'text',
+          price: lastMessage.offer,
+          quantity: negState?.quantity || cropQty,
+          quality: 'A',
+          deliveryDate: 'ASAP',
+          transportIncluded: true,
+          warehouseIncluded: false,
+          validity: '24 Hours',
+          reasoning: [
+            `Evaluated against MSP: ₹${statutoryBench}/kg`,
+            `Multi-attribute utility concession applied`
+          ]
+        };
+        setMessages(prev => [...prev, msgObj]);
+        setLiveTerminalLogs(prev => [
+          ...prev,
+          {
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            tag: isFarmerSender ? 'FARMER' : 'BUYER',
+            color: isFarmerSender ? 'text-emerald-400' : 'text-blue-400',
+            text: lastMessage.message
+          }
+        ]);
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      } else if (lastMessage.event === 'NEGOTIATION_FINISHED' || lastMessage.event === 'PARALLEL_PROCUREMENT_COMPLETE') {
+        const finalP = lastMessage.final_price || lastMessage.winner?.negotiated_price || targetPrice;
+        const finalDeal = {
+          ...negState,
+          id: id,
+          negotiation_id: id,
+          price: finalP,
+          final_price: finalP,
+          quantity: cropQty,
+          status: 'DEAL',
+          farmer: lastMessage.winner?.name || negState?.farmer || 'Latur APMC Producer',
+          farmer_name: lastMessage.winner?.name || negState?.farmer_name || 'Latur APMC Producer',
+          buyer: user?.name || user?.full_name || 'Buyer Enterprise'
+        };
+        setAgreementData(finalDeal);
+        setShowAgreement(true);
+      }
+    }
+  }, [lastMessage, id, negState, cropQty, targetPrice, statutoryBench, user]);
 
-  // 4. True Live Autonomous Negotiation Runner
-  const runLiveAutonomousNegotiation = useCallback(async () => {
-    clearAllTimeouts();
+  // Auto-scroll terminal
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [liveTerminalLogs]);
+
+  // Handle Offer Actions (Accept, Counter, Reject)
+  const handleAction = async (actionType: string, price: number) => {
+    if (actionType === 'accept') {
+      // Guardrail verification
+      if (price > maxAllowedCeiling) {
+        alert(`🛡️ [Guardrail] Price ₹${price}/kg exceeds statutory ceiling (₹${maxAllowedCeiling}/kg). Deal cannot be finalized.`);
+        return;
+      }
+      if (price < minAllowedFloor) {
+        alert(`🛡️ [Guardrail] Price ₹${price}/kg is below statutory APMC floor (₹${minAllowedFloor}/kg). Deal cannot be finalized.`);
+        return;
+      }
+
+      const finalDeal = {
+        ...negState,
+        id: id,
+        negotiation_id: id,
+        crop: cropName,
+        price: price,
+        final_price: price,
+        quantity: cropQty,
+        deliveryDate: '3-4 Business Days',
+        farmer: negState?.farmer || 'Latur APMC Cooperative',
+        farmer_name: negState?.farmer_name || 'Latur APMC Cooperative',
+        buyer: user?.name || user?.full_name || 'Buyer Enterprise',
+        status: 'DEAL'
+      };
+
+      setMessages(prev => [
+        ...prev, 
+        { agent: 'Human (You)', message: `I accept the deal at ₹${price}/kg. Preparing smart contract.`, type: 'text' }
+      ]);
+      setAgreementData(finalDeal);
+      setShowAgreement(true);
+
+      try {
+        await api.post(`/negotiations/${id}/finalize`, {
+          price: price,
+          quantity: cropQty,
+          crop: cropName,
+          farmer: finalDeal.farmer,
+          buyer: finalDeal.buyer
+        });
+      } catch (e) {
+        console.warn('Finalize endpoint notification:', e);
+      }
+    } else if (actionType === 'reject') {
+      setMessages(prev => [
+        ...prev, 
+        { agent: 'Human (You)', message: `I reject the offer of ₹${price}/kg. Please revise terms.`, type: 'text' }
+      ]);
+      try {
+        await api.post(`/negotiations/${id}/reject`);
+      } catch (e) {
+        console.warn('Reject notification:', e);
+      }
+    } else {
+      // Counter: focus manual override input
+      const el = document.getElementById('humanOverride');
+      if (el) el.focus();
+    }
+  };
+
+  // Manual Intervene / Override Mutation
+  const interveneMutation = useMutation({
+    mutationFn: async (priceNum: number) => {
+      // Guardrail 1: Price ceiling
+      if (priceNum > maxAllowedCeiling) {
+        throw new Error(`🛡️ [Guardrail] Price ₹${priceNum}/kg exceeds statutory ceiling (₹${maxAllowedCeiling}/kg for ${cropName}).`);
+      }
+      // Guardrail 2: Price floor
+      if (priceNum < minAllowedFloor) {
+        throw new Error(`🛡️ [Guardrail] Price ₹${priceNum}/kg is below statutory APMC floor threshold (₹${minAllowedFloor}/kg).`);
+      }
+
+      try {
+        await api.post(`/negotiations/${id}/intervene`, { price: priceNum, quantity: cropQty });
+      } catch (e) {
+        console.warn('Intervene call fallback:', e);
+      }
+
+      setMessages(prev => [...prev, {
+        agent: 'Human (You)',
+        type: 'offer',
+        price: priceNum,
+        quantity: cropQty,
+        quality: 'A',
+        deliveryDate: 'Prompt 2-3 Days',
+        transportIncluded: true,
+        warehouseIncluded: false,
+        validity: '24 Hours',
+        reasoning: [
+          `Manual intervention set by user`,
+          `Within statutory tolerance [₹${minAllowedFloor} - ₹${maxAllowedCeiling}]`
+        ]
+      }]);
+      setManualPrice('');
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Intervention failed.');
+    }
+  });
+
+  // 4. Autonomous Parallel 5 Negotiation Runner
+  const runParallelAutonomousNegotiation = async () => {
     setIsParallelRunning(true);
-    setCurrentRound(1);
     setLiveTerminalLogs([]);
-    setSelectedWinnerIdx(0);
+    setActiveTab('terminal');
 
     const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-    // Reset suppliers to initial state
-    setLiveSuppliers(prev => prev.map(s => ({
-      ...s,
-      current_price: s.initial_ask,
-      is_active_turn: false,
-      is_best: false,
-      status: 'Submitting Opening Ask...'
-    })));
-
-    // 1. Initial terminal handshakes
     setLiveTerminalLogs([
-      { time: now(), tag: 'CLUSTER', color: 'text-emerald-400', text: `🚀 Connected to Multi-Agent RL Execution Daemon. Session: #${id?.substring(0, 8)}.` },
-      { time: now(), tag: 'POLICY', color: 'text-purple-400', text: `Statutory MSP: ₹${statutoryBench}/kg | Live Mandi Modal: ₹${marketPrice}/kg | Buyer Target Ceiling: ₹${targetPrice}/kg.` },
-      { time: now(), tag: 'DISCOVERY', color: 'text-blue-400', text: `Concurrently pinging 5 verified Maharashtra APMC producers for ${cropQty.toLocaleString()} kg ${cropName}.` }
+      { time: now(), tag: 'CLUSTER', color: 'text-emerald-400', text: `🚀 Connected to LangGraph RL Daemon for ${cropQty.toLocaleString()} kg ${cropName}. Contract #${id?.substring(0, 8)}.` },
+      { time: now(), tag: 'POLICY', color: 'text-purple-400', text: `Statutory MSP: ₹${statutoryBench}/kg | Live Modal: ₹${marketPrice}/kg | Target Ceiling: ₹${targetPrice}/kg.` },
+      { time: now(), tag: 'DISCOVERY', color: 'text-blue-400', text: `Scanning 5 candidate Maharashtra APMC Mandis (Latur, Nanded, Solapur, Akola, Sangli).` }
     ]);
 
-    // 2. Call backend parallel-procure API in parallel with the live stream
-    let backendTimeline: any[] | null = null;
     try {
       const res = await api.post(`/negotiations/${id}/parallel-procure`, {
         quantity: cropQty,
         target_price: targetPrice
       });
-      if (res.data?.timeline || res.data?.data?.timeline) {
-        backendTimeline = res.data?.timeline || res.data?.data?.timeline;
+
+      const timeline = res.data?.timeline || res.data?.data?.timeline || [];
+      const winner = res.data?.winner || res.data?.data?.winner;
+
+      if (timeline.length > 0) {
+        timeline.forEach((step: any, idx: number) => {
+          setTimeout(() => {
+            setLiveTerminalLogs(prev => [
+              ...prev,
+              {
+                time: now(),
+                tag: step.tag || 'AGENT',
+                color: step.color || 'text-slate-200',
+                text: step.text
+              }
+            ]);
+
+            // Add corresponding chat bubble when counter-offers happen
+            if (step.tag === 'ROUND 3' || step.tag === 'WINNER') {
+              setMessages(prev => [
+                ...prev,
+                {
+                  agent: step.supplier_name || 'APMC Producer',
+                  type: 'offer',
+                  price: step.price || winner?.negotiated_price || targetPrice,
+                  quantity: cropQty,
+                  quality: 'A',
+                  deliveryDate: 'Immediate Mandi Dispatch',
+                  transportIncluded: true,
+                  warehouseIncluded: false,
+                  validity: '24 Hours',
+                  message: step.text,
+                  reasoning: [
+                    `Distance: Highway logistics calculated`,
+                    `APMC Mandi Cess (1%) factored in`,
+                    `Complies with Maharashtra Model Act`
+                  ]
+                }
+              ]);
+            }
+
+            if (idx === timeline.length - 1) {
+              setIsParallelRunning(false);
+              if (winner) {
+                const finalDeal = {
+                  ...negState,
+                  id: id,
+                  negotiation_id: id,
+                  crop: cropName,
+                  price: winner.negotiated_price,
+                  final_price: winner.negotiated_price,
+                  quantity: cropQty,
+                  farmer: winner.name,
+                  farmer_name: winner.name,
+                  buyer: user?.name || user?.full_name || 'Buyer Enterprise',
+                  status: 'DEAL'
+                };
+                setAgreementData(finalDeal);
+                setShowAgreement(true);
+              }
+              refetchNeg();
+            }
+          }, (idx + 1) * 450);
+        });
+      } else {
+        setIsParallelRunning(false);
       }
     } catch (err) {
-      console.warn('Backend parallel procurement endpoint fallback:', err);
-    }
-
-    // 3. Fallback / Client-orchestrated live timeline if endpoint returned raw or offline
-    const winner = initialSuppliers[0];
-    const liveSteps = backendTimeline || [
-      // Round 1: Opening asks
-      ...initialSuppliers.map((s, idx) => ({
-        round: 1,
-        tag: 'ROUND 1',
-        color: 'text-amber-400',
-        supplier_index: idx,
-        price: s.initial_ask,
-        text: `${s.name} (${s.location}, ${s.distance_km}km): Opening ask ₹${s.initial_ask.toFixed(2)}/kg (${s.special}).`
-      })),
-
-      // Round 2: Buyer Agent Multi-Attribute Utility & Counters
-      { round: 2, tag: 'UTILITY', color: 'text-cyan-400', text: 'Buyer Agent evaluating Multi-Attribute Utility: weights(price=0.45, qty=0.25, freshness=0.30). Generating strategic counters.' },
-      ...initialSuppliers.map((s, idx) => {
-        const counterP = Math.round(Number(targetPrice) * (0.95 + idx * 0.012) * 10) / 10;
-        return {
-          round: 2,
-          tag: 'ROUND 2',
-          color: 'text-cyan-300',
-          supplier_index: idx,
-          counter_price: counterP,
-          text: `Buyer Agent counters ${s.name.split(' ')[0]}: Proposing ₹${counterP.toFixed(2)}/kg with prompt 24-hr escrow guarantee.`
-        };
-      }),
-
-      // Round 3: Concessions
-      ...initialSuppliers.map((s, idx) => {
-        const concession = Math.round((s.initial_ask - s.negotiated_price) * 10) / 10;
-        return {
-          round: 3,
-          tag: 'ROUND 3',
-          color: 'text-amber-300',
-          supplier_index: idx,
-          price: s.negotiated_price,
-          text: `${s.name.split(' ')[0]} concedes -₹${concession.toFixed(2)}/kg → Conceded offer: ₹${s.negotiated_price.toFixed(2)}/kg.`
-        };
-      }),
-
-      // Round 4: Logistics & Guardrails
-      { round: 4, tag: 'LOGISTICS', color: 'text-blue-300', text: `Highway transit routing solved: Freight range ₹${Math.min(...initialSuppliers.map(s => s.freight_per_kg))} - ₹${Math.max(...initialSuppliers.map(s => s.freight_per_kg))}/kg • Mandi Cess (1%): +₹${winner.apmc_cess_per_kg}/kg.` },
-      { round: 4, tag: 'GUARDRAIL', color: 'text-emerald-400', text: `🛡️ All 5 quotes verified: Within statutory APMC floor (₹${(statutoryBench * 0.35).toFixed(2)}/kg) and buyer ceiling (₹${maxAllowedCeiling.toFixed(2)}/kg). Zero violations.` },
-
-      // Round 5: Pareto Optimization & Winner
-      { round: 5, tag: 'PARETO', color: 'text-purple-300', text: 'Multi-criteria Pareto optimization complete across 5 suppliers. Evaluated price, freight, quality grade, and distance.' },
-      { round: 5, tag: 'WINNER', color: 'text-emerald-300', supplier_index: 0, text: `🏆 Auto-Selected Winner: ${winner.name} (${winner.location}) at base ₹${winner.negotiated_price.toFixed(2)}/kg | True Landed: ₹${winner.landed_cost_per_kg.toFixed(2)}/kg (${winner.match_score}% Match)!` },
-      { round: 5, tag: 'LOCKED', color: 'text-emerald-400', text: `Terms locked. Total Landed Cost: ₹${winner.total_landed_cost.toLocaleString()}. Ready for APMC smart contract signing.` }
-    ];
-
-    // 4. Stream each step live with realistic pacing
-    const baseDelay = liveSpeed === 2 ? 260 : 520;
-    let accumulatedTime = 200;
-
-    liveSteps.forEach((step: any, i: number) => {
-      accumulatedTime += baseDelay;
-
-      const timeoutId = setTimeout(() => {
-        // Update round
-        if (step.round) {
-          setCurrentRound(step.round);
-        }
-
-        // Add log entry
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          {
-            time: now(),
-            tag: step.tag,
-            color: step.color || 'text-slate-200',
-            text: step.text,
-            round: step.round
-          }
-        ]);
-
-        // Update supplier live state
-        if (typeof step.supplier_index === 'number') {
-          const sIdx = step.supplier_index;
-          setLiveSuppliers(prev => prev.map((s, idx) => {
-            if (idx === sIdx) {
-              const updatedPrice = step.price || s.current_price;
-              const isWinner = step.tag === 'WINNER';
-              return {
-                ...s,
-                current_price: updatedPrice,
-                is_active_turn: true,
-                is_best: isWinner,
-                status: isWinner 
-                  ? '🏆 Auto-Selected Winner' 
-                  : step.tag === 'ROUND 3' 
-                    ? 'Conceded & Ranked' 
-                    : step.tag === 'ROUND 2' 
-                      ? 'Buyer Countered' 
-                      : 'Ask Submitted'
-              };
-            }
-            return {
-              ...s,
-              is_active_turn: false,
-              is_best: step.tag === 'WINNER' ? false : s.is_best
-            };
-          }));
-        }
-
-        // Conclude negotiation on final step
-        if (step.tag === 'LOCKED' || i === liveSteps.length - 1) {
-          setIsParallelRunning(false);
-          setSelectedWinnerIdx(0);
-          setLiveSuppliers(prev => prev.map(s => ({ ...s, is_active_turn: false })));
-          refetchNeg();
-        }
-      }, accumulatedTime);
-
-      timeoutsRef.current.push(timeoutId);
-    });
-
-  }, [id, cropName, cropQty, targetPrice, marketPrice, statutoryBench, maxAllowedCeiling, initialSuppliers, liveSpeed, refetchNeg, clearAllTimeouts]);
-
-  // Run automatically on first mount
-  useEffect(() => {
-    runLiveAutonomousNegotiation();
-    return () => clearAllTimeouts();
-  }, [id]);
-
-  // 5. Finalize Deal & Sign Smart Contract with Strict Guardrails
-  const handleSignSmartContract = async () => {
-    const seller = activeWinner.name;
-    const buyer = user?.name || user?.full_name || 'Buyer Enterprise';
-    const finalP = activeWinner.current_price || activeWinner.negotiated_price;
-
-    // 🛡️ Guardrail 1: Price Ceiling Validation
-    if (finalP > maxAllowedCeiling) {
-      const msg = `🛡️ [Buyer Guardrail] Price ₹${finalP}/kg exceeds statutory ceiling (₹${maxAllowedCeiling}/kg for ${cropName}). Finalizing deal is strictly rejected.`;
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        { 
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
-          tag: 'REJECTED', 
-          color: 'text-red-400', 
-          text: msg 
-        }
-      ]);
-      alert(msg);
-      return;
-    }
-
-    // 🛡️ Guardrail 2: Price Floor Validation
-    const minAllowedFloor = Math.round(statutoryBench * 0.35 * 100) / 100;
-    if (finalP <= 0 || finalP < minAllowedFloor) {
-      const msg = `🛡️ [Buyer Guardrail] Price ₹${finalP}/kg is below statutory APMC floor threshold (₹${minAllowedFloor}/kg for ${cropName}). Predatory or invalid pricing is strictly rejected.`;
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        { 
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
-          tag: 'REJECTED', 
-          color: 'text-red-400', 
-          text: msg 
-        }
-      ]);
-      alert(msg);
-      return;
-    }
-
-    // 🛡️ Guardrail 3: Positive Quantity Check
-    if (cropQty <= 0) {
-      alert(`Invalid procurement volume: ${cropQty} kg. Volume must be greater than zero.`);
-      return;
-    }
-
-    try {
-      const res = await api.post(`/negotiations/${id}/finalize`, {
-        price: finalP,
-        quantity: cropQty,
-        crop: cropName,
-        farmer: seller,
-        buyer: buyer
-      });
-
-      const txnId = res.data?.transaction_id || `TXN-MH-2026-${String(id).replace('neg_', '').toUpperCase()}`;
-      const contractHash = res.data?.contract_hash || '0x' + Array.from(txnId).map(c => c.charCodeAt(0).toString(16)).join('').slice(0, 32);
-
-      setAgreementData({
-        ...negState,
-        id: id,
-        negotiation_id: id,
-        transaction_id: txnId,
-        contract_hash: contractHash,
-        crop: cropName,
-        quantity: cropQty,
-        price: finalP,
-        farmer: seller,
-        farmer_name: seller,
-        buyer: buyer,
-        status: 'DEAL',
-        landed_cost: activeWinner.landed_cost_per_kg,
-        freight_per_kg: activeWinner.freight_per_kg
-      });
-
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        { 
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
-          tag: 'CONTRACT', 
-          color: 'text-emerald-400', 
-          text: `✍️ [Smart Contract Signed] APMC e-contract token ${contractHash.substring(0, 14)}... generated for ${seller} at ₹${finalP}/kg. Verified on-chain.` 
-        }
-      ]);
-
-      setShowValidationModal(true);
-    } catch (err: any) {
-      const detail = err.response?.data?.detail || 'Deal validation failed. Deal is strictly rejected.';
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        { 
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }), 
-          tag: 'BLOCKED', 
-          color: 'text-red-400', 
-          text: `❌ [Deal Rejected] ${detail}` 
-        }
-      ]);
-      alert(detail);
+      console.warn('Parallel procurement runner error:', err);
+      setIsParallelRunning(false);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-[70vh] flex flex-col items-center justify-center space-y-3">
+      <div className="h-[70vh] flex flex-col items-center justify-center space-y-3">
         <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-slate-600 font-bold text-sm">Initializing Autonomous Parallel Procurement Engine...</p>
+        <p className="text-slate-600 font-bold text-sm">Initializing LangGraph Negotiation Engine...</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-5 animate-in fade-in duration-300 pb-10">
+    <div className="h-[calc(100vh-90px)] flex flex-col xl:flex-row gap-6 p-4 max-w-[1600px] mx-auto animate-in fade-in duration-300">
       
-      {/* ── 1. Top Compact Header & Parameters Bar ── */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Link 
-              to="/dashboard/buyer" 
-              className="inline-flex items-center text-xs font-bold text-slate-500 hover:text-emerald-700 transition"
-            >
-              <ArrowLeft size={13} className="mr-1" /> Exit to Dashboard
-            </Link>
-            <span className="text-slate-300">•</span>
-            <span className="text-xs font-semibold text-slate-500">Contract Ref: #{id?.substring(0, 8)}</span>
+      {/* ════ COLUMN 1: Intelligence Panel (Left ~25%) ════ */}
+      <div className="w-full xl:w-1/4 flex flex-col gap-4 overflow-y-auto">
+        <Link 
+          to={isBuyer ? "/dashboard/buyer" : "/dashboard/farmer"} 
+          className="inline-flex items-center text-sm font-semibold text-slate-500 hover:text-emerald-700 transition"
+        >
+          <ArrowLeft size={16} className="mr-1" /> Exit Workspace
+        </Link>
+        
+        {/* Market Context Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <Briefcase size={17} className="text-blue-600" /> Market Context
+            </h2>
+            <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
+              {cropName}
+            </span>
           </div>
 
-          <h1 className="text-xl font-black text-slate-900 flex items-center gap-2">
-            <Zap size={22} className="text-emerald-600 fill-emerald-600" />
-            Autonomous Parallel Negotiation — {cropName}
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Live multi-round autonomous trading between Buyer Agent and 5 Maharashtra APMC Mandis
-          </p>
+          <div className="space-y-3 pt-1">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500">Lot Volume</span>
+              <span className="font-black text-slate-800">{cropQty.toLocaleString()} kg</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500">Live Modal Price</span>
+              <span className="font-black text-slate-800">₹{marketPrice}/kg</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500">Target Ceiling</span>
+              <span className="font-black text-emerald-600">₹{targetPrice}/kg</span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-slate-500">Statutory Benchmark (MSP)</span>
+              <span className="font-black text-purple-700">₹{statutoryBench}/kg</span>
+            </div>
+          </div>
+
+          {/* Mini 30-Day Trend Chart */}
+          <div className="pt-2 border-t border-slate-100">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Price Trend (30 Days)</p>
+            <PriceChart data={undefined} />
+          </div>
         </div>
 
-        {/* Live Badges & Quick Action */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2">
-            <span className="text-slate-500 font-medium">Quantity:</span>
-            <span className="font-bold text-slate-900">{cropQty.toLocaleString()} kg</span>
-          </div>
+        {/* Live Variables & Multi-Attribute Telemetry */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-3">
+          <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <Database size={17} className="text-purple-600" /> Live Variables
+          </h2>
+          
+          <div className="space-y-2.5">
+            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs space-y-1">
+              <p className="font-bold text-blue-700 flex items-center gap-1.5">
+                <CloudRain size={14} /> WEATHER & HARVEST RISK
+              </p>
+              <p className="text-slate-600">Clear weather across Marathwada & Western Maharashtra. Mandi arrivals steady.</p>
+            </div>
 
-          <div className="bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2">
-            <span className="text-emerald-700 font-medium">Target Ceiling:</span>
-            <span className="font-black text-emerald-800">₹{targetPrice}/kg</span>
-          </div>
+            <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs space-y-1">
+              <p className="font-bold text-amber-700 flex items-center gap-1.5">
+                <Truck size={14} /> HIGHWAY LOGISTICS
+              </p>
+              <p className="text-slate-600">Freight solved: ₹6.50/km + handling. Mandi Cess: 1% statutory APMC e-NAM.</p>
+            </div>
 
-          <div className="bg-purple-50 border border-purple-200 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2">
-            <span className="text-purple-700 font-medium">APMC Modal:</span>
-            <span className="font-bold text-purple-900">₹{marketPrice}/kg</span>
+            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs space-y-1">
+              <p className="font-bold text-emerald-800 flex items-center gap-1.5">
+                <ShieldCheck size={14} /> STATUTORY GUARDRAIL
+              </p>
+              <p className="text-slate-600">Protected Band: ₹{minAllowedFloor}/kg (APMC Floor) to ₹{maxAllowedCeiling}/kg (Ceiling).</p>
+            </div>
           </div>
-
-          <button
-            onClick={runLiveAutonomousNegotiation}
-            disabled={isParallelRunning}
-            className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 active:scale-95"
-            title="Re-run live autonomous parallel negotiation in real-time"
-          >
-            <Play size={13} className={isParallelRunning ? "animate-spin text-amber-300 fill-amber-300" : "fill-white"} />
-            <span>{isParallelRunning ? 'Negotiating Live...' : '▶ Start Live Negotiation'}</span>
-          </button>
         </div>
       </div>
 
-      {/* ── 2. Main 2-Column Split: Auto Parallel 5 Negotiation (Left 60%) + Live Terminal (Right 40%) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+      {/* ════ COLUMN 2: The Timeline / Chat Stream (Center ~50%) ════ */}
+      <div className="w-full xl:w-2/4 bg-white rounded-2xl shadow-sm border border-slate-200/80 flex flex-col overflow-hidden relative">
         
-        {/* ══ COLUMN 1 (7 Cols): 5-Supplier Auto Parallel Bidding & Concurrency Board ══ */}
-        <div className="lg:col-span-7 space-y-4">
-          
-          {/* 🏆 Spotlight Card: Auto-Selected Best Deal */}
-          {activeWinner && (
-            <div className="bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-emerald-500/10 border-2 border-amber-400 rounded-2xl p-5 shadow-sm space-y-3.5 relative overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0">
-                    🏆
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 bg-amber-500 text-white font-black text-[10px] rounded uppercase tracking-wider">
-                        Rank #1 Auto-Selected Winner
-                      </span>
-                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 font-bold text-[10px] rounded border border-emerald-300">
-                        {activeWinner.match_score}% Quality Match
-                      </span>
-                    </div>
-                    <h2 className="text-base font-black text-slate-900 mt-1">{activeWinner.name}</h2>
-                    <p className="text-xs text-slate-600 flex items-center gap-1 mt-0.5">
-                      <MapPin size={12} className="text-slate-400" />
-                      {activeWinner.location} • {activeWinner.distance_km} km highway transit • {activeWinner.special}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Big Landed Cost Display */}
-                <div className="text-right sm:border-l sm:border-amber-200 sm:pl-4">
-                  <span className="text-[10px] text-amber-900 uppercase font-black tracking-wider">
-                    Lowest Landed Cost
-                  </span>
-                  <p className="text-2xl font-black text-emerald-800">
-                    ₹{activeWinner.landed_cost_per_kg}<span className="text-xs text-slate-500">/kg</span>
-                  </p>
-                  <p className="text-[11px] font-bold text-slate-600">
-                    Total: ₹{activeWinner.total_landed_cost.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-
-              {/* Price Breakdown Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-amber-200/80 text-xs">
-                <div className="bg-white/90 p-2.5 rounded-xl border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-medium">Base Negotiated</span>
-                  <p className="font-black text-slate-900 text-sm">₹{activeWinner.current_price}/kg</p>
-                  <p className="text-[10px] text-emerald-600 font-bold">Saved -₹{activeWinner.concession}/kg</p>
-                </div>
-
-                <div className="bg-white/90 p-2.5 rounded-xl border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-medium">Transit Freight</span>
-                  <p className="font-black text-amber-800 text-sm">+₹{activeWinner.freight_per_kg}/kg</p>
-                  <p className="text-[10px] text-slate-500">{activeWinner.distance_km} km route</p>
-                </div>
-
-                <div className="bg-white/90 p-2.5 rounded-xl border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-medium">APMC Cess (1%)</span>
-                  <p className="font-black text-slate-800 text-sm">+₹{activeWinner.apmc_cess_per_kg}/kg</p>
-                  <p className="text-[10px] text-slate-500">Statutory e-NAM</p>
-                </div>
-
-                <div className="flex items-center">
-                  <button
-                    onClick={handleSignSmartContract}
-                    disabled={isParallelRunning}
-                    className="w-full h-full py-2.5 px-3 bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white font-black text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                  >
-                    <CheckCircle2 size={15} />
-                    <span>Sign Smart Contract</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 5-Supplier Parallel Concurrency Ranking Board */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-3">
-            <div className="flex justify-between items-center pb-2 border-b border-slate-100">
-              <h3 className="font-bold text-xs text-slate-900 flex items-center gap-1.5 uppercase tracking-wider">
-                <Layers size={14} className="text-emerald-600" />
-                5 Candidate Maharashtra Suppliers Competing in Parallel
-              </h3>
-              <div className="flex items-center gap-2">
-                {isParallelRunning && (
-                  <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full animate-pulse">
-                    Round {currentRound}/5 Active
-                  </span>
-                )}
-                <span className="text-[11px] text-slate-400 font-medium">
-                  Auto-Ranked by Lowest Landed Cost
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {liveSuppliers.map((sup, sIdx) => {
-                const isSelected = sIdx === selectedWinnerIdx;
-                const isTurn = sup.is_active_turn;
-                const hasConceded = sup.current_price < sup.initial_ask;
-
-                return (
-                  <div
-                    key={sIdx}
-                    onClick={() => setSelectedWinnerIdx(sIdx)}
-                    className={`p-3.5 rounded-xl border transition-all duration-300 cursor-pointer ${
-                      isTurn
-                        ? 'border-emerald-500 bg-emerald-50/50 ring-2 ring-emerald-400/40 shadow-md scale-[1.01]'
-                        : isSelected
-                          ? 'bg-amber-50/60 border-amber-400 ring-2 ring-amber-400/20 shadow-sm'
-                          : 'bg-white border-slate-200 hover:border-emerald-300 hover:bg-slate-50/60'
-                    }`}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center font-black text-xs shrink-0 mt-0.5 ${
-                          sup.is_best ? 'bg-amber-500 text-white shadow-sm' : isTurn ? 'bg-emerald-600 text-white animate-pulse' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          #{sup.rank}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-slate-900 text-xs">{sup.name}</p>
-                            {sup.is_best && (
-                              <span className="px-1.5 py-0.2 bg-amber-400 text-amber-950 font-black text-[9px] rounded">
-                                🏆 WINNER
-                              </span>
-                            )}
-                            {isTurn && (
-                              <span className="px-1.5 py-0.2 bg-emerald-500 text-white font-black text-[9px] rounded animate-pulse">
-                                LIVE TURN
-                              </span>
-                            )}
-                            <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 font-bold text-[9px] rounded">
-                              {sup.match_score}% Match
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                            <MapPin size={11} />
-                            {sup.location} • {sup.distance_km} km • {sup.special}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Right-Side Real-Time Numbers */}
-                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100">
-                        <div>
-                          <div className="flex items-center sm:justify-end gap-1.5">
-                            <span className="text-[10px] text-slate-400 line-through">
-                              ₹{sup.initial_ask}/kg
-                            </span>
-                            <span className="font-black text-slate-900 text-sm transition-all duration-300">
-                              ₹{sup.current_price}/kg
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-slate-500">
-                            Landed: <strong className="text-emerald-700">₹{sup.landed_cost_per_kg}/kg</strong>
-                          </p>
-                          {hasConceded && (
-                            <span className="text-[9px] font-bold text-emerald-600">
-                              Concession: -₹{(sup.initial_ask - sup.current_price).toFixed(2)}/kg
-                            </span>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedWinnerIdx(sIdx);
-                          }}
-                          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg transition cursor-pointer ${
-                            isSelected 
-                              ? 'bg-amber-500 text-white' 
-                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                          }`}
-                        >
-                          {isSelected ? 'Selected' : 'Select'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* Header Bar with Tabs & WebSocket Pulse */}
+        <div className="p-3.5 border-b border-slate-100 bg-slate-50 flex flex-wrap justify-between items-center z-10 sticky top-0 gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <MessageSquare size={17} className="text-emerald-600" /> AI Agent Negotiation
+            </h3>
+            <span className="text-slate-300">•</span>
+            <span className="text-xs text-slate-500 font-mono">#{id?.substring(0, 8)}</span>
           </div>
 
-        </div>
-
-        {/* ══ COLUMN 2 (5 Cols): Live Autonomous Negotiation Terminal ══ */}
-        <div className="lg:col-span-5 flex flex-col space-y-4">
-          
-          {/* Developer / Trading Terminal */}
-          <div className="bg-slate-950 text-slate-100 rounded-2xl shadow-xl border border-slate-800 flex flex-col overflow-hidden h-[540px]">
-            
-            {/* Terminal Top Window Bar */}
-            <div className="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
-                <span className="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
-                <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
-                <span className="ml-2 font-mono text-[11px] text-slate-400 font-bold flex items-center gap-1.5">
-                  <TerminalIcon size={13} className="text-emerald-400" />
-                  DAEMON // BUYER_PARALLEL_RL_ENGINE
-                </span>
-              </div>
-
-              {/* Terminal Controls: Speed Toggle & Status */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setLiveSpeed(liveSpeed === 1 ? 2 : 1)}
-                  className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-mono text-[10px] font-bold cursor-pointer transition flex items-center gap-1"
-                  title="Toggle streaming speed"
-                >
-                  <FastForward size={10} className={liveSpeed === 2 ? 'text-amber-400' : 'text-slate-400'} />
-                  <span>{liveSpeed === 2 ? '2x Fast' : '1x Normal'}</span>
-                </button>
-
-                <div className="flex items-center gap-1.5 pl-1 border-l border-slate-700">
-                  <span className={`w-2 h-2 rounded-full ${isParallelRunning ? 'bg-emerald-400 animate-ping' : 'bg-emerald-500'}`}></span>
-                  <span className="font-mono text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
-                    {isParallelRunning ? `ROUND ${currentRound}/5` : 'READY'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Terminal Live Stream Body */}
-            <div className="flex-1 p-4 font-mono text-[11px] leading-relaxed overflow-y-auto space-y-2 select-text dark-scroll">
-              <div className="text-slate-500 pb-2 border-b border-slate-800/80 text-[10px]">
-                # AgriNegotiator Multi-Agent Parallel Bidding Runtime v2.1.0<br />
-                # Target: {cropName} ({cropQty.toLocaleString()} kg) • APMC Region: Maharashtra State<br />
-                # Policy: Concession Bargaining with Statutory MSP Floor Protection
-              </div>
-
-              {liveTerminalLogs.map((log, lIdx) => (
-                <div key={lIdx} className="flex items-start gap-2 animate-in fade-in duration-150">
-                  <span className="text-slate-600 shrink-0 font-mono">[{log.time}]</span>
-                  <span className={`font-bold shrink-0 ${log.color || 'text-slate-300'}`}>
-                    [{log.tag}]
-                  </span>
-                  <span className="text-slate-200 break-words flex-1">
-                    {log.text}
-                  </span>
-                </div>
-              ))}
-
-              <div ref={terminalEndRef} />
-            </div>
-
-            {/* Terminal Input / Prompt Footer */}
-            <div className="bg-slate-900/90 px-4 py-2.5 border-t border-slate-800 flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <div className="flex items-center gap-2 text-emerald-400">
-                <span>$</span>
-                <span className="text-slate-300">
-                  {isParallelRunning 
-                    ? `Negotiating live with 5 Maharashtra Mandis in parallel (Round ${currentRound}/5)...` 
-                    : 'Negotiation complete. Best deal Pareto-optimized.'}
-                </span>
-                <span className="w-2 h-4 bg-emerald-400 animate-pulse inline-block"></span>
-              </div>
-
+          <div className="flex items-center gap-3">
+            {/* Tab Selector: Timeline Chat vs Live Terminal */}
+            <div className="bg-slate-200/70 p-1 rounded-xl flex items-center gap-1 text-xs">
               <button
-                onClick={runLiveAutonomousNegotiation}
-                disabled={isParallelRunning}
-                className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold cursor-pointer disabled:opacity-40"
+                onClick={() => setActiveTab('timeline')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                  activeTab === 'timeline' 
+                    ? 'bg-white text-slate-900 shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
               >
-                [Re-Run]
+                💬 Chat Timeline
+              </button>
+              <button
+                onClick={() => setActiveTab('terminal')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 ${
+                  activeTab === 'terminal' 
+                    ? 'bg-slate-900 text-emerald-400 shadow-sm' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <TerminalIcon size={12} /> Live Terminal
               </button>
             </div>
 
+            {/* WebSocket Connection Ping */}
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+              <span className="text-[10px] font-bold text-slate-500 font-mono uppercase">
+                {isConnected ? 'LIVE' : 'SYNCING'}
+              </span>
+            </div>
           </div>
+        </div>
 
-          {/* Quick Smart Contract Finalization Card */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm space-y-3">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <ShieldCheck size={18} className="text-emerald-600" />
-                <h4 className="font-bold text-xs text-slate-900">APMC Compliant Electronic Contract</h4>
+        {/* View Mode 1: Ritik's Signature Chat Timeline with OfferCards & ChatBubbles */}
+        {activeTab === 'timeline' ? (
+          <div className="flex-1 overflow-y-auto bg-slate-50/50 p-5 space-y-5">
+            {messages.map((m, i) => (
+              m.type === 'offer' ? (
+                <OfferCard 
+                  key={i}
+                  agent={m.agent}
+                  price={m.price}
+                  quantity={m.quantity || cropQty}
+                  quality={m.quality || 'A'}
+                  deliveryDate={m.deliveryDate || '3 Business Days'}
+                  transportIncluded={m.transportIncluded ?? true}
+                  warehouseIncluded={m.warehouseIncluded ?? false}
+                  validity={m.validity || '24 Hours'}
+                  isFarmer={m.agent?.toLowerCase().includes('farmer') || m.agent?.toLowerCase().includes('producer')}
+                  onAction={handleAction}
+                />
+              ) : (
+                <ChatBubble 
+                  key={i} 
+                  agent={m.agent} 
+                  price={m.price} 
+                  message={m.message} 
+                  reasoning={m.reasoning}
+                  isFarmer={m.agent?.toLowerCase().includes('farmer') || m.agent?.toLowerCase().includes('producer')} 
+                  isInteractive={false}
+                  onAction={handleAction}
+                />
+              )
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        ) : (
+          /* View Mode 2: Real-Time Streaming Terminal */
+          <div className="flex-1 bg-slate-950 p-4 font-mono text-[11px] leading-relaxed overflow-y-auto space-y-2 select-text dark-scroll text-slate-100 flex flex-col">
+            <div className="text-slate-500 pb-2 border-b border-slate-800 text-[10px]">
+              # LangGraph Multi-Agent Negotiation Daemon • APMC Maharashtra<br />
+              # Target: {cropName} ({cropQty.toLocaleString()} kg) • Benchmark: ₹{statutoryBench}/kg
+            </div>
+
+            {liveTerminalLogs.length === 0 ? (
+              <div className="text-center py-16 text-slate-500 space-y-3">
+                <TerminalIcon size={32} className="mx-auto text-slate-700" />
+                <p>Terminal idle. Click "Run Parallel 5 Negotiation" below to stream live negotiation.</p>
+                <button
+                  onClick={runParallelAutonomousNegotiation}
+                  disabled={isParallelRunning}
+                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition shadow inline-flex items-center gap-1.5"
+                >
+                  <Play size={13} className="fill-white" /> Start Live Parallel Negotiation
+                </button>
               </div>
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold text-[10px] rounded">
-                e-NAM Verified
+            ) : (
+              liveTerminalLogs.map((log, lIdx) => (
+                <div key={lIdx} className="flex items-start gap-2 animate-in fade-in duration-150">
+                  <span className="text-slate-600 shrink-0">[{log.time}]</span>
+                  <span className={`font-bold shrink-0 ${log.color || 'text-slate-300'}`}>[{log.tag}]</span>
+                  <span className="text-slate-200 break-words flex-1">{log.text}</span>
+                </div>
+              ))
+            )}
+            <div ref={terminalEndRef} />
+          </div>
+        )}
+
+        {/* Bottom Fast Action Bar */}
+        <div className="p-3 bg-white border-t border-slate-100 flex items-center justify-between text-xs">
+          <button
+            onClick={runParallelAutonomousNegotiation}
+            disabled={isParallelRunning}
+            className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={isParallelRunning ? "animate-spin text-emerald-400" : "text-emerald-400"} />
+            <span>{isParallelRunning ? 'Negotiating 5 Mandis...' : '⚡ Auto-Parallel 5 Negotiation'}</span>
+          </button>
+
+          <span className="text-slate-400 text-[11px]">
+            Protected by APMC Statutory Guardrails
+          </span>
+        </div>
+      </div>
+      
+      {/* ════ COLUMN 3: Action Panel & Workflow (Right ~25%) ════ */}
+      <div className="w-full xl:w-1/4 flex flex-col gap-6 overflow-y-auto">
+        
+        {/* LangGraph Execution Stepper */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+          <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <Zap size={17} className="text-emerald-500" /> LangGraph Execution
+          </h2>
+          <AgentWorkflowStepper activeAgent={activeAgent} />
+          
+          <button 
+            onClick={() => setIsRagOpen(true)}
+            className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition text-xs flex justify-center items-center gap-2 cursor-pointer"
+          >
+            <Database size={15} className="text-emerald-600" /> View RAG Context
+          </button>
+        </div>
+
+        {/* Dynamic Action Area: Agreement Preview OR Copilot Override */}
+        {showAgreement && agreementData ? (
+          <AgreementPreview 
+            dealData={agreementData} 
+            onSignAndClose={() => setShowValidationModal(true)} 
+          />
+        ) : (
+          <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-5 text-white space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <ShieldCheck size={18} className="text-emerald-400" /> Copilot Override
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-800 text-slate-300 rounded-full">
+                RL Policy Active
               </span>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Counterparty:</span>
-                <span className="font-bold text-slate-900">{activeWinner.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Settlement Rate:</span>
-                <span className="font-black text-emerald-700">₹{activeWinner.current_price}/kg</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Total Landed Amount:</span>
-                <span className="font-black text-slate-900">₹{activeWinner.total_landed_cost.toLocaleString()}</span>
-              </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Autonomous agents are negotiating based on RL policy. Intervene anytime to counter with a manual offer.
+            </p>
+
+            <div className="space-y-2.5">
+              <input 
+                type="number" 
+                id="humanOverride"
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder={`Enter price (e.g. ₹${targetPrice})...`} 
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+              />
+
+              <button 
+                onClick={() => {
+                  const val = parseFloat(manualPrice);
+                  if (isNaN(val) || val <= 0) {
+                    alert('Please enter a valid price.');
+                    return;
+                  }
+                  interveneMutation.mutate(val);
+                }}
+                disabled={interveneMutation.isPending}
+                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl transition shadow-sm cursor-pointer"
+              >
+                {interveneMutation.isPending ? 'Submitting Offer...' : 'Send Manual Offer'}
+              </button>
             </div>
-
-            <button
-              onClick={handleSignSmartContract}
-              disabled={isParallelRunning}
-              className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-sm transition flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <Check size={14} />
-              <span>Sign & Finalize Smart Contract</span>
-            </button>
           </div>
-
-        </div>
+        )}
 
       </div>
+      
+      {/* Floating RAG Modal */}
+      <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} crop={cropName} />
 
-      {/* ── 3. APMC Electronic Smart Contract Validation Modal ── */}
+      {/* APMC Validated Smart Contract Modal */}
       <TransactionValidationModal
         isOpen={showValidationModal}
         onClose={() => setShowValidationModal(false)}
-        dealData={agreementData || {
-          id: id,
-          negotiation_id: id,
-          crop: cropName,
-          quantity: cropQty,
-          price: activeWinner.current_price || activeWinner.negotiated_price,
-          farmer: activeWinner.name,
-          buyer: user?.name || user?.full_name || 'Buyer Enterprise',
-          status: 'DEAL'
-        }}
+        dealData={agreementData}
         buyerUser={user}
       />
 
