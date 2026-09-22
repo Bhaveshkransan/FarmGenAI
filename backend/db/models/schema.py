@@ -289,4 +289,25 @@ class DBCompost(Base):
     capacity_mt: Mapped[float] = mapped_column(nullable=False)
     district: Mapped[str] = mapped_column(nullable=False, index=True)
 
+class DBCurrentMandiPrice(Base):
+    __tablename__ = "current_mandi_prices"
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    state: Mapped[str] = mapped_column(nullable=False, index=True)
+    district: Mapped[str] = mapped_column(nullable=False, index=True)
+    market: Mapped[str] = mapped_column(nullable=False, index=True)
+    commodity: Mapped[str] = mapped_column(nullable=False, index=True)
+    variety: Mapped[str] = mapped_column(nullable=True)
+    grade: Mapped[str] = mapped_column(nullable=True)
+    arrival_date: Mapped[str] = mapped_column(nullable=False, index=True)
+    min_price_quintal: Mapped[float] = mapped_column(nullable=True)
+    max_price_quintal: Mapped[float] = mapped_column(nullable=True)
+    modal_price_quintal: Mapped[float] = mapped_column(nullable=True)
+    min_price_kg: Mapped[float] = mapped_column(nullable=True)
+    max_price_kg: Mapped[float] = mapped_column(nullable=True)
+    modal_price_kg: Mapped[float] = mapped_column(nullable=False)
+    source: Mapped[str] = mapped_column(nullable=False)
+    fetched_at: Mapped[str] = mapped_column(nullable=False)
+    freshness: Mapped[str] = mapped_column(nullable=False, default="CURRENT")
+
+
 

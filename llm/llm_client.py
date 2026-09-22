@@ -27,40 +27,79 @@ logger = logging.getLogger("LLMClient")
 
 OLLAMA_URL: str = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama").lower()
 ENABLE_LLM: bool = os.getenv("ENABLE_LLM", "true").lower() in {"1", "true", "yes"}
 
 
 class LLMClient:
-    """Unified LLM client supporting Cloud Gemini (Zero-setup) and Ollama (Local)."""
+    """Unified LLM client supporting Cloud Gemini, Groq, and Ollama (Local)."""
 
     def __init__(self):
         self.enabled = ENABLE_LLM
         self.provider = LLM_PROVIDER
         self.ollama_url = OLLAMA_URL
         self.ollama_model = OLLAMA_MODEL
-        self.gemini_key = GEMINI_API_KEY
+        self.gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+        self.groq_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
 
     def _generate_gemini(self, prompt: str) -> str | None:
-        if not self.gemini_key:
+        key = self.gemini_key or os.getenv("GEMINI_API_KEY", "")
+        if not key:
             return None
+        # Try REST endpoint first for gemini-3.6-flash / gemini-2.5-flash
+        for model in ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                res = requests.post(url, json=payload, timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if text:
+                            return text.strip()
+            except Exception as e:
+                logger.debug(f"Gemini REST {model} failed: {e}")
+
+        # Try SDK fallback
         try:
             import google.generativeai as genai
-            genai.configure(api_key=self.gemini_key)
-            g_model = genai.GenerativeModel("gemini-2.0-flash")
-            res = g_model.generate_content(prompt)
-            if res and res.text:
-                return res.text.strip()
+            genai.configure(api_key=key)
+            for m_name in ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-1.5-flash"]:
+                try:
+                    g_model = genai.GenerativeModel(m_name)
+                    res = g_model.generate_content(prompt)
+                    if res and res.text:
+                        return res.text.strip()
+                except Exception:
+                    continue
         except Exception as e:
-            try:
-                # Fallback to gemini-1.5-flash if 2.0 isn't available
-                g_model = genai.GenerativeModel("gemini-1.5-flash")
-                res = g_model.generate_content(prompt)
-                if res and res.text:
-                    return res.text.strip()
-            except Exception:
-                logger.warning(f"Gemini generation failed: {e}")
+            logger.warning(f"Gemini generation failed: {e}")
+        return None
+
+    def _generate_groq(self, prompt: str, temperature: float = 0.7, max_tokens: int = 150) -> str | None:
+        key = self.groq_key or os.getenv("GROQ_API_KEY", "")
+        if not key:
+            return None
+        try:
+            url = "https://api.groq.com/openai/v1/chat/completions"
+            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+            payload = {
+                "model": "llama-3.1-8b-instant",
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+            res = requests.post(url, json=payload, headers=headers, timeout=10)
+            if res.status_code == 200:
+                choices = res.json().get("choices", [])
+                if choices:
+                    return choices[0].get("message", {}).get("content", "").strip()
+        except Exception as e:
+            logger.warning(f"Groq generation failed: {e}")
         return None
 
     def _generate_ollama(self, prompt: str, model: str = None, temperature: float = 0.7, max_tokens: int = 120) -> str | None:
@@ -75,7 +114,6 @@ class LLMClient:
                     "num_predict": min(max_tokens, 120),
                 }
             }
-            # 12s timeout allows fast generation while avoiding hangs on CPU
             response = requests.post(url, json=payload, timeout=12)
             if response.status_code == 200:
                 text = response.json().get("response", "")
@@ -87,12 +125,22 @@ class LLMClient:
 
     def generate(self, prompt: str, model: str = None, temperature: float = 0.7, max_tokens: int = 120) -> str | None:
         """
-        Generate text completion with local Ollama routing.
+        Generate text completion with multi-provider routing (Gemini -> Groq -> Ollama).
         """
         if not self.enabled:
             return None
 
-        # Prioritize local Ollama (qwen2.5:1.5b)
+        # 1. Try Gemini if key present
+        res = self._generate_gemini(prompt)
+        if res:
+            return res
+
+        # 2. Try Groq if key present
+        res = self._generate_groq(prompt, temperature=temperature, max_tokens=max_tokens)
+        if res:
+            return res
+
+        # 3. Fallback to local Ollama (qwen2.5:1.5b)
         res = self._generate_ollama(prompt, model, temperature, max_tokens)
         if res:
             return res

@@ -554,7 +554,141 @@ class RAGService:
                 else:
                     logger.info("All historical negotiations already indexed. Skipping.")
 
+    def ingest_buyer_knowledge_base(self):
+        """
+        Seeds dedicated Buyer RAG knowledge domains into ChromaDB collections:
+        1. crop_quality_references.json -> crop_knowledge (domain=crop_quality, stakeholder=buyer)
+        2. government_rules.json -> government_rules (domain=government_rule, stakeholder=shared)
+        3. BUYER_PERSONAS -> buyer_profiles (domain=buyer_profile, stakeholder=buyer)
+        """
+        base_dir = os.path.dirname(__file__)
+        dataset_dir = os.path.abspath(os.path.join(base_dir, "..", "dataset"))
+        
+        # 1. Ingest Crop Quality References
+        quality_file = os.path.join(dataset_dir, "crop_quality_references.json")
+        if os.path.exists(quality_file):
+            try:
+                with open(quality_file, "r", encoding="utf-8") as f:
+                    q_records = json.load(f)
+                
+                vs_crop = self.vectorstores.get("crop_knowledge")
+                if vs_crop is not None:
+                    ids = [f"buyer_quality_spec_{idx}" for idx in range(len(q_records))]
+                    existing = vs_crop._collection.get(ids=ids)
+                    existing_ids = set(existing.get("ids", []))
+                    
+                    new_texts = []
+                    new_metas = []
+                    new_ids = []
+                    for idx, r in enumerate(q_records):
+                        doc_id = ids[idx]
+                        if doc_id not in existing_ids:
+                            text = (
+                                f"Crop Quality Standard for {r['crop']} (Variety: {r.get('variety', 'Standard')}, Grade {r['grade']}):\n"
+                                f"Min Size: {r.get('min_size_mm', 'N/A')}mm, Max Moisture: {r.get('max_moisture_pct', 'N/A')}%.\n"
+                                f"Color Standards: {r.get('color_standards', 'N/A')}.\n"
+                                f"Skin & Firmness Specs: {r.get('skin_firmness', 'N/A')}.\n"
+                                f"Allowed Defects: {r.get('common_defects_allowed', 'None')}."
+                            )
+                            new_texts.append(text)
+                            new_ids.append(doc_id)
+                            new_metas.append({
+                                "crop": r["crop"],
+                                "grade": r["grade"],
+                                "stakeholder": "buyer",
+                                "knowledge_domain": "crop_quality",
+                                "source": "crop_quality_references.json",
+                                "source_type": "project",
+                                "is_synthetic": False,
+                                "id": doc_id,
+                            })
+                    if new_ids:
+                        vs_crop.add_texts(texts=new_texts, metadatas=new_metas, ids=new_ids)
+                        logger.info(f"Indexed {len(new_ids)} crop quality reference specs for Buyer RAG.")
+            except Exception as e:
+                logger.error(f"Failed to ingest crop quality references: {e}")
+
+        # 2. Ingest Government Rules
+        rules_file = os.path.join(dataset_dir, "government_rules.json")
+        if os.path.exists(rules_file):
+            try:
+                with open(rules_file, "r", encoding="utf-8") as f:
+                    r_records = json.load(f)
+                
+                vs_rules = self.vectorstores.get("government_rules")
+                if vs_rules is not None:
+                    ids = [f"buyer_gov_rule_{idx}" for idx in range(len(r_records))]
+                    existing = vs_rules._collection.get(ids=ids)
+                    existing_ids = set(existing.get("ids", []))
+                    
+                    new_texts = []
+                    new_metas = []
+                    new_ids = []
+                    for idx, r in enumerate(r_records):
+                        doc_id = ids[idx]
+                        if doc_id not in existing_ids:
+                            text = (
+                                f"Government APMC & Procurement Guideline for {r['crop']}:\n"
+                                f"Storage Spec: {r.get('storage', 'N/A')}\n"
+                                f"APMC Guideline / Mandate: {r.get('apmc_guideline', 'N/A')}"
+                            )
+                            new_texts.append(text)
+                            new_ids.append(doc_id)
+                            new_metas.append({
+                                "crop": r["crop"],
+                                "stakeholder": "shared",
+                                "knowledge_domain": "government_rule",
+                                "source": "government_rules.json",
+                                "source_type": "government",
+                                "is_synthetic": False,
+                                "id": doc_id,
+                            })
+                    if new_ids:
+                        vs_rules.add_texts(texts=new_texts, metadatas=new_metas, ids=new_ids)
+                        logger.info(f"Indexed {len(new_ids)} government rules for Buyer RAG.")
+            except Exception as e:
+                logger.error(f"Failed to ingest government rules: {e}")
+
+        # 3. Ingest Buyer Personas / Profiles
+        try:
+            from agents.buyer_agent import BUYER_PERSONAS
+            vs_profiles = self.vectorstores.get("buyer_profiles")
+            if vs_profiles is not None:
+                p_ids = [f"buyer_profile_{persona_key}" for persona_key in BUYER_PERSONAS.keys()]
+                existing = vs_profiles._collection.get(ids=p_ids)
+                existing_ids = set(existing.get("ids", []))
+                
+                new_texts = []
+                new_metas = []
+                new_ids = []
+                for p_key, p_cfg in BUYER_PERSONAS.items():
+                    doc_id = f"buyer_profile_{p_key}"
+                    if doc_id not in existing_ids:
+                        text = (
+                            f"Buyer Profile Persona '{p_key}':\n"
+                            f"Description: {p_cfg.get('description', '')}\n"
+                            f"Strategy: {p_cfg.get('strategy', 'balanced')}, Min Shelf Life Requirement: {p_cfg.get('min_shelf_life', 2)} days.\n"
+                            f"Priority Weights: Price={p_cfg.get('weights', {}).get('price')}, Quantity={p_cfg.get('weights', {}).get('quantity')}, Freshness={p_cfg.get('weights', {}).get('freshness')}."
+                        )
+                        new_texts.append(text)
+                        new_ids.append(doc_id)
+                        new_metas.append({
+                            "persona": p_key,
+                            "stakeholder": "buyer",
+                            "knowledge_domain": "buyer_profile",
+                            "source": "BUYER_PERSONAS",
+                            "source_type": "buyer_profile",
+                            "is_synthetic": False,
+                            "id": doc_id,
+                        })
+                if new_ids:
+                    vs_profiles.add_texts(texts=new_texts, metadatas=new_metas, ids=new_ids)
+                    logger.info(f"Indexed {len(new_ids)} buyer profile personas into vector store.")
+        except Exception as e:
+            logger.error(f"Failed to ingest buyer profile personas: {e}")
+
 
 # Singleton instance
 rag_service = RAGService()
+
 

@@ -47,3 +47,42 @@ async def query_rag(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/buyer-query")
+async def query_buyer_rag(
+    crop: str = Query(None, description="Crop filter"),
+    location: str = Query(None, description="Location/district filter"),
+    persona: str = Query(None, description="Buyer persona filter"),
+    q: str = Query(None, description="Search query string"),
+    limit: int = Query(2, description="Max results per domain"),
+    current_user: dict = Depends(get_current_user_optional)
+):
+    """Retrieve purpose-built Buyer RAG context across buyer profile, crop quality, government rules, and negotiation memory."""
+    try:
+        from backend.services.buyer_rag_service import buyer_rag_service
+        ctx = buyer_rag_service.get_buyer_context(
+            crop=crop,
+            location=location,
+            persona=persona,
+            query=q,
+            limit_per_domain=limit
+        )
+        return {
+            "success": True,
+            "data": {
+                "buyer_profile": ctx.buyer_profile,
+                "crop_quality_knowledge": ctx.crop_quality_knowledge,
+                "government_rules": ctx.government_rules,
+                "negotiation_memory": ctx.negotiation_memory,
+                "procurement_knowledge": ctx.procurement_knowledge,
+                "relevant_shared_knowledge": ctx.relevant_shared_knowledge,
+                "sources": ctx.sources,
+                "formatted_text": ctx.to_prompt_text(),
+                "metadata": ctx.retrieval_metadata,
+            }
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+

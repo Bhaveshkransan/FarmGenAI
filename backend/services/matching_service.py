@@ -15,8 +15,22 @@ from backend.repositories.user_repository import UserRepository
 import logging
 from typing import List, Dict, Optional
 from database.db import Database
+from shared.crop_catalog import normalize_crop_name
 
 logger = logging.getLogger("MatchingService")
+
+
+def crops_match(crop_a: str, crop_b: str) -> bool:
+    norm_a = normalize_crop_name(crop_a)
+    norm_b = normalize_crop_name(crop_b)
+    if norm_a and norm_b:
+        return norm_a == norm_b
+    if not norm_a and not norm_b:
+        raw_a = (crop_a or "").strip().lower()
+        raw_b = (crop_b or "").strip().lower()
+        return bool(raw_a and raw_b and raw_a == raw_b)
+    return False
+
 
 
 CITY_DISTANCES_KM: Dict[str, Dict[str, float]] = {
@@ -108,11 +122,12 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
 
     results = []
     for req in all_requirements:
-        # Crop must match (case-insensitive)
+        # Crop must match using canonical crop matching
         req_crop = (req.get("crop") or "").strip()
         list_crop = (listing.get("crop") or "").strip()
-        if not req_crop or (list_crop and req_crop.lower() != list_crop.lower()):
+        if not req_crop or not crops_match(req_crop, list_crop):
             continue
+
 
         buyer_user = await UserRepository.get_by_id(req.get("user_id", "")) or {}
         score = await _score_match(listing, req, buyer_user)
@@ -184,8 +199,9 @@ async def match_requirement_to_listings(requirement: Dict) -> List[Dict]:
 
     results = []
     for listing in active:
-        if listing.get("crop", "").lower() != requirement.get("crop", "").lower():
+        if not crops_match(requirement.get("crop", ""), listing.get("crop", "")):
             continue
+
 
         buyer_user = await UserRepository.get_by_id(requirement.get("user_id", "")) or {}
         score = await _score_match(listing, requirement, buyer_user)

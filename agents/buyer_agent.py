@@ -37,6 +37,13 @@ except Exception:
         get_buyer_pricing_service = None
 
 try:
+    from backend.schemas.buyer_market_context import BuyerMarketContext
+    from backend.services.buyer_market_context_service import buyer_market_context_service
+except Exception:
+    BuyerMarketContext = None
+    buyer_market_context_service = None
+
+try:
     llm_client = LLMClient()
 except Exception:
     llm_client = None
@@ -104,6 +111,10 @@ class BuyerAgent(BaseAgent):
                 min_shelf_life = p_config["min_shelf_life"]
         else:
             self.weights = {"price": 0.60, "quantity": 0.25, "freshness": 0.15}
+            if persona in ["boulware", "aggressive", "conceder", "balanced"]:
+                strategy = persona
+
+
 
         super().__init__(name, "buyer", strategy=strategy)
 
@@ -399,11 +410,14 @@ class BuyerAgent(BaseAgent):
 
             # Dynamically resolve features from real APMC historical dataset if missing or incomplete
             if not features or any(col not in features for col in self.pricing_service.feature_cols):
+                if context and context.get("market_price") is not None:
+                    return float(context["market_price"])
                 try:
                     features, feature_meta = self.pricing_service.get_market_features(norm_crop, loc)
                 except Exception as e:
                     self.log_action(f"Failed to auto-resolve market features: {e}")
                     features = None
+
 
             if features:
                 try:
@@ -653,6 +667,52 @@ class BuyerAgent(BaseAgent):
         # 2. Hybrid Reasoning (LLM Proposal)
         llm_decision = None
         if llm_client and getattr(llm_client, "enabled", False) and not force_deterministic:
+            market_ctx_text = ""
+            if context and "buyer_market_context" in context:
+                b_m_ctx = context["buyer_market_context"]
+                if hasattr(b_m_ctx, "to_prompt_text"):
+                    market_ctx_text = "\n" + b_m_ctx.to_prompt_text()
+                elif isinstance(b_m_ctx, dict):
+                    market_ctx_text = f"\n- Market Context: {json.dumps(b_m_ctx)}"
+            else:
+                # Build market context dynamically if service available or format individual keys
+                if buyer_market_context_service and target_crop:
+                    try:
+                        resolved_m_ctx = buyer_market_context_service.build_market_context(
+                            crop=target_crop,
+                            location=self.location,
+                            persona=self.persona,
+                            context=context,
+                        )
+                        market_ctx_text = "\n" + resolved_m_ctx.to_prompt_text()
+                    except Exception:
+                        pass
+
+                if not market_ctx_text:
+                    rag_text = ""
+                    if context and "buyer_rag_context" in context:
+                        b_rag = context["buyer_rag_context"]
+                        if hasattr(b_rag, "to_prompt_text"):
+                            rag_text = b_rag.to_prompt_text()
+                        elif isinstance(b_rag, str):
+                            rag_text = b_rag
+                        elif isinstance(b_rag, dict):
+                            rag_text = json.dumps(b_rag)
+
+                    rag_section = f"\n- Relevant Buyer RAG Knowledge Context:\n{rag_text}" if rag_text else ""
+
+                    current_mandi_section = ""
+                    if context and "current_mandi_data" in context and isinstance(context["current_mandi_data"], dict):
+                        m_data = context["current_mandi_data"]
+                        if m_data.get("success", True):
+                            modal_kg = m_data.get("modal_price_kg", 0.0)
+                            apmc = m_data.get("apmc", "APMC Mandi")
+                            freshness = m_data.get("freshness", "CURRENT")
+                            obs_date = m_data.get("observation_date", "")
+                            current_mandi_section = f"\n- Current Daily Mandi Price (Observed): ₹{modal_kg}/kg at {apmc} (Date: {obs_date}, Freshness: {freshness})"
+
+                    market_ctx_text = f"- Predicted Next-Period Modal Price (ML Forecast): ₹{market_price}/kg{current_mandi_section}{rag_section}"
+
             prompt = f"""
             You are a buyer agent ({self.persona}) negotiating the purchase of agricultural produce.
             - Your target price: ₹{self.target_price}/kg
@@ -661,9 +721,11 @@ class BuyerAgent(BaseAgent):
             - Your current budget: ₹{self.budget}
             - Maximum quantity needed: {self.max_quantity}kg
             - Seller offered price: ₹{price}/kg for {req_qty}kg
-            - Regional market benchmark: ₹{market_price}/kg
             - Produce shelf life: {shelf_life if shelf_life is not None else 'Normal'} days
             - Negotiation round: {current_round} of {max_rounds}
+            
+            Market Intelligence & Context:
+            {market_ctx_text}
 
             Decide whether to ACCEPT, REJECT, or COUNTER.
             If COUNTER, provide a realistic counter_price <= ₹{min(self.reservation_price, batna)}.
@@ -835,6 +897,17 @@ class BuyerAgent(BaseAgent):
                 "counter_price": None,
                 "reason": "Offered price far exceeds sustainable market pricing and reservation ceiling.",
             }
+
+        # 2b. Stall Detection: Detect immobile seller offers above acceptable threshold
+        if len(self.seller_offer_history) >= 3:
+            recent_delta = abs(self.seller_offer_history[-1] - self.seller_offer_history[-3])
+            if recent_delta < 0.15 and price > self.reservation_price:
+                return {
+                    "decision": "REJECT",
+                    "counter_price": None,
+                    "reason": f"Stall detected: seller price (₹{price}/kg) has remained static across 3 rounds above reservation ceiling.",
+                }
+
 
         # 3. Spoilage Advantage
         # If shelf-life is critical (<= 2 days), farmer is under decay pressure. Hold firm or discount.

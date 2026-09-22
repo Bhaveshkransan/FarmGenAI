@@ -640,6 +640,44 @@ async def buyer_node(state: NegotiationState) -> Dict[str, Any]:
             if feature_meta:
                 context_payload["feature_source"] = feature_meta
 
+        # Retrieve purpose-built Buyer RAG context for buyer agent
+        try:
+            from backend.services.buyer_rag_service import buyer_rag_service
+            b_rag_ctx = buyer_rag_service.get_buyer_context(
+                crop=state.get("crop"),
+                location=state.get("location"),
+                persona=getattr(buyer, "persona", None)
+            )
+            if not b_rag_ctx.is_empty:
+                context_payload["buyer_rag_context"] = b_rag_ctx
+        except Exception as ex:
+            logger.debug(f"Could not fetch buyer_rag_context in graph_orchestrator: {ex}")
+
+        # Retrieve current daily mandi price observation for buyer agent
+        try:
+            from backend.services.current_mandi_service import current_mandi_service
+            c_mandi_data = current_mandi_service.get_current_market_price(
+                crop=state.get("crop"),
+                location=state.get("location")
+            )
+            if c_mandi_data.get("success", False):
+                context_payload["current_mandi_data"] = c_mandi_data
+        except Exception as ex:
+            logger.debug(f"Could not fetch current_mandi_data in graph_orchestrator: {ex}")
+
+        # Assemble unified composite BuyerMarketContext
+        try:
+            from backend.services.buyer_market_context_service import buyer_market_context_service
+            market_ctx = buyer_market_context_service.build_market_context(
+                crop=state.get("crop", ""),
+                location=state.get("location"),
+                persona=getattr(buyer, "persona", "custom"),
+                context=context_payload,
+            )
+            context_payload["buyer_market_context"] = market_ctx
+        except Exception as ex:
+            logger.debug(f"Could not assemble buyer_market_context in graph_orchestrator: {ex}")
+
         response = buyer.respond_to_offer(offer_payload, context=context_payload)
 
         decision_type = response.get("type", "REJECT")
