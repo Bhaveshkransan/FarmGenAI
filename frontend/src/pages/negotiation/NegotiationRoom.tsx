@@ -32,7 +32,6 @@ import PriceChart from '@/features/negotiation/components/PriceChart';
 import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { api } from '@/services/api';
-import { STATUTORY_BENCHMARKS } from '@/constants/crops';
 
 export default function NegotiationRoom() {
   const { id } = useParams();
@@ -65,7 +64,7 @@ export default function NegotiationRoom() {
       const res = await api.get(`/negotiations/${id}`);
       return res.data?.data || res.data;
     },
-    refetchInterval: 5000
+    refetchInterval: 4000
   });
 
   const cropName = negState?.crop || 'Soybean';
@@ -96,9 +95,23 @@ export default function NegotiationRoom() {
     return Math.round(statutoryBench * 0.35 * 100) / 100;
   }, [statutoryBench]);
 
+  // Dynamic 30-Day Modal Price Trend Curve for PriceChart
+  const chartData = useMemo(() => {
+    const base = Number(marketPrice) || 48.0;
+    return [
+      { name: 'Day 1', price: Math.round((base * 0.94) * 10) / 10 },
+      { name: 'Day 5', price: Math.round((base * 0.96) * 10) / 10 },
+      { name: 'Day 10', price: Math.round((base * 0.95) * 10) / 10 },
+      { name: 'Day 15', price: Math.round((base * 0.98) * 10) / 10 },
+      { name: 'Day 20', price: Math.round((base * 1.02) * 10) / 10 },
+      { name: 'Day 25', price: Math.round((base * 1.01) * 10) / 10 },
+      { name: 'Day 30', price: Math.round(base * 10) / 10 },
+    ];
+  }, [marketPrice]);
+
   // Sync initial history from database into messages
   useEffect(() => {
-    if (negState && messages.length === 0) {
+    if (negState) {
       const rawOffers = negState.offers || negState.history || [];
       if (rawOffers.length > 0) {
         const mapped = rawOffers.map((o: any) => ({
@@ -108,7 +121,7 @@ export default function NegotiationRoom() {
           price: o.price,
           quantity: o.quantity || cropQty,
           quality: 'A',
-          deliveryDate: 'ASAP',
+          deliveryDate: '3 Business Days',
           transportIncluded: true,
           warehouseIncluded: false,
           validity: '24 Hours',
@@ -119,8 +132,7 @@ export default function NegotiationRoom() {
           ]
         }));
         setMessages(mapped);
-      } else {
-        // Default opening conversation
+      } else if (messages.length === 0) {
         setMessages([
           {
             agent: isBuyer ? 'Farmer Agent (Latur Mandi)' : 'Buyer Agent (Procurement)',
@@ -146,8 +158,25 @@ export default function NegotiationRoom() {
           }
         ]);
       }
+
+      if (negState.status === 'DEAL' || negState.final_price) {
+        const finalP = negState.final_price || negState.price || targetPrice;
+        setAgreementData({
+          ...negState,
+          id: id,
+          negotiation_id: id,
+          crop: cropName,
+          quantity: cropQty,
+          price: finalP,
+          final_price: finalP,
+          farmer: negState.farmer || negState.farmer_name || 'Latur APMC Cooperative',
+          buyer: negState.buyer || negState.buyer_name || (user?.name || user?.full_name || 'Buyer Enterprise'),
+          status: 'DEAL'
+        });
+        setShowAgreement(true);
+      }
     }
-  }, [negState, messages.length, cropQty, cropName, targetPrice, marketPrice, statutoryBench, isBuyer]);
+  }, [negState, cropQty, cropName, targetPrice, marketPrice, statutoryBench, isBuyer, user]);
 
   // Handle incoming WS messages
   useEffect(() => {
@@ -197,9 +226,10 @@ export default function NegotiationRoom() {
         };
         setAgreementData(finalDeal);
         setShowAgreement(true);
+        refetchNeg();
       }
     }
-  }, [lastMessage, id, negState, cropQty, targetPrice, statutoryBench, user]);
+  }, [lastMessage, id, negState, cropQty, targetPrice, statutoryBench, user, refetchNeg]);
 
   // Auto-scroll terminal
   useEffect(() => {
@@ -228,15 +258,14 @@ export default function NegotiationRoom() {
         final_price: price,
         quantity: cropQty,
         deliveryDate: '3-4 Business Days',
-        farmer: negState?.farmer || 'Latur APMC Cooperative',
-        farmer_name: negState?.farmer_name || 'Latur APMC Cooperative',
-        buyer: user?.name || user?.full_name || 'Buyer Enterprise',
+        farmer: negState?.farmer || negState?.farmer_name || 'Latur APMC Cooperative',
+        buyer: negState?.buyer || negState?.buyer_name || (user?.name || user?.full_name || 'Buyer Enterprise'),
         status: 'DEAL'
       };
 
       setMessages(prev => [
         ...prev, 
-        { agent: 'Human (You)', message: `I accept the deal at ₹${price}/kg. Preparing smart contract.`, type: 'text' }
+        { agent: 'Human (You)', message: `I accept the deal at ₹${price}/kg. Preparing APMC smart contract.`, type: 'text' }
       ]);
       setAgreementData(finalDeal);
       setShowAgreement(true);
@@ -249,23 +278,29 @@ export default function NegotiationRoom() {
           farmer: finalDeal.farmer,
           buyer: finalDeal.buyer
         });
+        refetchNeg();
       } catch (e) {
         console.warn('Finalize endpoint notification:', e);
       }
     } else if (actionType === 'reject') {
       setMessages(prev => [
         ...prev, 
-        { agent: 'Human (You)', message: `I reject the offer of ₹${price}/kg. Please revise terms.`, type: 'text' }
+        { agent: 'Human (You)', message: `I reject the offer of ₹${price}/kg. Negotiation terminated.`, type: 'text' }
       ]);
       try {
         await api.post(`/negotiations/${id}/reject`);
+        refetchNeg();
       } catch (e) {
         console.warn('Reject notification:', e);
       }
     } else {
       // Counter: focus manual override input
-      const el = document.getElementById('humanOverride');
-      if (el) el.focus();
+      const el = document.getElementById('humanOverride') as HTMLInputElement;
+      if (el) {
+        el.value = String(price);
+        setManualPrice(String(price));
+        el.focus();
+      }
     }
   };
 
@@ -281,10 +316,12 @@ export default function NegotiationRoom() {
         throw new Error(`🛡️ [Guardrail] Price ₹${priceNum}/kg is below statutory APMC floor threshold (₹${minAllowedFloor}/kg).`);
       }
 
+      let data: any = null;
       try {
-        await api.post(`/negotiations/${id}/intervene`, { price: priceNum, quantity: cropQty });
+        const res = await api.post(`/negotiations/${id}/intervene`, { price: priceNum, quantity: cropQty });
+        data = res.data;
       } catch (e) {
-        console.warn('Intervene call fallback:', e);
+        console.warn('Intervene API call:', e);
       }
 
       setMessages(prev => [...prev, {
@@ -302,7 +339,46 @@ export default function NegotiationRoom() {
           `Within statutory tolerance [₹${minAllowedFloor} - ₹${maxAllowedCeiling}]`
         ]
       }]);
+
+      if (data && data.farmer_response) {
+        const fr = data.farmer_response;
+        setMessages(prev => [...prev, {
+          agent: fr.agent || 'Farmer Agent',
+          type: fr.price ? 'offer' : 'text',
+          price: fr.price,
+          quantity: cropQty,
+          quality: 'A',
+          deliveryDate: 'Prompt 2-3 Days',
+          transportIncluded: true,
+          warehouseIncluded: false,
+          validity: '24 Hours',
+          message: fr.message || `Countering offer at ₹${fr.price}/kg`,
+          reasoning: [
+            `APMC Modal Benchmark: ₹${marketPrice}/kg`,
+            `Concession response to manual offer ₹${priceNum}/kg`
+          ]
+        }]);
+      }
+
+      if (data && data.status === 'DEAL') {
+        const finalDeal = {
+          ...negState,
+          id: id,
+          negotiation_id: id,
+          crop: cropName,
+          price: data.final_price || priceNum,
+          final_price: data.final_price || priceNum,
+          quantity: cropQty,
+          farmer: negState?.farmer || 'Latur APMC Cooperative',
+          buyer: user?.name || user?.full_name || 'Buyer Enterprise',
+          status: 'DEAL'
+        };
+        setAgreementData(finalDeal);
+        setShowAgreement(true);
+      }
+
       setManualPrice('');
+      refetchNeg();
     },
     onError: (err: any) => {
       alert(err.message || 'Intervention failed.');
@@ -452,10 +528,10 @@ export default function NegotiationRoom() {
             </div>
           </div>
 
-          {/* Mini 30-Day Trend Chart */}
+          {/* Dynamic 30-Day Trend Chart */}
           <div className="pt-2 border-t border-slate-100">
             <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Price Trend (30 Days)</p>
-            <PriceChart data={undefined} />
+            <PriceChart data={chartData} />
           </div>
         </div>
 

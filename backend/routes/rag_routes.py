@@ -4,7 +4,7 @@ backend/routes/rag_routes.py
 API endpoints for querying the RAG knowledge base.
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
-from backend.services.security import get_current_user
+from backend.services.security import get_current_user_optional
 from backend.services.rag_service import rag_service
 import asyncio
 
@@ -16,7 +16,7 @@ async def query_rag(
     collection: str = Query("market_prices", description="Collection name to query"),
     limit: int = Query(3, description="Max results"),
     crop: str = Query(None, description="Filter by crop"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user_optional)
 ):
     """Query a specific RAG collection."""
     try:
