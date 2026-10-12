@@ -72,7 +72,8 @@ async def get_my_workflow_plans(
     """Retrieve all saved workflow plans for the logged in farmer."""
     try:
         from backend.repositories.database_repo import Database
-        plans = await Database.get_workflow_plans_async(user_id=current_user["user_id"])
+        uid = current_user.get("user_id") or current_user.get("sub")
+        plans = await Database.get_workflow_plans_async(user_id=uid)
         return {"success": True, "data": plans}
     except Exception as e:
         return {"success": False, "error": str(e), "message": "Failed to retrieve workflow plans."}

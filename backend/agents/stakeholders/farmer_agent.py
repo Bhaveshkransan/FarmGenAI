@@ -15,7 +15,8 @@ from backend.agents.prompts import FARMER_PROMPT
 class FarmerValidator(AgentValidator):
     def validate(self, output: Dict[str, Any], state: Any) -> Tuple[bool, str, Dict[str, Any]]:
         decision = output.get("decision", "COUNTER").upper()
-        price = float(output.get("counter_price", state.get("latest_buyer_offer", state.get("min_price", 0.0))))
+        raw_price = output.get("price") if output.get("price") is not None else output.get("counter_price")
+        price = float(raw_price if raw_price is not None else state.get("latest_buyer_offer", state.get("min_price", 0.0)))
         message = output.get("reason", "")
         
         # Hard Rule 1: Min Price Floor

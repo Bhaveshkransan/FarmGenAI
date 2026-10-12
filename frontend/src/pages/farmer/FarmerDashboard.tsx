@@ -102,16 +102,25 @@ export default function FarmerDashboard() {
     }
   });
 
+  const { data: dashboardStats, refetch: refetchDashboard } = useQuery({
+    queryKey: ['farmer_dashboard_stats'],
+    queryFn: async () => {
+      const res = await api.get('/dashboards/farmer');
+      return res.data?.data;
+    }
+  });
+
   useEffect(() => {
     if (lastMessage) {
       if (lastMessage.event === 'NEGOTIATION_FINISHED') {
         refetchNegotiations();
         refetchListings();
+        refetchDashboard();
       } else if (lastMessage.event === 'SCENARIO_READY') {
         refetchWorkflows();
       }
     }
-  }, [lastMessage, refetchNegotiations, refetchListings, refetchWorkflows]);
+  }, [lastMessage, refetchNegotiations, refetchListings, refetchWorkflows, refetchDashboard]);
 
   const fetchMandiComparison = (lat: number, lon: number, crop: string) => {
     setMandiLoading(true);
@@ -167,7 +176,7 @@ export default function FarmerDashboard() {
           </div>
           <div className="text-right">
             <p className="text-slate-500">Trust Score</p>
-            <p className="font-bold text-emerald-600 text-lg">4.8 <span className="text-sm text-slate-400">/ 5.0</span></p>
+            <p className="font-bold text-emerald-600 text-lg">{dashboardStats?.user?.trust_score ? Number(dashboardStats.user.trust_score).toFixed(1) : '4.9'} <span className="text-sm text-slate-400">/ 5.0</span></p>
           </div>
         </div>
       </div>
@@ -182,7 +191,13 @@ export default function FarmerDashboard() {
           trend={mandiData ? `${selectedCrop} ${mandiData.best_option?.trend === 'Bullish' ? '+15%' : '-5%'}` : "Fetch Mandis"} 
           color="blue" 
         />
-        <StatCard icon={<Clock />} title="Avg. Deal Time" value="2.4 hrs" trend="-15 mins" color="purple" />
+        <StatCard 
+          icon={<Clock />} 
+          title="Deals Closed" 
+          value={dashboardStats?.negotiations?.successful ?? (negotiations?.filter((n: any) => n.status === 'DEAL')?.length || 0)} 
+          trend={dashboardStats?.earnings?.total ? `₹${dashboardStats.earnings.total.toLocaleString()} earned` : 'Active'} 
+          color="purple" 
+        />
       </div>
 
       {/* ── MandiMitra Section ── */}
@@ -664,14 +679,32 @@ export default function FarmerDashboard() {
                 </p>
               </div>
             )}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 mb-1">Recent Activity</p>
-              <p className="text-sm text-slate-700">Your latest listing was indexed and matched against 12 active buyers in your region.</p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 mb-1">Market Insight</p>
-              <p className="text-sm text-slate-700">Local processors are paying premium for Grade A {selectedCrop} this week.</p>
-            </div>
+            {dashboardStats?.recent_activity && dashboardStats.recent_activity.length > 0 ? (
+              dashboardStats.recent_activity.map((act: any, idx: number) => (
+                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xs font-semibold text-emerald-600 mb-1">{act.crop} · {act.status}</p>
+                  <p className="text-sm text-slate-700">{act.summary || `Deal finalized for ${act.quantity}kg at ₹${act.final_price}/kg`}</p>
+                </div>
+              ))
+            ) : (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Recent Activity</p>
+                <p className="text-sm text-slate-700">No past closed transactions. Active listings will sync updates here in real-time.</p>
+              </div>
+            )}
+            {mandiData && mandiData.best_option ? (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Market Insight ({selectedCrop})</p>
+                <p className="text-sm text-slate-700">
+                  Optimal dispatch target: {mandiData.best_option.mandi_name} ({mandiData.best_option.distance_km} km) with net realization of ₹{mandiData.best_option.net_realization}/kg.
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Market Intelligence</p>
+                <p className="text-sm text-slate-700">Select a district and click &apos;Find Mandis&apos; to view real-time APMC price benchmarks and transport deductions.</p>
+              </div>
+            )}
           </div>
         </div>
 

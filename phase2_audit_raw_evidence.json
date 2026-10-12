@@ -226,7 +226,7 @@
       "canonical_status": "VALID",
       "statutory_benchmark": 315.0,
       "xgboost_model_type": "XGBRegressor",
-      "xgboost_forecast": 126.0,
+      "xgboost_forecast": 3.98,
       "sample_match_score": 91.5
     },
     {
@@ -234,7 +234,7 @@
       "canonical_status": "VALID",
       "statutory_benchmark": 43.36,
       "xgboost_model_type": "XGBRegressor",
-      "xgboost_forecast": 72.31,
+      "xgboost_forecast": 72.33,
       "sample_match_score": 91.5
     },
     {
@@ -242,7 +242,7 @@
       "canonical_status": "VALID",
       "statutory_benchmark": 70.21,
       "xgboost_model_type": "XGBRegressor",
-      "xgboost_forecast": 70.69,
+      "xgboost_forecast": 70.71,
       "sample_match_score": 91.5
     },
     {
@@ -250,7 +250,7 @@
       "canonical_status": "VALID",
       "statutory_benchmark": 33.71,
       "xgboost_model_type": "XGBRegressor",
-      "xgboost_forecast": 61.63,
+      "xgboost_forecast": 61.65,
       "sample_match_score": 91.5
     },
     {
@@ -266,7 +266,7 @@
       "canonical_status": "VALID",
       "statutory_benchmark": 25.5,
       "xgboost_model_type": "XGBRegressor",
-      "xgboost_forecast": 35.4,
+      "xgboost_forecast": 34.98,
       "sample_match_score": 91.5
     },
     {
@@ -274,7 +274,7 @@
       "canonical_status": "VALID",
       "statutory_benchmark": 23.0,
       "xgboost_model_type": "XGBRegressor",
-      "xgboost_forecast": 34.45,
+      "xgboost_forecast": 34.48,
       "sample_match_score": 91.5
     }
   ],
@@ -345,9 +345,12 @@
         "market_intelligence_agent",
         "matching_agent",
         "planner_agent",
+        "processor_agent",
         "rank_responses_agent",
         "reflection_agent",
-        "validator_agent"
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
       ],
       "BUYER_ONLY": [
         "buyer_agent",
@@ -367,6 +370,7 @@
         "planner_agent",
         "rank_responses_agent",
         "reflection_agent",
+        "transport_agent",
         "validator_agent"
       ]
     },
@@ -378,9 +382,12 @@
         "market_intelligence_agent",
         "matching_agent",
         "planner_agent",
+        "processor_agent",
         "rank_responses_agent",
         "reflection_agent",
-        "validator_agent"
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
       ],
       "BUYER_ONLY": [
         "buyer_agent",
@@ -400,6 +407,7 @@
         "planner_agent",
         "rank_responses_agent",
         "reflection_agent",
+        "transport_agent",
         "validator_agent"
       ]
     },
@@ -413,6 +421,7 @@
         "planner_agent",
         "rank_responses_agent",
         "reflection_agent",
+        "transport_agent",
         "validator_agent"
       ],
       "BUYER_ONLY": [
@@ -422,6 +431,7 @@
         "planner_agent",
         "rank_responses_agent",
         "reflection_agent",
+        "transport_agent",
         "validator_agent"
       ],
       "TRANSPORT_ONLY": [
@@ -431,6 +441,7 @@
         "planner_agent",
         "rank_responses_agent",
         "reflection_agent",
+        "transport_agent",
         "validator_agent"
       ]
     },
@@ -442,18 +453,21 @@
         "market_intelligence_agent",
         "matching_agent",
         "planner_agent",
+        "processor_agent",
         "rank_responses_agent",
         "reflection_agent",
-        "validator_agent"
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
       ],
       "BUYER_ONLY": [
-        "dynamic_routing_agent",
         "market_intelligence_agent",
         "matching_agent",
         "planner_agent",
         "rank_responses_agent",
         "reflection_agent",
-        "validator_agent"
+        "validator_agent",
+        "warehouse_agent"
       ],
       "TRANSPORT_ONLY": [
         "dynamic_routing_agent",
@@ -462,7 +476,9 @@
         "planner_agent",
         "rank_responses_agent",
         "reflection_agent",
-        "validator_agent"
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
       ]
     }
   },
@@ -499,7 +515,7 @@
       "failure_simulated": "Connection Refused (Port 8001 Down)",
       "recovery_strategy": "Ephemeral in-memory vector store fallback",
       "status": "GRACEFUL_FALLBACK",
-      "heartbeat": 1790789066806390100
+      "heartbeat": 1791352182762682800
     },
     {
       "component": "Ollama / Cloud LLM",
@@ -511,12 +527,12 @@
   ],
   "concurrency_10": {
     "operations": 10,
-    "elapsed_seconds": 0.0,
+    "elapsed_seconds": 0.001,
     "ops_per_sec": 10000.0
   },
   "concurrency_50": {
     "operations": 50,
-    "elapsed_seconds": 0.001,
-    "ops_per_sec": 37019.5
+    "elapsed_seconds": 0.006,
+    "ops_per_sec": 8676.7
   }
 }

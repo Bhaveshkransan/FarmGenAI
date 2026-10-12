@@ -335,25 +335,41 @@ class NegotiationService:
         farmer_prefs = user.get("preferences", {})
         buyer_pref = str(farmer_prefs.get("buyer_preference", "any")).lower()
 
-        offers = []
-        # Use in-memory buyers (seeded by ensure_default_buyers) which have 'name', 'budget', 'target_price' etc.
-        buyer_profiles = list(self.db_repo.buyers.values())
-        # Fallback: if in-memory is empty, query DB
+        crop = payload.get("crop", "")
+        db_buyers = await self.db_repo.list_buyers_async()
+        from backend.services.matching_service import crops_match
+
+        # Filter to real buyers from DB that match this crop
+        matching_db_buyers = [
+            b for b in db_buyers
+            if b.get("crop") and crops_match(b.get("crop"), crop)
+        ]
+
+        buyer_profiles = [
+            {
+                "id": b.get("id"),
+                "name": b.get("buyer_name") or b.get("name") or "Unknown Buyer",
+                "budget": float((b.get("max_price") or b.get("target_price") or min_price * 1.2) * quantity * 1.2),
+                "max_quantity": float(b.get("quantity") or quantity),
+                "target_price": float(b.get("max_price") or b.get("target_price") or min_price * 1.2),
+                "location": b.get("location", "Market"),
+                "strategy": b.get("strategy", "standard"),
+                "crop": b.get("crop"),
+                "verified": bool(b.get("verified", True))
+            }
+            for b in matching_db_buyers
+        ]
+
         if not buyer_profiles:
-            db_buyers = await self.db_repo.list_buyers_async()
-            # Normalize DB rows to match in-memory schema
-            buyer_profiles = [
-                {
-                    "id": b.get("id"),
-                    "name": b.get("buyer_name") or b.get("name") or "Unknown Buyer",
-                    "budget": float(b.get("max_price") or b.get("budget") or min_price * quantity * 1.5),
-                    "max_quantity": float(b.get("quantity") or quantity),
-                    "target_price": float(b.get("max_price") or b.get("target_price") or min_price * 1.2),
-                    "location": b.get("location", "Market"),
-                    "strategy": b.get("strategy", "standard"),
-                }
-                for b in db_buyers
-            ]
+            # Check requirements table for requirements matching this crop
+            from backend.services.matching_service import match_listing_to_buyers
+            real_matches = await match_listing_to_buyers(payload)
+            if real_matches:
+                return real_matches
+            # Truly NO buyers matching this crop exist in the database! Return empty list
+            return []
+
+        offers = []
         for profile in buyer_profiles:
             strategy = str(profile.get("strategy") or "").lower()
             if profile.get("kind") == "offer":
@@ -363,50 +379,47 @@ class NegotiationService:
             if offered_qty <= 0:
                 continue
 
-            budget_limited_price = float(profile.get("budget", 0)) / offered_qty
-            
+            budget_limited_price = float(profile.get("budget", 0)) / max(offered_qty, 1)
+            target_p = float(profile.get("target_price", min_price))
+
             if "restaurant" in strategy or "premium" in strategy:
-                # Premium buyers start slightly higher but still below target
-                opening_bid = min(float(profile.get("target_price", min_price)) * 0.85, budget_limited_price)
+                opening_bid = min(target_p * 0.95, budget_limited_price)
             else:
-                opening_bid = min(float(profile.get("target_price", min_price)) * 0.75, budget_limited_price, (market_price + 3) * 0.75)
-                
+                base_offer = max(target_p * 0.92, min_price if target_p >= min_price else target_p * 0.88)
+                opening_bid = min(target_p, budget_limited_price, max(base_offer, 1.0))
+
             offer_price = round(max(1.0, opening_bid), 2)
             distance_penalty = 0 if profile.get("location") == location else 0.2
-            
+
             # User Preference Boost (Stakeholder Requirement C4)
             pref_boost = 15.0 if (buyer_pref in strategy and buyer_pref != "any") else 0.0
-            
-            # Verification Integrity Boost (Test I2)
+
+            # Verification Integrity Boost
             is_verified = bool(profile.get("verified", False))
             verification_weight = 20.0 if is_verified else -10.0
-            
-            is_viable = offer_price >= min_price
-            
-            # Weighted Scoring Engine (Personalized for Phase C4 + Phase I)
-            if "restaurant" in strategy:
-                score = round((offer_price - distance_penalty) * 150 + pref_boost + verification_weight + min(offered_qty, quantity) / 50, 2)
-            else:
-                score = round((offer_price - distance_penalty) * 100 + pref_boost + verification_weight + min(offered_qty, quantity) / 10, 2)
 
-            # Strategic Labelling (Test E4)
+            is_viable = offer_price >= min_price
+
+            # Real match score
+            score = round(min(98.0, max(75.0, 95.0 - (distance_penalty * 20.0) + (pref_boost / 3.0))), 1)
+
             label = "Market Option"
             if is_viable:
-                if score > 150: label = "👑 Best Profit"
+                if score > 90: label = "👑 Best Profit"
                 elif distance_penalty == 0: label = "⚡ Fast Handshake"
                 elif "restaurant" in strategy: label = "💎 Premium Match"
                 elif pref_boost > 0: label = "🎯 Strategic Fit"
 
             offers.append(
                 {
-                    "buyer_id": profile.get("id") or profile.get("buyer_id") or profile.get("user_id", "unknown"),
-                    "buyer_name": profile.get("name") or profile.get("buyer_name") or profile.get("company", "Unknown Buyer"),
+                    "buyer_id": profile.get("id") or profile.get("buyer_id") or "unknown",
+                    "buyer_name": profile.get("name") or "Unknown Buyer",
                     "location": profile.get("location", "Market"),
                     "strategy": label,
                     "offered_price": offer_price,
                     "offered_quantity": round(offered_qty, 2),
                     "budget": float(profile.get("budget", 0)),
-                    "target_price": float(profile.get("target_price", min_price)),
+                    "target_price": target_p,
                     "status": "VIABLE" if is_viable else "BELOW_MIN_PRICE",
                     "score": score,
                 }
@@ -548,6 +561,7 @@ class NegotiationService:
             "agents_involved": [farmer_display_name, buyer_display_name],
             "next_action": "Autonomous multi-round negotiation active",
             "market_offers": market_offers,
+            "active_buyers": market_offers[:3],
             "selected_buyer": selected_offer,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "transport_plan": None,
@@ -867,6 +881,7 @@ class NegotiationService:
             "next_action": row.get("next_action"),
             "final_price": row.get("final_price") or next((c.get("price") for c in self.db_repo.contracts.values() if c.get("negotiation_id") == negotiation_id), None),
             "market_offers": row.get("market_offers", []),
+            "active_buyers": row.get("active_buyers", row.get("market_offers", [])[:3]),
             "selected_buyer": row.get("selected_buyer"),
             "transport_plan": row.get("transport_plan"),
         }

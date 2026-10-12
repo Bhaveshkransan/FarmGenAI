@@ -46,7 +46,7 @@ async def _get_storage_loads() -> dict:
 
 
 async def list_warehouses():
-    loads = _get_storage_loads()
+    loads = await _get_storage_loads()
     result = []
 
     for profile in _WAREHOUSE_PROFILES:

@@ -7,7 +7,7 @@ router = APIRouter()
 
 @router.get("/list")
 async def get_warehouses(current_user: dict = Depends(get_current_user)):
-    warehouses = list_warehouses()
+    warehouses = await list_warehouses()
     total_capacity = sum(warehouse["capacity_kg"] for warehouse in warehouses)
     used_capacity = sum(warehouse["used_capacity_kg"] for warehouse in warehouses)
     return {
