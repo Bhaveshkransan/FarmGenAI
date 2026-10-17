@@ -42,6 +42,8 @@ from backend.services.negotiation_service import (
 )
 from backend.agents.transport_agent.graph import run_transport_workflow
 from backend.services.storage_service import assign_storage
+from backend.services.supply_chain_intelligence_service import supply_chain_intelligence_service
+from backend.services.negotiation_memory_service import NegotiationMemoryService
 
 try:
     from backend.websocket.agent_updates import agent_update_hub
@@ -308,7 +310,7 @@ class BuyerOrchestrationService:
         req_qty = float(requirement.get("quantity", 500.0))
         location = requirement.get("location", "Maharashtra")
         persona = requirement.get("persona") or requirement.get("buyer_persona") or "bulk_wholesaler"
-        strategy = requirement.get("strategy", "balanced")
+        strategy = requirement.get("recommended_strategy") or requirement.get("strategy") or "balanced"
 
         # 1. Instantiate Isolated BuyerAgent
         buyer_agent = BuyerAgent(
@@ -322,6 +324,11 @@ class BuyerOrchestrationService:
             persona=persona,
             crop=crop,
         )
+        if requirement.get("calibrated_opening_bid"):
+            try:
+                buyer_agent.current_bid = float(requirement["calibrated_opening_bid"])
+            except Exception:
+                pass
 
         seller_ask = float(seller.get("price") or seller.get("initial_ask") or target_p)
         seller_floor = float(seller.get("floor_price") or seller_ask * 0.85)
@@ -690,6 +697,9 @@ class BuyerOrchestrationService:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             })
 
+        # Determine market anchor
+        market_price = float(requirement.get("market_price") or target_p)
+
         # 1. Fetch Market Context (RAG, Mandi, ML)
         market_context = None
         if buyer_market_context_service:
@@ -700,8 +710,41 @@ class BuyerOrchestrationService:
                     persona=requirement.get("persona", "bulk_wholesaler"),
                     context=requirement,
                 )
+                if market_context and hasattr(market_context, "current_modal_price") and market_context.current_modal_price:
+                    market_price = float(market_context.current_modal_price)
             except Exception as e:
                 logger.warning(f"Could not build market context: {e}")
+
+        # 1b. Calibrate Adaptive Negotiation Strategy via Persistent Memory
+        buyer_id = requirement.get("user_id") or requirement.get("buyer_id") or "usr_buyer_demo"
+        try:
+            memory_strategy = await NegotiationMemoryService.calibrate_adaptive_strategy(
+                buyer_id=buyer_id,
+                crop=norm_crop,
+                target_price=target_p,
+                reservation_price=reservation_p,
+                current_market_price=market_price,
+                budget=budget,
+                quantity=req_qty,
+            )
+            requirement["recommended_strategy"] = memory_strategy.get("recommended_strategy")
+            requirement["calibrated_opening_bid"] = memory_strategy.get("calibrated_opening_bid")
+        except Exception as e:
+            logger.warning(f"Could not calibrate adaptive negotiation memory: {e}")
+            memory_strategy = {
+                "buyer_id": buyer_id,
+                "crop": norm_crop,
+                "recommended_strategy": "balanced",
+                "calibrated_opening_bid": round(target_p * 0.90, 2),
+                "memory_insights": [f"Fallback to default balanced strategy: {e}"],
+            }
+
+        # 1c. Integrated Supply-Chain Intelligence Optimization
+        sci_result = None
+        try:
+            sci_result = await supply_chain_intelligence_service.optimize_supply_chain(requirement)
+        except Exception as e:
+            logger.warning(f"Supply chain intelligence evaluation: {e}")
 
         # 2. Discover Top Candidates
         candidates = await self.get_top_candidates(requirement, max_candidates=max_candidates)
@@ -904,6 +947,26 @@ class BuyerOrchestrationService:
                 except Exception as e:
                     logger.debug(f"Inventory deduction: {e}")
 
+            # Persist in PostgreSQL negotiations table via NegotiationMemoryService
+            try:
+                await NegotiationMemoryService.persist_negotiation_record(
+                    negotiation_id=neg_id or f"neg_{uuid.uuid4().hex[:8]}",
+                    buyer_id=buyer_id,
+                    crop=norm_crop,
+                    quantity=float(winner["executable_quantity"]),
+                    farmer_name=winner["seller_name"],
+                    status="ACCEPTED",
+                    current_round=int(winner.get("rounds_count") or len(winner.get("rounds") or []) or 3),
+                    final_price=float(winner["final_price"]),
+                    market_price=market_price,
+                    min_price=float(winner.get("initial_ask", winner["final_price"]) * 0.85),
+                    logs=winner.get("rounds", []),
+                    summary=f"Deal finalized with {winner['seller_name']} at ₹{winner['final_price']:.2f}/kg ({winner['executable_quantity']}kg). Landed: ₹{winner['landed_cost_per_kg']:.2f}/kg.",
+                    transport_plan=str(sci_result.get("best_option", {}).get("selected_vehicle", {}).get("vehicle_name", "Assigned Carrier")) if sci_result else "Road Freight",
+                )
+            except Exception as e:
+                logger.debug(f"Negotiation memory deal persistence: {e}")
+
             # Broadcast finalization event
             if neg_id:
                 await _broadcast_safe({
@@ -918,6 +981,25 @@ class BuyerOrchestrationService:
         else:
             winner = None
             winner_status = "NO_EXECUTABLE_DEAL"
+
+            # Persist failed negotiation record in PostgreSQL memory
+            try:
+                await NegotiationMemoryService.persist_negotiation_record(
+                    negotiation_id=neg_id or f"neg_{uuid.uuid4().hex[:8]}",
+                    buyer_id=buyer_id,
+                    crop=norm_crop,
+                    quantity=req_qty,
+                    farmer_name="No Agreement",
+                    status="FAILED",
+                    current_round=max_rounds,
+                    final_price=None,
+                    market_price=market_price,
+                    min_price=None,
+                    logs=[{"reason": "Exceeded reservation ceiling or budget across all candidates"}],
+                    summary=f"No agreement reached below reservation ceiling ₹{reservation_p:.2f}/kg.",
+                )
+            except Exception as e:
+                logger.debug(f"Negotiation memory failure persistence: {e}")
 
         # 5b. Workflow Scope & Downstream Agent Assessment (FR-6, SRS Section 4)
         raw_mode = str(requirement.get("workflow_mode") or "SINGLE_AGENT").upper()
@@ -1106,9 +1188,11 @@ class BuyerOrchestrationService:
             "workflow_mode": workflow_mode,
             "permitted_agents": permitted_agents,
             "required_agents": required_agents,
-            "transport_assignment": transport_assignment,
-            "warehouse_assignment": warehouse_assignment,
+            "transport_assignment": (sci_result.get("best_option", {}).get("selected_vehicle") if sci_result and sci_result.get("best_option") else None) or transport_assignment,
+            "warehouse_assignment": (sci_result.get("best_option", {}).get("selected_warehouse") if sci_result and sci_result.get("best_option") else None) or warehouse_assignment,
             "processor_assignment": processor_assignment,
+            "supply_chain_intelligence": sci_result,
+            "negotiation_memory": memory_strategy,
             "chat_transcript": chat_transcript,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }

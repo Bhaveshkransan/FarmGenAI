@@ -197,14 +197,17 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
 
         # Also update status in negotiations table
         try:
-            await Database.update_negotiation_async(negotiation_id, {
+            update_data = {
                 "status": "DEAL",
                 "final_price": final_p,
                 "farmer": farmer,
                 "farmer_name": farmer
-            })
-        except Exception:
-            pass
+            }
+            if isinstance(payload, dict) and "transport_plan" in payload:
+                update_data["transport_plan"] = payload["transport_plan"]
+            await Database.update_negotiation_async(negotiation_id, update_data)
+        except Exception as update_err:
+            print("Error updating negotiation record:", update_err)
 
         # Deduct sold quantity from listing inventory if linked to a crop listing
         listing_id = (payload.get("listing_id") if isinstance(payload, dict) else None) or status_data.get("listing_id")

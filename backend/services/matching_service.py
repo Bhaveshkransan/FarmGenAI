@@ -52,18 +52,78 @@ CITY_DISTANCES_KM: Dict[str, Dict[str, float]] = {
 MAX_MATCH_DISTANCE_KM = 600.0
 
 
+MAHARASHTRA_DISTRICT_COORDS: Dict[str, tuple] = {
+    "Pune": (18.5204, 73.8567),
+    "Mumbai": (19.0760, 72.8777),
+    "Nashik": (19.9975, 73.7898),
+    "Nagpur": (21.1458, 79.0882),
+    "Thane": (19.2183, 72.9781),
+    "Kalyan": (19.2437, 73.1355),
+    "Aurangabad": (19.8762, 75.3433),
+    "Ahmednagar": (19.0948, 74.7480),
+    "Satara": (17.6805, 74.0183),
+    "Solapur": (17.6599, 75.9064),
+    "Kolhapur": (16.7050, 74.2433),
+    "Latur": (18.4088, 76.5604),
+    "Amravati": (20.9374, 77.7796),
+    "Gondia": (21.4600, 80.1900),
+    "Jalgaon": (21.0077, 75.5626),
+    "Dhule": (20.9042, 74.7749),
+    "Nanded": (19.1383, 77.3210),
+    "Sangli": (16.8524, 74.5815),
+    "Wardha": (20.7453, 78.6022),
+    "Yavatmal": (20.3888, 78.1204),
+    "Akola": (20.7002, 77.0082),
+    "Palghar": (19.6967, 72.7655),
+    "Ratnagiri": (16.9902, 73.3120),
+    "Beed": (18.9891, 75.7601),
+    "Jalna": (19.8410, 75.8864),
+    "Bhandara": (21.1667, 79.6500),
+    "Dharashiv": (18.1856, 76.0420),
+    "Osmanabad": (18.1856, 76.0420)
+}
+
+def extract_maharashtra_district(loc: str) -> str:
+    if not loc:
+        return ""
+    loc_lower = str(loc).lower()
+    for d in MAHARASHTRA_DISTRICT_COORDS:
+        if d.lower() in loc_lower:
+            return d
+    return str(loc).strip().title()
+
 def get_distance_km_sync(loc_a: str, loc_b: str) -> float:
-    """Synchronous distance calculation between two city locations."""
+    """Synchronous distance calculation between two city locations with intelligent district extraction and haversine road fallback."""
     if not loc_a or not loc_b:
         return 150.0
     if loc_a == loc_b:
         return 0.0
-    a = loc_a.strip()
-    b = loc_b.strip()
-    dist = CITY_DISTANCES_KM.get(a, {}).get(b)
+    da = extract_maharashtra_district(loc_a)
+    db = extract_maharashtra_district(loc_b)
+    if da and db and da.lower() == db.lower():
+        return 15.0  # Same district cluster / local APMC mandi transit
+    
+    # 1. Lookup in predefined road distance matrix
+    dist = CITY_DISTANCES_KM.get(da, {}).get(db)
     if dist is None:
-        dist = CITY_DISTANCES_KM.get(b, {}).get(a)
-    return dist if dist is not None else 250.0  # default
+        dist = CITY_DISTANCES_KM.get(db, {}).get(da)
+    if dist is not None:
+        return dist
+        
+    # 2. Highway road approximation via coordinates (1.25x road detour multiplier)
+    ca = MAHARASHTRA_DISTRICT_COORDS.get(da)
+    cb = MAHARASHTRA_DISTRICT_COORDS.get(db)
+    if ca and cb:
+        import math
+        lat1, lon1 = math.radians(ca[0]), math.radians(ca[1])
+        lat2, lon2 = math.radians(cb[0]), math.radians(cb[1])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a_val = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c_val = 2 * math.asin(math.sqrt(a_val))
+        return round(6371.0 * c_val * 1.25, 1)
+
+    return 250.0  # default
 
 
 async def _get_distance_km(loc_a: str, loc_b: str) -> float:

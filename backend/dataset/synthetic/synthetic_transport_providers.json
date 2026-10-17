@@ -1,0 +1,30 @@
+[
+  {
+    "id": "synth_tp_mahalogistics_01",
+    "name": "MahaExpress Logistics Fleet",
+    "rating": 4.85,
+    "rel": 0.96,
+    "phone": "+91-9822100201"
+  },
+  {
+    "id": "synth_tp_sahyadri_02",
+    "name": "Sahyadri Rural Agri Transport Co",
+    "rating": 4.7,
+    "rel": 0.94,
+    "phone": "+91-9822100202"
+  },
+  {
+    "id": "synth_tp_vidarbha_03",
+    "name": "Vidarbha Heavy Haulers",
+    "rating": 4.9,
+    "rel": 0.98,
+    "phone": "+91-9822100203"
+  },
+  {
+    "id": "synth_tp_godavari_04",
+    "name": "Godavari Reefer & Cold Chain Express",
+    "rating": 4.95,
+    "rel": 0.99,
+    "phone": "+91-9822100204"
+  }
+]
