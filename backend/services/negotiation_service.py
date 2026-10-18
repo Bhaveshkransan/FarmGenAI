@@ -566,6 +566,10 @@ class NegotiationService:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "transport_plan": None,
             "workflow_mode": payload.get("workflow_mode", "FULL_SUPPLY_CHAIN"),
+            "selected_services": payload.get("selected_services") or {},
+            "district": payload.get("district"),
+            "location": payload.get("location") or payload.get("buyer_location"),
+            "buyer_location": payload.get("buyer_location") or payload.get("location"),
             "permitted_agents": payload.get("permitted_agents", ["buyer_agent", "dynamic_routing_agent"]),
             "has_transport": bool(payload.get("has_transport", False)),
             "has_storage": bool(payload.get("has_storage", False)),
@@ -846,6 +850,20 @@ class NegotiationService:
             res = dict(self.active_negotiations[negotiation_id])
             if offers:
                 res["offers"] = offers
+            try:
+                row = await self.db_repo.get_negotiation_async(negotiation_id)
+                if row:
+                    if row.get("transport_plan"):
+                        res["transport_plan"] = row.get("transport_plan")
+                    if row.get("status") in ("DEAL", "ACCEPTED", "FAILED", "CANCELLED"):
+                        res["status"] = row.get("status")
+                    if row.get("final_price"):
+                        res["final_price"] = row.get("final_price")
+                    if row.get("farmer_name"):
+                        res["farmer_name"] = row.get("farmer_name")
+                        res["farmer"] = row.get("farmer_name")
+            except Exception:
+                pass
             return res
 
         row = await self.db_repo.get_negotiation_async(negotiation_id)
@@ -884,6 +902,11 @@ class NegotiationService:
             "active_buyers": row.get("active_buyers", row.get("market_offers", [])[:3]),
             "selected_buyer": row.get("selected_buyer"),
             "transport_plan": row.get("transport_plan"),
+            "workflow_mode": row.get("workflow_mode") or "FULL_SUPPLY_CHAIN",
+            "selected_services": row.get("selected_services") or {},
+            "district": row.get("district") or (selected_b.get("district") if isinstance(selected_b, dict) else None),
+            "location": row.get("location") or (selected_b.get("location") if isinstance(selected_b, dict) else None),
+            "buyer_location": row.get("buyer_location") or (selected_b.get("location") if isinstance(selected_b, dict) else None),
         }
 
     async def list_agents(self):

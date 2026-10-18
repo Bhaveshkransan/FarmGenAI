@@ -195,7 +195,7 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
         except Exception:
             pass
 
-        # Also update status in negotiations table
+        # Also update status in negotiations table and memory controller
         try:
             update_data = {
                 "status": "DEAL",
@@ -206,6 +206,10 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
             if isinstance(payload, dict) and "transport_plan" in payload:
                 update_data["transport_plan"] = payload["transport_plan"]
             await Database.update_negotiation_async(negotiation_id, update_data)
+
+            for nid in (negotiation_id, f"neg_{negotiation_id}", negotiation_id.replace("neg_", "")):
+                if nid in controller.active_negotiations:
+                    controller.active_negotiations[nid].update(update_data)
         except Exception as update_err:
             print("Error updating negotiation record:", update_err)
 

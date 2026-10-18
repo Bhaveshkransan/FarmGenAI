@@ -204,7 +204,16 @@ export default function NegotiationRoom() {
   const targetPrice = Number(negState?.expected_price || negState?.target_price || 51);
   const farmerName = negState?.farmer_name || negState?.farmer || 'Maharashtra Producer';
   const buyerName = negState?.buyer_name || negState?.buyer || user?.name || 'Buyer Enterprise';
-  const farmerLocation = negState?.farmer_location || negState?.location || 'Latur APMC, Maharashtra';
+  // Dynamic APMC district origin fallback (Requirement 7: dynamic origin based on actual district)
+  const resolvedDistrict = useMemo(() => {
+    const raw = negState?.district || negState?.buyer_district || 
+      (typeof negState?.buyer_location === 'string' ? negState.buyer_location.split(',')[0].trim() : '') ||
+      (typeof negState?.location === 'string' && !negState.location.includes('APMC') ? negState.location.split(',')[0].trim() : '');
+    return raw || '';
+  }, [negState]);
+
+  const defaultApmcOrigin = resolvedDistrict ? `${resolvedDistrict} APMC, Maharashtra` : 'Latur APMC, Maharashtra';
+  const farmerLocation = negState?.farmer_location || (negState?.location && negState.location.includes('APMC') ? negState.location : defaultApmcOrigin);
   const bestOfferPrice = Number(negState?.final_price || negState?.current_offer || negState?.price || targetPrice * 1.04);
   const marketPrice = Number(negState?.market_price || Math.round(targetPrice * 1.02 * 10) / 10);
   const activeStakeholder = (isBuyer ? 'BUYER' : 'FARMER');
@@ -265,7 +274,7 @@ export default function NegotiationRoom() {
             status: 'DEAL',
             agreedPrice: Number(negState.final_price || negState.price),
             counterParty: negState.farmer_name || negState.farmer || 'Maharashtra Producer',
-            location: negState.location || negState.farmer_location || 'Latur APMC, Maharashtra',
+            location: negState.location || negState.farmer_location || defaultApmcOrigin,
             lotSize: Number(negState.quantity || cropQty),
             messages: [],
             timestamp: 'Persisted in DB',
@@ -281,9 +290,9 @@ export default function NegotiationRoom() {
               phase: 'TRANSPORT',
               title: 'Inbound Freight Logistics',
               status: 'DEAL',
-              agreedPrice: Number(tp.agreed_freight || tp.final_cost || tp.freight || 7200),
-              counterParty: tp.vehicle_name || tp.vehicle || 'Assigned Logistics Carrier',
-              location: `${tp.origin || 'Latur APMC'} -> ${tp.destination || 'Pune Hub'}`,
+              agreedPrice: Number(tp.agreed_freight || tp.final_cost || tp.freight || tp.cost || 7200),
+              counterParty: tp.vehicle_name || tp.vehicle || tp.agent || 'Assigned Logistics Carrier',
+              location: `${tp.origin || defaultApmcOrigin} -> ${tp.destination || 'Pune Hub'}`,
               lotSize: cropQty,
               details: tp,
               messages: [],
@@ -510,7 +519,7 @@ export default function NegotiationRoom() {
 
   // Route & Transit Calculation
   const transitRoute = useMemo(() => {
-    const origin = completedPhases['FARMER']?.location || farmerLocation || 'Latur APMC, Maharashtra';
+    const origin = completedPhases['FARMER']?.location || farmerLocation || defaultApmcOrigin;
     const destination = 'Pune Agro-Industrial Complex, Hadapsar';
     let distanceKm = 285;
     const oLower = origin.toLowerCase();
@@ -521,6 +530,12 @@ export default function NegotiationRoom() {
     else if (oLower.includes('akola')) distanceKm = 480;
     else if (oLower.includes('ahmednagar')) distanceKm = 125;
     else if (oLower.includes('kolhapur')) distanceKm = 230;
+    else if (oLower.includes('solapur')) distanceKm = 250;
+    else if (oLower.includes('nagpur')) distanceKm = 710;
+    else if (oLower.includes('amravati')) distanceKm = 570;
+    else if (oLower.includes('satara')) distanceKm = 110;
+    else if (oLower.includes('sangli')) distanceKm = 230;
+    else if (oLower.includes('pune')) distanceKm = 35;
 
     return {
       origin,
