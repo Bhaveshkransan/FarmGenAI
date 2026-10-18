@@ -105,6 +105,8 @@ class DBNegotiation(Base):
     summary: Mapped[str] = mapped_column(nullable=True)
     final_price: Mapped[float] = mapped_column(nullable=True)
     transport_plan: Mapped[str] = mapped_column(nullable=True)
+    warehouse_plan: Mapped[str] = mapped_column(nullable=True)
+    processor_plan: Mapped[str] = mapped_column(nullable=True)
     peer_node: Mapped[str] = mapped_column(nullable=True)
     logs: Mapped[list] = mapped_column(type_=JSON, nullable=True)
     market_offers: Mapped[list] = mapped_column(type_=JSON, nullable=True)

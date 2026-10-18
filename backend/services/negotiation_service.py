@@ -663,67 +663,79 @@ class NegotiationService:
                 agents_involved.append("CompostAgent")
 
             buyer_loc = selected_offer.get("location", "Market") if selected_offer else "Market"
-            if farmer.location != buyer_loc:
-                from backend.services.matching_service import get_distance_km_sync
-                dist = get_distance_km_sync(farmer.location, buyer_loc)
-                if not dist or dist <= 0 or dist == 150.0:
-                    c_lower = str(payload.get("crop", "")).lower()
-                    if "soy" in c_lower: dist = 320.0
-                    elif "cotton" in c_lower or "kapas" in c_lower: dist = 250.0
-                    elif "onion" in c_lower: dist = 215.0
-                    elif "jowar" in c_lower: dist = 245.0
-                    elif "bajra" in c_lower: dist = 115.0
-                    elif "rice" in c_lower or "paddy" in c_lower: dist = 160.0
-                    elif "sugar" in c_lower: dist = 195.0
-                    elif "wheat" in c_lower: dist = 340.0
-                    else: dist = 230.0
+            qty_val = float(payload.get("quantity", 2500))
+            norm_crop = payload.get("crop", "Produce")
+            is_reefer = norm_crop.lower() in {"tomato", "strawberry", "grape", "banana", "mango"} or "onion" in norm_crop.lower()
 
-                qty_val = float(payload.get("quantity", 2500))
-                if "onion" in str(payload.get("crop", "")).lower() or "tomato" in str(payload.get("crop", "")).lower():
-                    veh_name = "Kisan ColdChain Reefer 4MT"
-                    v_type = "Refrigerated Truck"
-                    r_km = 32.0
-                elif qty_val <= 1500:
-                    veh_name = "Tata Ace Gold"
-                    v_type = "Mini Truck"
-                    r_km = 16.0
-                elif qty_val <= 3500:
-                    veh_name = "Mahindra Bolero Maxi Truck"
-                    v_type = "LCV"
-                    r_km = 24.0
-                elif qty_val <= 10000:
-                    veh_name = "Eicher Pro 2059"
-                    v_type = "Medium Truck"
-                    r_km = 36.0
+            try:
+                from backend.services.vehicle_service import filter_suitable_vehicles
+                from backend.services.routing_service import calculate_transport_route
+                from backend.services.transport_cost_service import calculate_transportation_cost
+                
+                route_res = calculate_transport_route(farmer.location, buyer_loc)
+                dist = float(route_res.get("distance_km", 250.0))
+                dur_h = float(route_res.get("estimated_duration_hours", 4.0))
+                
+                veh_filter = await filter_suitable_vehicles(
+                    quantity_kg=qty_val,
+                    refrigerated_required=is_reefer
+                )
+                best_v = veh_filter.get("best_vehicle")
+                if not best_v and veh_filter.get("candidates"):
+                    best_v = veh_filter["candidates"][0]
+                
+                if best_v:
+                    cost_res = await calculate_transportation_cost(
+                        vehicle=best_v,
+                        distance_km=dist,
+                        estimated_duration_hours=dur_h,
+                        deadhead_km=float(route_res.get("deadhead_km", 0.0)),
+                        is_perishable=is_reefer
+                    )
+                    cost = round(float(cost_res.get("agreed_price") or cost_res.get("minimum_acceptable_price") or cost_res.get("initial_quote") or (dist * 28.0)))
+                    transport_plan = {
+                        "agent": best_v["vehicle_name"],
+                        "vehicle_name": best_v["vehicle_name"],
+                        "vehicle_type": best_v["vehicle_type"],
+                        "vehicle_id": best_v.get("vehicle_id"),
+                        "cost": cost,
+                        "agreed_freight": cost,
+                        "distance": dist,
+                        "distance_km": dist,
+                        "estimated_duration_hours": dur_h,
+                        "capacity": best_v["capacity_kg"],
+                        "capacity_kg": best_v["capacity_kg"],
+                        "fuel_type": best_v.get("fuel_type", "Diesel"),
+                        "refrigerated": best_v.get("refrigerated", False),
+                        "cost_breakdown": cost_res.get("cost_breakdown", {}),
+                        "origin": farmer.location,
+                        "destination": buyer_loc,
+                        "routing_source": route_res.get("routing_source", "OSRM Live Routing Engine")
+                    }
                 else:
-                    veh_name = "BharatBenz 2823C Multi-Axle"
-                    v_type = "Heavy Commercial Vehicle"
-                    r_km = 52.0
-
-                cost = round(dist * r_km)
+                    transport_plan = {
+                        "status": "INFEASIBLE",
+                        "message": f"No vehicle available matching {qty_val:,.0f}kg payload capacity.",
+                        "rejected_vehicles": veh_filter.get("rejected_vehicles", []),
+                        "origin": farmer.location,
+                        "destination": buyer_loc
+                    }
+            except Exception as tp_err:
+                from backend.services.matching_service import get_distance_km_sync
+                dist = get_distance_km_sync(farmer.location, buyer_loc) or 250.0
+                rate = 32.0 if is_reefer else 24.0
+                cost = round(dist * rate)
                 transport_plan = {
-                    "agent": veh_name,
-                    "vehicle_name": veh_name,
-                    "vehicle_type": v_type,
+                    "agent": "Assigned Carrier",
+                    "vehicle_name": "Agro Haulage Carrier",
+                    "vehicle_type": "Medium Commercial Truck",
                     "cost": cost,
                     "agreed_freight": cost,
                     "distance": dist,
                     "distance_km": dist,
-                    "capacity": transporter.vehicle_capacity,
+                    "capacity": max(qty_val, 5000),
                     "origin": farmer.location,
-                    "destination": buyer_loc
-                }
-            else:
-                transport_plan = {
-                    "agent": "Tata Ace Gold (Local APMC Drayage)",
-                    "vehicle_name": "Tata Ace Gold",
-                    "vehicle_type": "Mini Truck",
-                    "base_fee": transporter.base_fee,
-                    "cost": transporter.base_fee,
-                    "agreed_freight": transporter.base_fee,
-                    "distance": 15.0,
-                    "distance_km": 15.0,
-                    "capacity": transporter.vehicle_capacity,
+                    "destination": buyer_loc,
                 }
 
             for idx, event in enumerate(manager.memory.get_offers(), start=2):
@@ -902,6 +914,10 @@ class NegotiationService:
                 if row:
                     if row.get("transport_plan"):
                         res["transport_plan"] = row.get("transport_plan")
+                    if row.get("warehouse_plan"):
+                        res["warehouse_plan"] = row.get("warehouse_plan")
+                    if row.get("processor_plan"):
+                        res["processor_plan"] = row.get("processor_plan")
                     if row.get("status") in ("DEAL", "ACCEPTED", "FAILED", "CANCELLED"):
                         res["status"] = row.get("status")
                     if row.get("final_price"):
@@ -949,6 +965,8 @@ class NegotiationService:
             "active_buyers": row.get("active_buyers", row.get("market_offers", [])[:3]),
             "selected_buyer": row.get("selected_buyer"),
             "transport_plan": row.get("transport_plan"),
+            "warehouse_plan": row.get("warehouse_plan"),
+            "processor_plan": row.get("processor_plan"),
             "workflow_mode": row.get("workflow_mode") or "FULL_SUPPLY_CHAIN",
             "selected_services": row.get("selected_services") or {},
             "district": row.get("district") or (selected_b.get("district") if isinstance(selected_b, dict) else None),

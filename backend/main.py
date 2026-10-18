@@ -193,6 +193,7 @@ app.include_router(transport_router, prefix="/api/v1/transport", tags=["Transpor
 
 # Processors
 app.include_router(processor_router, prefix="/api/v1/processors", tags=["Processor"])
+app.include_router(processor_router, prefix="/api/v1/processor", tags=["Processor"])
 
 # Dashboards
 app.include_router(dashboard_router, prefix="/api/v1/dashboards", tags=["Dashboard"])

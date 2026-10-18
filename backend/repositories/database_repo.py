@@ -432,6 +432,12 @@ class Database:
                         "summary": db_neg.summary,
                         "final_price": db_neg.final_price,
                         "transport_plan": db_neg.transport_plan,
+                        "warehouse_plan": getattr(db_neg, "warehouse_plan", None),
+                        "processor_plan": getattr(db_neg, "processor_plan", None),
+                        "workflow_mode": getattr(db_neg, "workflow_mode", None),
+                        "district": getattr(db_neg, "district", None),
+                        "location": getattr(db_neg, "location", None),
+                        "buyer_name": getattr(db_neg, "buyer_name", None),
                         "peer_node": db_neg.peer_node,
                         "listing_id": getattr(db_neg, "listing_id", None),
                         "logs": db_neg.logs or [],
@@ -508,6 +514,18 @@ class Database:
                         import json
                         tp = json.dumps(tp)
                     db_neg.transport_plan = tp
+                if "warehouse_plan" in payload:
+                    wp = payload["warehouse_plan"]
+                    if isinstance(wp, dict):
+                        import json
+                        wp = json.dumps(wp)
+                    db_neg.warehouse_plan = wp
+                if "processor_plan" in payload:
+                    pp = payload["processor_plan"]
+                    if isinstance(pp, dict):
+                        import json
+                        pp = json.dumps(pp)
+                    db_neg.processor_plan = pp
                 if "peer_node" in payload: db_neg.peer_node = payload["peer_node"]
                 if "logs" in payload: db_neg.logs = payload["logs"]
                 if "market_offers" in payload: db_neg.market_offers = payload["market_offers"]

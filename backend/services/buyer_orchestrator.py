@@ -305,6 +305,7 @@ class BuyerOrchestrationService:
         crop = requirement.get("crop") or "Soybean"
         buyer_name = requirement.get("buyer_name", "Procurement Buyer")
         budget = float(requirement.get("budget", 1000000.0))
+        min_batch = float(requirement.get("min_batch_size") or requirement.get("min_purchase_quantity") or requirement.get("min_sale_quantity") or 0.0)
         target_p = float(requirement.get("target_price") or requirement.get("max_price") or 50.0)
         max_price = float(requirement.get("max_price") or requirement.get("reservation_price") or target_p * 1.20)
         req_qty = float(requirement.get("quantity", 500.0))
@@ -656,6 +657,7 @@ class BuyerOrchestrationService:
         neg_id = negotiation_id or requirement.get("negotiation_id") or requirement.get("id")
         crop = requirement.get("crop") or "Soybean"
         norm_crop = normalize_crop_name(crop) or crop or "Soybean"
+        min_batch = float(requirement.get("min_batch_size") or requirement.get("min_purchase_quantity") or requirement.get("min_sale_quantity") or 0.0)
 
         # Strict crop allowlist validation
         if not is_supported_buyer_crop(norm_crop):
@@ -746,11 +748,32 @@ class BuyerOrchestrationService:
         except Exception as e:
             logger.warning(f"Supply chain intelligence evaluation: {e}")
 
-        # 2. Discover Top Candidates
-        candidates = await self.get_top_candidates(requirement, max_candidates=max_candidates)
-        candidate_count = len(candidates)
+        # 2. Discover Top Candidates (or Bypass Produce Phase if not requested)
+        raw_mode = str(requirement.get("workflow_mode") or "SINGLE_AGENT").upper()
+        selected_services = requirement.get("selected_services") or {}
+        has_sel_srv = isinstance(selected_services, dict) and bool(selected_services)
+        run_farmer_matching = True
+        if has_sel_srv:
+            if "farmer_matching" in selected_services and not selected_services["farmer_matching"]:
+                run_farmer_matching = False
+            elif "produce" in selected_services and not selected_services["produce"]:
+                run_farmer_matching = False
+        if raw_mode == "TRANSPORT_ONLY":
+            run_farmer_matching = False
 
-        if candidate_count == 0:
+        if run_farmer_matching:
+            candidates = await self.get_top_candidates(requirement, max_candidates=max_candidates)
+            candidate_count = len(candidates)
+        else:
+            candidates = []
+            candidate_count = 0
+
+        has_downstream = (
+            (selected_services.get("transport") or selected_services.get("warehouse") or selected_services.get("processor"))
+            if has_sel_srv else (raw_mode in ("FULL", "FULL_SUPPLY_CHAIN", "SUPPLY_CHAIN", "TRANSPORT_ONLY"))
+        )
+
+        if candidate_count == 0 and not has_downstream:
             return {
                 "orchestration_id": orch_id,
                 "requirement": requirement,
@@ -763,243 +786,249 @@ class BuyerOrchestrationService:
                 "chat_transcript": f"System: No active seller listings found for {norm_crop}.",
             }
 
-        # Broadcast Step 2: Discovery & Selection of Top 5
-        if neg_id:
-            await _broadcast_safe({
-                "event": "TOP5_DISCOVERY",
-                "negotiation_id": neg_id,
-                "step": "DISCOVERING FARMERS",
-                "candidate_count": candidate_count,
-                "candidates": [
-                    {
-                        "index": idx,
-                        "name": c["name"],
-                        "location": c["location"],
-                        "distance_km": c["distance_km"],
-                        "initial_ask": c["price"],
-                        "negotiated_price": c["price"],
-                        "freight_per_kg": round((max(650.0, c["distance_km"] * 6.50 + req_qty * 0.35)) / max(1.0, req_qty), 2),
-                        "landed_cost_per_kg": round(c["price"] + ((max(650.0, c["distance_km"] * 6.50 + req_qty * 0.35)) / max(1.0, req_qty)) + (c["price"] * 0.01), 2),
-                        "match_score": c.get("match_score", 90.0),
-                        "round": 1,
-                        "status": "Discovered",
-                        "is_best": False,
-                    }
-                    for idx, c in enumerate(candidates)
-                ],
-                "message": f"Found {candidate_count} eligible candidate farmers across Maharashtra APMC mandis. Starting concurrent negotiations in parallel...",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
-            await asyncio.sleep(0.3)
-
-        # 2b. Initialize Concurrent Budget Tracker
-        budget_tracker = BudgetReservationTracker(budget)
-
-        # 3. Launch Parallel Isolated Negotiations
-        tasks = [
-            self._negotiate_single_seller_branch(
-                seller=c,
-                requirement=requirement,
-                market_context=market_context,
-                max_rounds=max_rounds,
-                branch_idx=idx,
-                negotiation_id=neg_id,
-                budget_tracker=budget_tracker,
-            )
-            for idx, c in enumerate(candidates)
-        ]
-        negotiation_results = await asyncio.gather(*tasks, return_exceptions=False)
-
-        # 4. Filter & Validate Executable Deals
-        executable_deals = [n for n in negotiation_results if n.get("is_valid_deal")]
-
-        # Broadcast Step 4: Deal Evaluation
-        if neg_id:
-            await _broadcast_safe({
-                "event": "TOP5_EVALUATION",
-                "negotiation_id": neg_id,
-                "step": "EVALUATING DEALS",
-                "candidate_count": candidate_count,
-                "executable_deals_count": len(executable_deals),
-                "message": f"All {candidate_count} parallel negotiations completed. Found {len(executable_deals)} executable deals satisfying reservation ceiling (₹{reservation_p:.2f}/kg) and budget.",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
-            await asyncio.sleep(0.3)
-
-        # 5. Rank Valid Deals by Landed Cost & Revalidate Listing Freshness
-        winner = None
-        min_batch = float(requirement.get("min_batch_size") or requirement.get("min_purchase_quantity") or requirement.get("min_sale_quantity") or 0.0)
-
-        if executable_deals:
-            executable_deals.sort(key=lambda d: (d["landed_cost_per_kg"], -d["match_score"]))
-
-            # Revalidate produce listing freshness & availability from Database
-            for candidate_deal in executable_deals:
-                listing_id = candidate_deal.get("seller_id") or candidate_deal.get("id")
-                is_fresh = True
-                if listing_id:
-                    fresh_produce = await Database.get_produce_async(listing_id)
-                    if fresh_produce:
-                        st = str(fresh_produce.get("status", "")).upper()
-                        avail_q = float(fresh_produce.get("quantity") or 0.0)
-                        if st not in ("ACTIVE", "AVAILABLE"):
-                            is_fresh = False
-                            candidate_deal["is_valid_deal"] = False
-                            candidate_deal["rejection_reason"] = f"Listing {listing_id} is no longer active (status: {st})."
-                        elif avail_q < float(candidate_deal["executable_quantity"]):
-                            is_fresh = False
-                            candidate_deal["is_valid_deal"] = False
-                            candidate_deal["rejection_reason"] = f"Listing {listing_id} inventory depleted: requested {candidate_deal['executable_quantity']}kg, available {avail_q}kg."
-
-                if is_fresh:
-                    winner = candidate_deal
-                    break
-
-        if winner:
-            winner["is_winner"] = True
-            winner_status = "DEAL_SELECTED"
-
-            # Strict quantity allocation lifecycle
-            allocated_qty = float(winner["executable_quantity"])
-            remaining_qty = round(max(0.0, req_qty - allocated_qty), 2)
-            winner["requested_quantity"] = req_qty
-            winner["allocated_quantity"] = allocated_qty
-            winner["remaining_quantity"] = remaining_qty
-            winner["min_purchase_quantity"] = min_batch
-
-            # Commit budget in tracker
-            await budget_tracker.commit(winner.get("branch_index", 0), float(winner["total_landed_cost"]))
-
-            # 5a. Automatic Deal Finalization (Transaction ID & SHA-256 Digital Contract Hash)
-            txn_id = f"TXN-MH-2026-{uuid.uuid4().hex[:8].upper()}"
-            idempotency_key = hashlib.sha256(
-                f"{neg_id}:{winner.get('seller_id')}:{winner['final_price']}:{winner['executable_quantity']}".encode()
-            ).hexdigest()
-            raw_hash_input = f"{txn_id}:{norm_crop}:{winner['executable_quantity']}:{winner['final_price']}:{datetime.now(timezone.utc).isoformat()}"
-            contract_hash = "0x" + hashlib.sha256(raw_hash_input.encode()).hexdigest()
-
-            txn_record = {
-                "transaction_id": txn_id,
-                "negotiation_id": neg_id or f"neg_{uuid.uuid4().hex[:8]}",
-                "status": "COMPLETED",
-                "crop": norm_crop,
-                "quantity": winner["executable_quantity"],
-                "requested_quantity": req_qty,
-                "allocated_quantity": allocated_qty,
-                "remaining_quantity": remaining_qty,
-                "final_price": winner["final_price"],
-                "freight_per_kg": winner["freight_per_kg"],
-                "apmc_cess_per_kg": winner["apmc_cess_per_kg"],
-                "landed_cost_per_kg": winner["landed_cost_per_kg"],
-                "total_value": round(float(winner["final_price"]) * float(winner["executable_quantity"]), 2),
-                "total_landed_cost": winner["total_landed_cost"],
-                "contract_hash": contract_hash,
-                "idempotency_key": idempotency_key,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "framework": "Maharashtra APMC Model Act Compliant Electronic Trade",
-                "seller_name": winner["seller_name"],
-                "buyer_name": requirement.get("buyer_name", "Procurement Buyer"),
-            }
-            winner["transaction_id"] = txn_id
-            winner["contract_hash"] = contract_hash
-            winner["idempotency_key"] = idempotency_key
-            winner["transaction_record"] = txn_record
-
-            # Persist in Database history
-            user_id = requirement.get("user_id") or requirement.get("buyer_id")
-            try:
-                hist_payload = {
-                    "type": "DEAL_FINALIZED",
-                    "transaction_id": txn_id,
-                    "negotiation_id": neg_id,
-                    "crop": norm_crop,
-                    "quantity": winner["executable_quantity"],
-                    "final_price": winner["final_price"],
-                    "status": "SETTLED",
-                    "summary": f"Autonomous deal finalized for {winner['executable_quantity']}kg {norm_crop} at ₹{winner['final_price']}/kg.",
-                    "details": txn_record
-                }
-                if user_id:
-                    await Database.add_history_async(user_id, hist_payload)
-                await Database.add_history_async("all", hist_payload)
-            except Exception as e:
-                logger.debug(f"Database history recording: {e}")
-
-            # Update negotiation status if neg_id exists
-            if neg_id:
-                try:
-                    await Database.update_negotiation_async(neg_id, {
-                        "status": "DEAL",
-                        "final_price": winner["final_price"],
-                        "seller_name": winner["seller_name"],
-                        "transaction_id": txn_id,
-                        "contract_hash": contract_hash,
-                        "idempotency_key": idempotency_key,
-                    })
-                except Exception as e:
-                    logger.debug(f"Negotiation status update: {e}")
-
-            # Deduct listing inventory if linked to produce listing
-            listing_id = winner.get("seller_id") or winner.get("id")
-            if listing_id:
-                try:
-                    await Database.deduct_produce_inventory_async(listing_id, float(winner["executable_quantity"]))
-                except Exception as e:
-                    logger.debug(f"Inventory deduction: {e}")
-
-            # Persist in PostgreSQL negotiations table via NegotiationMemoryService
-            try:
-                await NegotiationMemoryService.persist_negotiation_record(
-                    negotiation_id=neg_id or f"neg_{uuid.uuid4().hex[:8]}",
-                    buyer_id=buyer_id,
-                    crop=norm_crop,
-                    quantity=float(winner["executable_quantity"]),
-                    farmer_name=winner["seller_name"],
-                    status="ACCEPTED",
-                    current_round=int(winner.get("rounds_count") or len(winner.get("rounds") or []) or 3),
-                    final_price=float(winner["final_price"]),
-                    market_price=market_price,
-                    min_price=float(winner.get("initial_ask", winner["final_price"]) * 0.85),
-                    logs=winner.get("rounds", []),
-                    summary=f"Deal finalized with {winner['seller_name']} at ₹{winner['final_price']:.2f}/kg ({winner['executable_quantity']}kg). Landed: ₹{winner['landed_cost_per_kg']:.2f}/kg.",
-                    transport_plan=str(sci_result.get("best_option", {}).get("selected_vehicle", {}).get("vehicle_name", "Assigned Carrier")) if sci_result else "Road Freight",
-                )
-            except Exception as e:
-                logger.debug(f"Negotiation memory deal persistence: {e}")
-
-            # Broadcast finalization event
+        if candidate_count == 0:
+            negotiation_results = []
+            executable_deals = []
+            winner = None
+            winner_status = "PRODUCE_BYPASSED" if not run_farmer_matching else "NO_ELIGIBLE_FARMERS"
+        else:
+                # Broadcast Step 2: Discovery & Selection of Top 5
             if neg_id:
                 await _broadcast_safe({
-                    "event": "TOP5_DEAL_FINALIZED",
+                    "event": "TOP5_DISCOVERY",
                     "negotiation_id": neg_id,
-                    "transaction_id": txn_id,
-                    "contract_hash": contract_hash,
-                    "winner": winner,
-                    "message": f"🏆 Deal officially finalized with {winner['seller_name']}. Transaction ID: {txn_id}.",
+                    "step": "DISCOVERING FARMERS",
+                    "candidate_count": candidate_count,
+                    "candidates": [
+                        {
+                            "index": idx,
+                            "name": c["name"],
+                            "location": c["location"],
+                            "distance_km": c["distance_km"],
+                            "initial_ask": c["price"],
+                            "negotiated_price": c["price"],
+                            "freight_per_kg": round((max(650.0, c["distance_km"] * 6.50 + req_qty * 0.35)) / max(1.0, req_qty), 2),
+                            "landed_cost_per_kg": round(c["price"] + ((max(650.0, c["distance_km"] * 6.50 + req_qty * 0.35)) / max(1.0, req_qty)) + (c["price"] * 0.01), 2),
+                            "match_score": c.get("match_score", 90.0),
+                            "round": 1,
+                            "status": "Discovered",
+                            "is_best": False,
+                        }
+                        for idx, c in enumerate(candidates)
+                    ],
+                    "message": f"Found {candidate_count} eligible candidate farmers across Maharashtra APMC mandis. Starting concurrent negotiations in parallel...",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 })
-        else:
-            winner = None
-            winner_status = "NO_EXECUTABLE_DEAL"
+                await asyncio.sleep(0.3)
 
-            # Persist failed negotiation record in PostgreSQL memory
-            try:
-                await NegotiationMemoryService.persist_negotiation_record(
-                    negotiation_id=neg_id or f"neg_{uuid.uuid4().hex[:8]}",
-                    buyer_id=buyer_id,
-                    crop=norm_crop,
-                    quantity=req_qty,
-                    farmer_name="No Agreement",
-                    status="FAILED",
-                    current_round=max_rounds,
-                    final_price=None,
-                    market_price=market_price,
-                    min_price=None,
-                    logs=[{"reason": "Exceeded reservation ceiling or budget across all candidates"}],
-                    summary=f"No agreement reached below reservation ceiling ₹{reservation_p:.2f}/kg.",
+            # 2b. Initialize Concurrent Budget Tracker
+            budget_tracker = BudgetReservationTracker(budget)
+
+            # 3. Launch Parallel Isolated Negotiations
+            tasks = [
+                self._negotiate_single_seller_branch(
+                    seller=c,
+                    requirement=requirement,
+                    market_context=market_context,
+                    max_rounds=max_rounds,
+                    branch_idx=idx,
+                    negotiation_id=neg_id,
+                    budget_tracker=budget_tracker,
                 )
-            except Exception as e:
-                logger.debug(f"Negotiation memory failure persistence: {e}")
+                for idx, c in enumerate(candidates)
+            ]
+            negotiation_results = await asyncio.gather(*tasks, return_exceptions=False)
+
+            # 4. Filter & Validate Executable Deals
+            executable_deals = [n for n in negotiation_results if n.get("is_valid_deal")]
+
+            # Broadcast Step 4: Deal Evaluation
+            if neg_id:
+                await _broadcast_safe({
+                    "event": "TOP5_EVALUATION",
+                    "negotiation_id": neg_id,
+                    "step": "EVALUATING DEALS",
+                    "candidate_count": candidate_count,
+                    "executable_deals_count": len(executable_deals),
+                    "message": f"All {candidate_count} parallel negotiations completed. Found {len(executable_deals)} executable deals satisfying reservation ceiling (₹{reservation_p:.2f}/kg) and budget.",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+                await asyncio.sleep(0.3)
+
+            # 5. Rank Valid Deals by Landed Cost & Revalidate Listing Freshness
+            winner = None
+            min_batch = float(requirement.get("min_batch_size") or requirement.get("min_purchase_quantity") or requirement.get("min_sale_quantity") or 0.0)
+
+            if executable_deals:
+                executable_deals.sort(key=lambda d: (d["landed_cost_per_kg"], -d["match_score"]))
+
+                # Revalidate produce listing freshness & availability from Database
+                for candidate_deal in executable_deals:
+                    listing_id = candidate_deal.get("seller_id") or candidate_deal.get("id")
+                    is_fresh = True
+                    if listing_id:
+                        fresh_produce = await Database.get_produce_async(listing_id)
+                        if fresh_produce:
+                            st = str(fresh_produce.get("status", "")).upper()
+                            avail_q = float(fresh_produce.get("quantity") or 0.0)
+                            if st not in ("ACTIVE", "AVAILABLE"):
+                                is_fresh = False
+                                candidate_deal["is_valid_deal"] = False
+                                candidate_deal["rejection_reason"] = f"Listing {listing_id} is no longer active (status: {st})."
+                            elif avail_q < float(candidate_deal["executable_quantity"]):
+                                is_fresh = False
+                                candidate_deal["is_valid_deal"] = False
+                                candidate_deal["rejection_reason"] = f"Listing {listing_id} inventory depleted: requested {candidate_deal['executable_quantity']}kg, available {avail_q}kg."
+
+                    if is_fresh:
+                        winner = candidate_deal
+                        break
+
+            if winner:
+                winner["is_winner"] = True
+                winner_status = "DEAL_SELECTED"
+
+                # Strict quantity allocation lifecycle
+                allocated_qty = float(winner["executable_quantity"])
+                remaining_qty = round(max(0.0, req_qty - allocated_qty), 2)
+                winner["requested_quantity"] = req_qty
+                winner["allocated_quantity"] = allocated_qty
+                winner["remaining_quantity"] = remaining_qty
+                winner["min_purchase_quantity"] = min_batch
+
+                # Commit budget in tracker
+                await budget_tracker.commit(winner.get("branch_index", 0), float(winner["total_landed_cost"]))
+
+                # 5a. Automatic Deal Finalization (Transaction ID & SHA-256 Digital Contract Hash)
+                txn_id = f"TXN-MH-2026-{uuid.uuid4().hex[:8].upper()}"
+                idempotency_key = hashlib.sha256(
+                    f"{neg_id}:{winner.get('seller_id')}:{winner['final_price']}:{winner['executable_quantity']}".encode()
+                ).hexdigest()
+                raw_hash_input = f"{txn_id}:{norm_crop}:{winner['executable_quantity']}:{winner['final_price']}:{datetime.now(timezone.utc).isoformat()}"
+                contract_hash = "0x" + hashlib.sha256(raw_hash_input.encode()).hexdigest()
+
+                txn_record = {
+                    "transaction_id": txn_id,
+                    "negotiation_id": neg_id or f"neg_{uuid.uuid4().hex[:8]}",
+                    "status": "COMPLETED",
+                    "crop": norm_crop,
+                    "quantity": winner["executable_quantity"],
+                    "requested_quantity": req_qty,
+                    "allocated_quantity": allocated_qty,
+                    "remaining_quantity": remaining_qty,
+                    "final_price": winner["final_price"],
+                    "freight_per_kg": winner["freight_per_kg"],
+                    "apmc_cess_per_kg": winner["apmc_cess_per_kg"],
+                    "landed_cost_per_kg": winner["landed_cost_per_kg"],
+                    "total_value": round(float(winner["final_price"]) * float(winner["executable_quantity"]), 2),
+                    "total_landed_cost": winner["total_landed_cost"],
+                    "contract_hash": contract_hash,
+                    "idempotency_key": idempotency_key,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "framework": "Maharashtra APMC Model Act Compliant Electronic Trade",
+                    "seller_name": winner["seller_name"],
+                    "buyer_name": requirement.get("buyer_name", "Procurement Buyer"),
+                }
+                winner["transaction_id"] = txn_id
+                winner["contract_hash"] = contract_hash
+                winner["idempotency_key"] = idempotency_key
+                winner["transaction_record"] = txn_record
+
+                # Persist in Database history
+                user_id = requirement.get("user_id") or requirement.get("buyer_id")
+                try:
+                    hist_payload = {
+                        "type": "DEAL_FINALIZED",
+                        "transaction_id": txn_id,
+                        "negotiation_id": neg_id,
+                        "crop": norm_crop,
+                        "quantity": winner["executable_quantity"],
+                        "final_price": winner["final_price"],
+                        "status": "SETTLED",
+                        "summary": f"Autonomous deal finalized for {winner['executable_quantity']}kg {norm_crop} at ₹{winner['final_price']}/kg.",
+                        "details": txn_record
+                    }
+                    if user_id:
+                        await Database.add_history_async(user_id, hist_payload)
+                    await Database.add_history_async("all", hist_payload)
+                except Exception as e:
+                    logger.debug(f"Database history recording: {e}")
+
+                # Update negotiation status if neg_id exists
+                if neg_id:
+                    try:
+                        await Database.update_negotiation_async(neg_id, {
+                            "status": "DEAL",
+                            "final_price": winner["final_price"],
+                            "seller_name": winner["seller_name"],
+                            "transaction_id": txn_id,
+                            "contract_hash": contract_hash,
+                            "idempotency_key": idempotency_key,
+                        })
+                    except Exception as e:
+                        logger.debug(f"Negotiation status update: {e}")
+
+                # Deduct listing inventory if linked to produce listing
+                listing_id = winner.get("seller_id") or winner.get("id")
+                if listing_id:
+                    try:
+                        await Database.deduct_produce_inventory_async(listing_id, float(winner["executable_quantity"]))
+                    except Exception as e:
+                        logger.debug(f"Inventory deduction: {e}")
+
+                # Persist in PostgreSQL negotiations table via NegotiationMemoryService
+                try:
+                    await NegotiationMemoryService.persist_negotiation_record(
+                        negotiation_id=neg_id or f"neg_{uuid.uuid4().hex[:8]}",
+                        buyer_id=buyer_id,
+                        crop=norm_crop,
+                        quantity=float(winner["executable_quantity"]),
+                        farmer_name=winner["seller_name"],
+                        status="ACCEPTED",
+                        current_round=int(winner.get("rounds_count") or len(winner.get("rounds") or []) or 3),
+                        final_price=float(winner["final_price"]),
+                        market_price=market_price,
+                        min_price=float(winner.get("initial_ask", winner["final_price"]) * 0.85),
+                        logs=winner.get("rounds", []),
+                        summary=f"Deal finalized with {winner['seller_name']} at ₹{winner['final_price']:.2f}/kg ({winner['executable_quantity']}kg). Landed: ₹{winner['landed_cost_per_kg']:.2f}/kg.",
+                        transport_plan=str(sci_result.get("best_option", {}).get("selected_vehicle", {}).get("vehicle_name", "Assigned Carrier")) if sci_result else "Road Freight",
+                    )
+                except Exception as e:
+                    logger.debug(f"Negotiation memory deal persistence: {e}")
+
+                # Broadcast finalization event
+                if neg_id:
+                    await _broadcast_safe({
+                        "event": "TOP5_DEAL_FINALIZED",
+                        "negotiation_id": neg_id,
+                        "transaction_id": txn_id,
+                        "contract_hash": contract_hash,
+                        "winner": winner,
+                        "message": f"🏆 Deal officially finalized with {winner['seller_name']}. Transaction ID: {txn_id}.",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    })
+            else:
+                winner = None
+                winner_status = "NO_EXECUTABLE_DEAL"
+
+                # Persist failed negotiation record in PostgreSQL memory
+                try:
+                    await NegotiationMemoryService.persist_negotiation_record(
+                        negotiation_id=neg_id or f"neg_{uuid.uuid4().hex[:8]}",
+                        buyer_id=buyer_id,
+                        crop=norm_crop,
+                        quantity=req_qty,
+                        farmer_name="No Agreement",
+                        status="FAILED",
+                        current_round=max_rounds,
+                        final_price=None,
+                        market_price=market_price,
+                        min_price=None,
+                        logs=[{"reason": "Exceeded reservation ceiling or budget across all candidates"}],
+                        summary=f"No agreement reached below reservation ceiling ₹{reservation_p:.2f}/kg.",
+                    )
+                except Exception as e:
+                    logger.debug(f"Negotiation memory failure persistence: {e}")
 
         # 5b. Workflow Scope & Downstream Agent Assessment (FR-6, SRS Section 4)
         raw_mode = str(requirement.get("workflow_mode") or "SINGLE_AGENT").upper()
@@ -1010,7 +1039,22 @@ class BuyerOrchestrationService:
         else:
             workflow_mode = raw_mode
 
-        if workflow_mode == "SINGLE_AGENT":
+        # Dynamic Multi-Agent Orchestration without Hardcoded Priority
+        selected_services = requirement.get("selected_services") or {}
+        has_sel_srv = isinstance(selected_services, dict) and bool(selected_services)
+
+        if has_sel_srv:
+            permitted_agents = ["BUYER"]
+            if selected_services.get("transport"):
+                permitted_agents.append("TRANSPORT")
+            if selected_services.get("warehouse") or selected_services.get("storage"):
+                permitted_agents.append("WAREHOUSE")
+            if selected_services.get("processor") or selected_services.get("processing"):
+                permitted_agents.append("PROCESSOR")
+            if len(permitted_agents) > 1 and workflow_mode == "SINGLE_AGENT":
+                workflow_mode = "MULTI_AGENT"
+            required_agents = ["BUYER"]
+        elif workflow_mode == "SINGLE_AGENT":
             permitted_agents = ["BUYER"]
             required_agents = ["BUYER"]
         else:
@@ -1024,41 +1068,82 @@ class BuyerOrchestrationService:
         warehouse_assignment = None
         processor_assignment = None
 
-        if workflow_mode == "FULL_SUPPLY_CHAIN":
+        # 1. Transport Evaluation
+        needs_transport = (
+            (selected_services.get("transport", False) if has_sel_srv else False) or
+            requirement.get("need_transport", False) or
+            workflow_mode in ("TRANSPORT_ONLY", "FULL_SUPPLY_CHAIN", "MULTI_AGENT") or
+            requirement.get("delivery_option") in ("buyer_pickup", "need_transport")
+        )
+        if needs_transport and ("TRANSPORT" in permitted_agents or workflow_mode in ("TRANSPORT_ONLY", "MULTI_AGENT") or (has_sel_srv and selected_services.get("transport"))):
+            if "TRANSPORT" not in required_agents:
+                required_agents.append("TRANSPORT")
+
+            # Determine genuine pickup origin location:
+            # - From confirmed farmer deal if farmer won
+            # - From requirement pickup_location / district / origin if farmer unavailable or bypassed
+            pickup_loc = None
             if winner:
-                # Conditional Transport Dependency
-                needs_transport = requirement.get("need_transport", False) or requirement.get("delivery_option") in ("buyer_pickup", "need_transport")
-                if needs_transport and "TRANSPORT" in permitted_agents:
-                    if "TRANSPORT" not in required_agents:
-                        required_agents.append("TRANSPORT")
-                    if neg_id:
-                        await _broadcast_safe({
-                            "event": "TRANSPORT_REQUIRED",
-                            "negotiation_id": neg_id,
-                            "quantity": winner["executable_quantity"],
-                            "crop": norm_crop,
-                            "destination": requirement.get("location", "Maharashtra"),
-                        })
-                    try:
-                        seller_loc = winner.get("seller_location") or winner.get("location") or requirement.get("location", "Ahmednagar")
-                        buyer_loc = requirement.get("location", "Maharashtra")
-                        shelf_life_days = int(winner.get("shelf_life", 4))
-                        deadline_hours = max(4.0, shelf_life_days * 24 * 0.8)
-                        transport_req = {
-                            "request_id": f"TR-{neg_id or uuid.uuid4().hex[:8]}",
-                            "crop": norm_crop,
-                            "quantity_kg": float(winner["executable_quantity"]),
-                            "pickup_location": seller_loc,
-                            "delivery_location": buyer_loc,
-                            "delivery_deadline_hours": deadline_hours,
-                            "shelf_life_hours": float(shelf_life_days) * 24,
-                            "urgency": "HIGH" if shelf_life_days <= 2 else "NORMAL",
-                            "refrigerated_required": norm_crop.lower() in {"tomato", "strawberry", "grape", "banana", "mango"},
+                pickup_loc = winner.get("seller_location") or winner.get("location")
+            if not pickup_loc:
+                pickup_loc = (
+                    requirement.get("pickup_location") or
+                    requirement.get("district") or
+                    requirement.get("origin") or
+                    requirement.get("farmer_location") or
+                    requirement.get("location")
+                )
+
+            buyer_dest = (
+                requirement.get("delivery_location") or
+                requirement.get("destination") or
+                requirement.get("buyer_location") or
+                "Pune Agro-Industrial Complex, Hadapsar"
+            )
+
+            eff_qty = float(winner["executable_quantity"]) if winner else req_qty
+
+            if not pickup_loc or str(pickup_loc).strip().lower() in ("", "unknown", "none"):
+                transport_assignment = {
+                    "status": "UNRESOLVED_DEPENDENCY",
+                    "error": "Pickup origin location required to evaluate transport. Farmer not confirmed and no district origin specified."
+                }
+            else:
+                if neg_id:
+                    await _broadcast_safe({
+                        "event": "TRANSPORT_REQUIRED",
+                        "negotiation_id": neg_id,
+                        "quantity": eff_qty,
+                        "crop": norm_crop,
+                        "origin": pickup_loc,
+                        "destination": buyer_dest,
+                    })
+                try:
+                    shelf_life_days = int(winner.get("shelf_life", 4)) if winner else int(requirement.get("shelf_life", 4))
+                    deadline_hours = max(4.0, shelf_life_days * 24 * 0.8)
+                    transport_req = {
+                        "request_id": f"TR-{neg_id or uuid.uuid4().hex[:8]}",
+                        "crop": norm_crop,
+                        "quantity_kg": eff_qty,
+                        "pickup_location": str(pickup_loc).strip(),
+                        "delivery_location": str(buyer_dest).strip(),
+                        "delivery_deadline_hours": deadline_hours,
+                        "shelf_life_hours": float(shelf_life_days) * 24,
+                        "urgency": "HIGH" if shelf_life_days <= 2 else "NORMAL",
+                        "refrigerated_required": norm_crop.lower() in {"tomato", "strawberry", "grape", "banana", "mango"},
+                    }
+                    transport_state = await run_transport_workflow(transport_req)
+                    transport_plan = transport_state.get("final_transport_plan") or {}
+                    if transport_plan and "truck" not in transport_plan:
+                        transport_plan["truck"] = transport_plan.get("vehicle_name") or transport_plan.get("vehicle_type") or "Carrier Truck"
+                    
+                    if not transport_plan or transport_state.get("status") in ("INFEASIBLE", "FAILED"):
+                        transport_assignment = {
+                            "status": "INFEASIBLE",
+                            "message": "No vehicle available matching requested payload quantity and hard constraints.",
+                            "rejected_vehicles": transport_state.get("rejected_vehicles", []),
                         }
-                        transport_state = await run_transport_workflow(transport_req)
-                        transport_plan = transport_state.get("final_transport_plan") or {}
-                        if transport_plan and "truck" not in transport_plan:
-                            transport_plan["truck"] = transport_plan.get("vehicle_name") or transport_plan.get("vehicle_type") or "Carrier Truck"
+                    else:
                         transport_assignment = transport_plan
                         if neg_id:
                             await _broadcast_safe({
@@ -1069,60 +1154,74 @@ class BuyerOrchestrationService:
                                 "agreed_freight": transport_plan.get("agreed_price"),
                                 "distance_km": transport_plan.get("distance_km"),
                                 "eta": transport_plan.get("estimated_arrival_iso"),
-                                "status": transport_state.get("status", "UNKNOWN"),
+                                "status": transport_state.get("status", "CONFIRMED"),
                             })
-                    except Exception as e:
-                        logger.warning(f"Downstream transport assignment: {e}")
-                        transport_assignment = {"status": "FAILED", "error": str(e)}
+                except Exception as e:
+                    logger.warning(f"Downstream transport assignment: {e}")
+                    transport_assignment = {"status": "FAILED", "error": str(e)}
 
-                # Conditional Warehouse Dependency
-                needs_storage = requirement.get("need_storage", False) or int(requirement.get("holding_days", 0)) > 0
-                if needs_storage and "WAREHOUSE" in permitted_agents:
-                    if "WAREHOUSE" not in required_agents:
-                        required_agents.append("WAREHOUSE")
-                    try:
-                        storage_req = {
-                            "quantity": float(winner["executable_quantity"]),
-                            "crop": norm_crop,
-                            "location": requirement.get("location", "Maharashtra"),
-                            "shelf_life": int(requirement.get("holding_days", 7)),
-                        }
-                        warehouse_assignment = await assign_storage(storage_req)
-                        if neg_id:
-                            await _broadcast_safe({
-                                "event": "WAREHOUSE_ASSIGNED",
-                                "negotiation_id": neg_id,
-                                "warehouse": warehouse_assignment.get("warehouse"),
-                                "total_daily_cost": warehouse_assignment.get("total_daily_cost"),
-                            })
-                    except Exception as e:
-                        logger.warning(f"Downstream warehouse assignment: {e}")
-                        warehouse_assignment = {"status": "FAILED", "error": str(e)}
-            else:
-                # Deal failed: conditional processor escalation
-                if requirement.get("allow_processing", False) and "PROCESSOR" in permitted_agents:
-                    if "PROCESSOR" not in required_agents:
-                        required_agents.append("PROCESSOR")
-                    try:
-                        from backend.services.processor_service import _PROCESSOR_CATALOG
-                        match_proc = next((p for p in _PROCESSOR_CATALOG if norm_crop in p.get("crop_types", [])), _PROCESSOR_CATALOG[0])
-                        processor_assignment = {
-                            "processor_id": match_proc["processor_id"],
-                            "name": match_proc["name"],
-                            "location": match_proc["location"],
-                            "output_product": match_proc["output_product"],
-                            "offered_price_per_kg": match_proc["price_per_kg"],
-                            "status": "ALLOCATED",
-                        }
-                        if neg_id:
-                            await _broadcast_safe({
-                                "event": "PROCESSOR_ASSIGNED",
-                                "negotiation_id": neg_id,
-                                "processor": match_proc["name"],
-                            })
-                    except Exception as e:
-                        logger.warning(f"Downstream processor escalation: {e}")
-                        processor_assignment = {"status": "FAILED", "error": str(e)}
+        # 2. Warehouse Evaluation
+        needs_storage = (
+            (selected_services.get("warehouse", False) if has_sel_srv else False) or
+            requirement.get("need_storage", False) or
+            int(requirement.get("holding_days", 0)) > 0
+        )
+        if needs_storage and ("WAREHOUSE" in permitted_agents or has_sel_srv):
+            if "WAREHOUSE" not in required_agents:
+                required_agents.append("WAREHOUSE")
+            try:
+                storage_qty = float(winner["executable_quantity"]) if winner else req_qty
+                storage_loc = (winner.get("location") if winner else None) or requirement.get("location", "Maharashtra")
+                storage_req = {
+                    "quantity": storage_qty,
+                    "crop": norm_crop,
+                    "location": storage_loc,
+                    "shelf_life": int(requirement.get("holding_days", 7)),
+                }
+                warehouse_assignment = await assign_storage(storage_req)
+                if neg_id:
+                    await _broadcast_safe({
+                        "event": "WAREHOUSE_ASSIGNED",
+                        "negotiation_id": neg_id,
+                        "warehouse": warehouse_assignment.get("warehouse"),
+                        "total_daily_cost": warehouse_assignment.get("total_daily_cost"),
+                    })
+            except Exception as e:
+                logger.warning(f"Downstream warehouse assignment: {e}")
+                warehouse_assignment = {"status": "FAILED", "error": str(e)}
+
+        # 3. Processor Evaluation
+        needs_processing = (
+            (selected_services.get("processor", False) if has_sel_srv else False) or
+            requirement.get("allow_processing", False) or
+            (not winner and requirement.get("allow_processing_fallback", False))
+        )
+        if needs_processing and ("PROCESSOR" in permitted_agents or has_sel_srv):
+            if "PROCESSOR" not in required_agents:
+                required_agents.append("PROCESSOR")
+            try:
+                from backend.services.processor_service import _PROCESSOR_CATALOG
+                match_proc = next((p for p in _PROCESSOR_CATALOG if norm_crop in p.get("crop_types", [])), _PROCESSOR_CATALOG[0])
+                proc_qty = float(winner["executable_quantity"]) if winner else req_qty
+                processor_assignment = {
+                    "processor_id": match_proc["processor_id"],
+                    "name": match_proc["name"],
+                    "location": match_proc["location"],
+                    "output_product": match_proc["output_product"],
+                    "offered_price_per_kg": match_proc["price_per_kg"],
+                    "total_payment": round(match_proc["price_per_kg"] * proc_qty, 2),
+                    "status": "ALLOCATED",
+                    "mode": "CATALOG_ALLOCATION"
+                }
+                if neg_id:
+                    await _broadcast_safe({
+                        "event": "PROCESSOR_ASSIGNED",
+                        "negotiation_id": neg_id,
+                        "processor": match_proc["name"],
+                    })
+            except Exception as e:
+                logger.warning(f"Downstream processor escalation: {e}")
+                processor_assignment = {"status": "FAILED", "error": str(e)}
 
         # 6. Build Natural Chat Transcript & Comparison Table
         transcript_lines = [
@@ -1188,8 +1287,8 @@ class BuyerOrchestrationService:
             "workflow_mode": workflow_mode,
             "permitted_agents": permitted_agents,
             "required_agents": required_agents,
-            "transport_assignment": (sci_result.get("best_option", {}).get("selected_vehicle") if sci_result and sci_result.get("best_option") else None) or transport_assignment,
-            "warehouse_assignment": (sci_result.get("best_option", {}).get("selected_warehouse") if sci_result and sci_result.get("best_option") else None) or warehouse_assignment,
+            "transport_assignment": transport_assignment if transport_assignment is not None else (sci_result.get("best_option", {}).get("selected_vehicle") if sci_result and sci_result.get("best_option") else None),
+            "warehouse_assignment": warehouse_assignment if warehouse_assignment is not None else (sci_result.get("best_option", {}).get("selected_warehouse") if sci_result and sci_result.get("best_option") else None),
             "processor_assignment": processor_assignment,
             "supply_chain_intelligence": sci_result,
             "negotiation_memory": memory_strategy,

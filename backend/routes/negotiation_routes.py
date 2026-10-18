@@ -93,8 +93,8 @@ from datetime import datetime, timezone
 async def accept_deal(negotiation_id: str, payload: dict = None):
     try:
         status_data = await controller.get_negotiation_status(negotiation_id) or {}
-        p_price = payload.get("price") if isinstance(payload, dict) else None
-        final_p_raw = p_price or status_data.get("final_price") or status_data.get("price") or 15.0
+        p_price = (payload.get("price") if payload.get("price") is not None else payload.get("final_price")) if isinstance(payload, dict) else None
+        final_p_raw = p_price or status_data.get("final_price") or status_data.get("target_price") or status_data.get("price") or 50.0
         p_qty = payload.get("quantity") if isinstance(payload, dict) else None
         qty_raw = p_qty or status_data.get("quantity") or 3000.0
         p_farmer = payload.get("farmer") if isinstance(payload, dict) else None
@@ -203,8 +203,13 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
                 "farmer": farmer,
                 "farmer_name": farmer
             }
-            if isinstance(payload, dict) and "transport_plan" in payload:
-                update_data["transport_plan"] = payload["transport_plan"]
+            if isinstance(payload, dict):
+                if "transport_plan" in payload:
+                    update_data["transport_plan"] = payload["transport_plan"]
+                if "warehouse_plan" in payload:
+                    update_data["warehouse_plan"] = payload["warehouse_plan"]
+                if "processor_plan" in payload:
+                    update_data["processor_plan"] = payload["processor_plan"]
             await Database.update_negotiation_async(negotiation_id, update_data)
 
             for nid in (negotiation_id, f"neg_{negotiation_id}", negotiation_id.replace("neg_", "")):
