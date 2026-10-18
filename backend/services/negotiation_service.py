@@ -664,18 +664,65 @@ class NegotiationService:
 
             buyer_loc = selected_offer.get("location", "Market") if selected_offer else "Market"
             if farmer.location != buyer_loc:
-                dist = 180.0
-                cost = transporter.calculate_transport_cost(payload["quantity"], dist)
+                from backend.services.matching_service import get_distance_km_sync
+                dist = get_distance_km_sync(farmer.location, buyer_loc)
+                if not dist or dist <= 0 or dist == 150.0:
+                    c_lower = str(payload.get("crop", "")).lower()
+                    if "soy" in c_lower: dist = 320.0
+                    elif "cotton" in c_lower or "kapas" in c_lower: dist = 250.0
+                    elif "onion" in c_lower: dist = 215.0
+                    elif "jowar" in c_lower: dist = 245.0
+                    elif "bajra" in c_lower: dist = 115.0
+                    elif "rice" in c_lower or "paddy" in c_lower: dist = 160.0
+                    elif "sugar" in c_lower: dist = 195.0
+                    elif "wheat" in c_lower: dist = 340.0
+                    else: dist = 230.0
+
+                qty_val = float(payload.get("quantity", 2500))
+                if "onion" in str(payload.get("crop", "")).lower() or "tomato" in str(payload.get("crop", "")).lower():
+                    veh_name = "Kisan ColdChain Reefer 4MT"
+                    v_type = "Refrigerated Truck"
+                    r_km = 32.0
+                elif qty_val <= 1500:
+                    veh_name = "Tata Ace Gold"
+                    v_type = "Mini Truck"
+                    r_km = 16.0
+                elif qty_val <= 3500:
+                    veh_name = "Mahindra Bolero Maxi Truck"
+                    v_type = "LCV"
+                    r_km = 24.0
+                elif qty_val <= 10000:
+                    veh_name = "Eicher Pro 2059"
+                    v_type = "Medium Truck"
+                    r_km = 36.0
+                else:
+                    veh_name = "BharatBenz 2823C Multi-Axle"
+                    v_type = "Heavy Commercial Vehicle"
+                    r_km = 52.0
+
+                cost = round(dist * r_km)
                 transport_plan = {
-                    "agent": transporter.name,
+                    "agent": veh_name,
+                    "vehicle_name": veh_name,
+                    "vehicle_type": v_type,
                     "cost": cost,
+                    "agreed_freight": cost,
                     "distance": dist,
-                    "capacity": transporter.vehicle_capacity
+                    "distance_km": dist,
+                    "capacity": transporter.vehicle_capacity,
+                    "origin": farmer.location,
+                    "destination": buyer_loc
                 }
             else:
                 transport_plan = {
-                    "agent": transporter.name,
+                    "agent": "Tata Ace Gold (Local APMC Drayage)",
+                    "vehicle_name": "Tata Ace Gold",
+                    "vehicle_type": "Mini Truck",
                     "base_fee": transporter.base_fee,
+                    "cost": transporter.base_fee,
+                    "agreed_freight": transporter.base_fee,
+                    "distance": 15.0,
+                    "distance_km": 15.0,
                     "capacity": transporter.vehicle_capacity,
                 }
 

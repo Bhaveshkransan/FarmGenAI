@@ -1159,11 +1159,13 @@ export default function BuyerDashboard() {
                           <div className="flex flex-col">
                             <span className="font-semibold text-slate-800 text-xs flex items-center gap-1">
                               <Truck size={12} className="text-emerald-600" />
-                              {tp.vehicle_name || tp.agent || 'Assigned Carrier'}
+                              {typeof tp === 'object' ? (tp.vehicle_name || tp.agent || tp.vehicle || 'Assigned Carrier') : String(tp)}
                             </span>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              ₹{(tp.cost || tp.agreed_price || 0).toLocaleString()} • {tp.distance || '0'} km
-                            </span>
+                            {typeof tp === 'object' && (
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                ₹{(tp.cost || tp.agreed_freight || tp.agreed_price || tp.final_cost || 0).toLocaleString()} • {tp.distance_km || tp.distance || '0'} km
+                              </span>
+                            )}
                           </div>
                         ) : neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? (
                           <span className="text-[11px] text-slate-400 italic">Dispatch Scheduled</span>
