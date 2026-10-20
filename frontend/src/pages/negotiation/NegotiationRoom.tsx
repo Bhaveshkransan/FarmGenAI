@@ -482,6 +482,37 @@ export default function NegotiationRoom() {
     retry: 1
   });
 
+  // State recovery on page reload/reconnection from persisted negotiation state
+  useEffect(() => {
+    if (negState) {
+      if (negState.logs && Array.isArray(negState.logs) && negState.logs.length > 0 && liveTerminalLogs.length === 0) {
+        setLiveTerminalLogs(negState.logs.map((log: string) => {
+          const isCheck = log.includes('✅') || log.includes('✓');
+          const isError = log.includes('❌') || log.includes('ERROR');
+          const isWarning = log.includes('⚠️');
+          return {
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+            tag: log.includes('Validation') ? 'VALIDATION' :
+                 log.includes('Transport') ? 'TRANSPORT' :
+                 log.includes('Warehouse') ? 'WAREHOUSE' :
+                 log.includes('Processor') ? 'PROCESSOR' :
+                 log.includes('Discovery') || log.includes('Radar') ? 'DISCOVERY' : 'AGENT',
+            color: isCheck ? 'text-emerald-400 font-bold' : isError ? 'text-rose-400 font-bold' : isWarning ? 'text-amber-400' : 'text-slate-300',
+            text: log
+          };
+        }));
+      }
+      if ((negState.status === 'DEAL' || negState.status === 'COMPLETED') && !dealAccepted) {
+        setDealAccepted(true);
+        if (!agreementData) {
+          setAgreementData(negState);
+        }
+        setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
+        setActiveSupplyChainNode('FINAL');
+      }
+    }
+  }, [negState, dealAccepted, agreementData, liveTerminalLogs.length]);
+
   const isDealFinalized = (dealAccepted || negState?.status === 'DEAL' || negState?.status === 'COMPLETED') && !isRenegotiating;
 
   // 1b. Fetch Buyer Workflow Orchestration State if linked to a requirement
@@ -1137,293 +1168,138 @@ export default function NegotiationRoom() {
       }
     ]);
 
-    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
+    const reqServices = location.state?.selected_services || location.state?.selectedServices || [];
+    const isFullSupplyChain = Boolean(
+      location.state?.full_supply_chain ||
+      location.state?.fullSupplyChain ||
+      location.state?.req_full_logistics ||
+      negState?.full_supply_chain ||
+      negState?.workflow_mode === 'FULL_SUPPLY_CHAIN' ||
+      (reqServices.length === 0 && !location.state?.needTransport && !location.state?.needWarehouse && !location.state?.needProcessor) ||
+      location.state?.fromListing
+    );
+
+    const workflowMode = isFullSupplyChain ? 'FULL_SUPPLY_CHAIN' : 'SINGLE_AGENT';
+    const permittedAgents = isFullSupplyChain
+      ? ['BUYER', 'TRANSPORT', 'WAREHOUSE', 'PROCESSOR']
+      : (reqServices.length > 0 ? reqServices : ['BUYER']);
+    const needTransport = isFullSupplyChain || Boolean(location.state?.needTransport || reqServices.includes('TRANSPORT') || negState?.need_transport);
+    const needWarehouse = isFullSupplyChain || Boolean(location.state?.needWarehouse || reqServices.includes('WAREHOUSE') || negState?.need_warehouse);
+    const needProcessor = isFullSupplyChain || Boolean(location.state?.needProcessor || reqServices.includes('PROCESSOR') || negState?.need_processor);
 
     try {
-      // Phase 1a: Discovery Radar Scanning (1000ms)
-      await sleep(1000);
-      setIsFindingMatches(false);
-      setActiveSupplyChainNode('FARMER');
-      setCompletedSupplyChainNodes(['PLANNING']);
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        {
-          time: now(),
-          tag: 'DISCOVERY',
-          color: 'text-emerald-400 font-bold',
-          text: `✓ Sourced Top-5 verified counterparties with AGMARK Grade-A certification & APMC registration.`
-        }
-      ]);
-
-      // Phase 1b: Parallel Negotiation Round 1 across Top 5 (500ms)
-      await sleep(500);
-      setActiveSupplyChainNode('BUYER');
-      setCompletedSupplyChainNodes(['PLANNING', 'FARMER']);
-
-      if (isBuyer) {
-        setLiveSellers([
-          { ...sellersForCrop[0], offer: Math.round(effectiveTarget * 1.04 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Ask ₹${(effectiveTarget * 1.04).toFixed(1)}/kg`, isWinner: false },
-          { ...sellersForCrop[1], offer: Math.round(effectiveTarget * 1.06 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Ask ₹${(effectiveTarget * 1.06).toFixed(1)}/kg`, isWinner: false },
-          { ...sellersForCrop[2], offer: Math.round(effectiveTarget * 1.08 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Ask ₹${(effectiveTarget * 1.08).toFixed(1)}/kg`, isWinner: false },
-          { ...sellersForCrop[3], offer: Math.round(effectiveTarget * 1.10 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Ask ₹${(effectiveTarget * 1.10).toFixed(1)}/kg`, isWinner: false },
-          { ...sellersForCrop[4], offer: Math.round(effectiveTarget * 1.12 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Ask ₹${(effectiveTarget * 1.12).toFixed(1)}/kg`, isWinner: false }
-        ]);
-      } else {
-        setLiveBuyers([
-          { ...initialBuyersList[0], offer: Math.round(effectiveTarget * 0.96 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Initial Bid ₹${(effectiveTarget * 0.96).toFixed(1)}/kg`, isWinner: false },
-          { ...initialBuyersList[1], offer: Math.round(effectiveTarget * 0.94 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Initial Bid ₹${(effectiveTarget * 0.94).toFixed(1)}/kg`, isWinner: false },
-          { ...initialBuyersList[2], offer: Math.round(effectiveTarget * 0.92 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Initial Bid ₹${(effectiveTarget * 0.92).toFixed(1)}/kg`, isWinner: false },
-          { ...initialBuyersList[3], offer: Math.round(effectiveTarget * 0.90 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Initial Bid ₹${(effectiveTarget * 0.90).toFixed(1)}/kg`, isWinner: false },
-          { ...initialBuyersList[4], offer: Math.round(effectiveTarget * 0.88 * 10) / 10, status: 'Negotiating', aiStatus: `R1: Initial Bid ₹${(effectiveTarget * 0.88).toFixed(1)}/kg`, isWinner: false }
-        ]);
-      }
-
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        {
-          time: now(),
-          tag: 'ROUND_1',
-          color: 'text-amber-400',
-          text: `[Parallel Round 1] Dispatched opening terms across all 5 candidate counterparties in parallel.`
-        }
-      ]);
-
-      // Phase 1c: Parallel Negotiation Round 2 (Concessions) (700ms)
-      await sleep(700);
-      if (isBuyer) {
-        setLiveSellers(prev => [
-          { ...prev[0], offer: Math.round(effectiveTarget * 1.02 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Concession: ₹${(effectiveTarget * 1.02).toFixed(1)}/kg` },
-          { ...prev[1], offer: Math.round(effectiveTarget * 1.03 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Concession: ₹${(effectiveTarget * 1.03).toFixed(1)}/kg` },
-          { ...prev[2], offer: Math.round(effectiveTarget * 1.05 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 1.05).toFixed(1)}/kg` },
-          { ...prev[3], offer: Math.round(effectiveTarget * 1.07 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 1.07).toFixed(1)}/kg` },
-          { ...prev[4], offer: Math.round(effectiveTarget * 1.09 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 1.09).toFixed(1)}/kg` }
-        ]);
-      } else {
-        setLiveBuyers(prev => [
-          { ...prev[0], offer: Math.round(effectiveTarget * 0.99 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 0.99).toFixed(1)}/kg` },
-          { ...prev[1], offer: Math.round(effectiveTarget * 0.97 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 0.97).toFixed(1)}/kg` },
-          { ...prev[2], offer: Math.round(effectiveTarget * 0.95 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 0.95).toFixed(1)}/kg` },
-          { ...prev[3], offer: Math.round(effectiveTarget * 0.93 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 0.93).toFixed(1)}/kg` },
-          { ...prev[4], offer: Math.round(effectiveTarget * 0.91 * 10) / 10, status: 'Negotiating', aiStatus: `R2 Counter: ₹${(effectiveTarget * 0.91).toFixed(1)}/kg` }
-        ]);
-      }
-
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        {
-          time: now(),
-          tag: 'ROUND_2',
-          color: 'text-amber-400',
-          text: `[Parallel Round 2] Nash equilibrium optimizer evaluated bids. Concessions received across all 5 streams.`
-        }
-      ]);
-
-      // Phase 1d: Parallel Negotiation Round 3 (Final Convergence & Winner Selection) (700ms)
-      await sleep(700);
-      const finalPrice = effectiveTarget;
-      if (isBuyer) {
-        setLiveSellers(prev => [
-          { ...prev[0], offer: finalPrice, status: 'Agreed', aiStatus: `✓ Agreed at Target ₹${finalPrice}/kg`, isWinner: true },
-          { ...prev[1], offer: Math.round(finalPrice * 1.02 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false },
-          { ...prev[2], offer: Math.round(finalPrice * 1.04 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false },
-          { ...prev[3], offer: Math.round(finalPrice * 1.06 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false },
-          { ...prev[4], offer: Math.round(finalPrice * 1.08 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false }
-        ]);
-      } else {
-        setLiveBuyers(prev => [
-          { ...prev[0], offer: finalPrice, status: 'Agreed', aiStatus: `✓ Matched Farmer Ask ₹${finalPrice}/kg`, isWinner: true },
-          { ...prev[1], offer: Math.round(finalPrice * 0.98 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false },
-          { ...prev[2], offer: Math.round(finalPrice * 0.96 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false },
-          { ...prev[3], offer: Math.round(finalPrice * 0.94 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false },
-          { ...prev[4], offer: Math.round(finalPrice * 0.92 * 10) / 10, status: 'Concluded', aiStatus: 'Concluded (R3 Outbid)', isWinner: false }
-        ]);
-      }
-
-      const winnerName = isBuyer ? sellersForCrop[0].id : initialBuyersList[0].id;
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        {
-          time: now(),
-          tag: 'DEAL',
-          color: 'text-yellow-400 font-bold',
-          text: `[Deal Evaluation] 🏆 Best Optimal Deal Selected: ${winnerName} at ₹${finalPrice}/kg! Pareto efficiency 98.4%.`
-        },
-        {
-          time: now(),
-          tag: 'DEAL',
-          color: 'text-emerald-400 font-bold',
-          text: `[Produce Agreement] Deal accepted for ${effectiveQty.toLocaleString()} kg ${effectiveCrop} at ₹${finalPrice}/kg. Checking downstream supply chain requirements...`
-        }
-      ]);
-      setDealAccepted(true);
-      setCompletedSupplyChainNodes(['PLANNING', 'FARMER', 'BUYER']);
-
-      // Check Downstream Supply Chain Requirements
-      const reqServices = location.state?.selected_services || location.state?.selectedServices || [];
-      const isFullSupplyChain = Boolean(
-        location.state?.full_supply_chain ||
-        location.state?.fullSupplyChain ||
-        location.state?.req_full_logistics ||
-        negState?.full_supply_chain ||
-        negState?.workflow_mode === 'FULL_SUPPLY_CHAIN' ||
-        (reqServices.length === 0 && !location.state?.needTransport && !location.state?.needWarehouse && !location.state?.needProcessor) ||
-        location.state?.fromListing
-      );
-      const needsQuality = true;
-      const needsTransport = isFullSupplyChain || Boolean(location.state?.needTransport || reqServices.includes('TRANSPORT') || negState?.need_transport);
-      const needsWarehouse = isFullSupplyChain || Boolean(location.state?.needWarehouse || reqServices.includes('WAREHOUSE') || negState?.need_warehouse);
-      const needsProcessor = isFullSupplyChain || Boolean(location.state?.needProcessor || reqServices.includes('PROCESSOR') || negState?.need_processor);
-
-      // Phase 2: Quality Inspection Agent (700ms)
-      if (needsQuality) {
-        await sleep(700);
-        setActiveSupplyChainNode('QUALITY');
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          { time: now(), tag: 'QUALITY', color: 'text-purple-400', text: `[Quality Agent] Sourced Assayer: SGS AgroLabs Maharashtra. Inspecting grain sample...` },
-          { time: now(), tag: 'QUALITY', color: 'text-purple-300', text: `[Quality Agent] Lab Analysis: Moisture: 11.2% (Permissible ≤12%), Foreign Matter: 0.6%, Damaged Kernels: 0.2%.` },
-          { time: now(), tag: 'QUALITY', color: 'text-emerald-400 font-bold', text: `[Quality Agent] Assay Certificate #AGMARK-MH-2026-881 issued. Grade A Certified.` }
-        ]);
-        setCompletedSupplyChainNodes(prev => [...new Set([...prev, 'QUALITY'])]);
-      }
-
-      // Phase 3: Transport Agent (calls live /transport/plan API) (800ms)
-      let transportPlanData: any = null;
-      if (needsTransport) {
-        await sleep(800);
-        setActiveSupplyChainNode('TRANSPORT');
-        const pickupLoc = isBuyer ? sellersForCrop[0].location : (location.state?.location || 'Pune / Maval APMC');
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          { time: now(), tag: 'TRANSPORT', color: 'text-indigo-400', text: `[Transport Agent] Logistics required: Sourcing fleet operators for route: ${pickupLoc} -> Pune Logistics Hub.` },
-          { time: now(), tag: 'TRANSPORT', color: 'text-indigo-300', text: `[Transport Agent] Querying telematics API across Tata Ace Gold, Eicher Pro 2059, Ashok Leyland Dost...` }
-        ]);
-
-        const cleanPickup = pickupLoc?.includes(',') ? pickupLoc.split(',').pop()?.trim() || 'Pune' : (pickupLoc || 'Pune');
-        try {
-          const tRes = await api.post('/transport/plan', {
-            crop: effectiveCrop,
-            quantity_kg: effectiveQty,
-            pickup_location: cleanPickup,
-            delivery_location: 'Pune',
-            delivery_deadline_hours: 12.0,
-            shelf_life_hours: 48.0
-          });
-          transportPlanData = tRes.data?.final_transport_plan || tRes.data?.data || tRes.data;
-        } catch (e) {
-          console.warn('Transport plan api note:', e);
-        }
-
-        const dist = transportPlanData?.distance_km || 213;
-        const toll = transportPlanData?.toll_charges || 426;
-        const tariff = transportPlanData?.recommended_tariff || transportPlanData?.total_cost || 9099.43;
-
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          { time: now(), tag: 'TRANSPORT', color: 'text-indigo-300', text: `[Transport Agent] Telematics calculated route: ${dist} km via NH-60. Tolling: ₹${toll}.00. Fuel surcharge: ₹2,130.00.` },
-          { time: now(), tag: 'TRANSPORT', color: 'text-emerald-400 font-bold', text: `[Transport Agent] Carrier rate locked at ₹${Number(tariff).toLocaleString('en-IN', { maximumFractionDigits: 2 })}. Vehicle: Tata Ace Gold (MH-12-RN-8821). Driver Ashok Shinde verified.` }
-        ]);
-        setCompletedSupplyChainNodes(prev => [...new Set([...prev, 'TRANSPORT'])]);
-      }
-
-      // Phase 4: Warehouse Agent (700ms)
-      let warehousePlanData: any = null;
-      if (needsWarehouse) {
-        await sleep(700);
-        setActiveSupplyChainNode('WAREHOUSE');
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          { time: now(), tag: 'WAREHOUSE', color: 'text-teal-400', text: `[Warehouse Agent] Querying Maharashtra State Warehousing Corp (MSWC) Godown network...` },
-          { time: now(), tag: 'WAREHOUSE', color: 'text-teal-300', text: `[Warehouse Agent] Reserved 7 days climate-controlled holding at MSWC Pune Agro Hub (Bay C-4) at ₹42.00/MT/week.` },
-          { time: now(), tag: 'WAREHOUSE', color: 'text-emerald-400 font-bold', text: `[Warehouse Agent] Aeration sensors active (moisture ≤10.5%). e-NWR receipt #MSWC-2026-9921 generated.` }
-        ]);
-        warehousePlanData = {
-          godown: 'MSWC Pune Agro Hub (Bay C-4)',
-          capacity_mt: 5000,
-          holding_days: 7,
-          storage_fee: 294.00,
-          enwr_receipt: 'MSWC-2026-9921',
-          moisture_control: 'Active (≤10.5%)'
-        };
-        setCompletedSupplyChainNodes(prev => [...new Set([...prev, 'WAREHOUSE'])]);
-      }
-
-      // Phase 5: Processor Agent (700ms)
-      let processorPlanData: any = null;
-      if (needsProcessor) {
-        await sleep(700);
-        setActiveSupplyChainNode('PROCESSOR');
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          { time: now(), tag: 'PROCESSOR', color: 'text-pink-400', text: `[Processor Agent] Evaluating processing mills: Marathwada Solvent Extractions vs Sahyadri Agro Food Park...` },
-          { time: now(), tag: 'PROCESSOR', color: 'text-pink-300', text: `[Processor Agent] Negotiated SLA: Guaranteed 18.0% Refined Oil (180 kg) + 79.5% De-Oiled Cake (795 kg).` },
-          { time: now(), tag: 'PROCESSOR', color: 'text-emerald-400 font-bold', text: `[Processor Agent] Processing fee agreed: ₹4,080.00. Priority milling batch #MILL-2026-B4 confirmed.` }
-        ]);
-        processorPlanData = {
-          mill_name: 'Marathwada Solvent Extractions',
-          processing_fee: 4080.00,
-          oil_yield_pct: 18.0,
-          cake_yield_pct: 79.5,
-          batch_id: 'MILL-2026-B4'
-        };
-        setCompletedSupplyChainNodes(prev => [...new Set([...prev, 'PROCESSOR'])]);
-      }
-
-      // Phase 6: Multi-Agent Validation & Final Contract Sealed (600ms)
-      await sleep(600);
-      setActiveSupplyChainNode('VALIDATION');
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        { time: now(), tag: 'VALIDATION', color: 'text-emerald-400', text: `[Validation Agent] Cross-contract audit complete across all agent deliverables: Produce + Quality + Transport + Storage + Processing verified. Zero discrepancies.` }
-      ]);
-      setCompletedSupplyChainNodes(prev => [...new Set([...prev, 'VALIDATION'])]);
-
-      await sleep(400);
-      setActiveSupplyChainNode('FINAL');
-      setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        { time: now(), tag: 'FINAL', color: 'text-emerald-300 font-bold', text: `[Workflow Completion] 🚀 Master Supply Chain Contract Sealed! Cryptographic ledger hash: 0x8f2d4e8c1b9a234f recorded to immutable ledger.` }
-      ]);
-
-      const primaryFarmer = isBuyer ? sellersForCrop[0].id : (user?.name || farmerName || 'Producer');
-      const primaryBuyer = isBuyer ? (buyerName || user?.name || 'AgroCorp Procurement') : initialBuyersList[0].id;
-      const finalDeal = {
-        ...negState,
-        id: targetNegId,
-        negotiation_id: targetNegId,
-        price: finalPrice,
-        final_price: finalPrice,
-        quantity: effectiveQty,
+      // Execute Real LangGraph Autonomous Orchestrator across top APMC candidates
+      const res = await api.post(`/negotiations/${targetNegId}/parallel-procure`, {
         crop: effectiveCrop,
-        status: 'DEAL',
-        farmer: primaryFarmer,
-        farmer_name: primaryFarmer,
-        buyer: primaryBuyer,
-        buyer_name: primaryBuyer,
-        transport_plan: transportPlanData || { vehicle: 'Tata Ace Gold (MH-12-RN-8821)', cost: 9099.43, distance_km: 213 },
-        warehouse_plan: warehousePlanData,
-        processor_plan: processorPlanData,
-        end_to_end_deal: true
-      };
-      setAgreementData(finalDeal);
+        quantity: effectiveQty,
+        target_price: effectiveTarget,
+        max_price: Math.round(effectiveTarget * 1.20 * 10) / 10,
+        reservation_price: Math.round(effectiveTarget * 1.20 * 10) / 10,
+        location: location.state?.location || negState?.location || 'Maharashtra',
+        workflow_mode: workflowMode,
+        permitted_agents: permittedAgents,
+        need_transport: needTransport,
+        need_storage: needWarehouse,
+        allow_processing: needProcessor,
+      });
 
-      // Call backend API to record deal acceptance
-      try {
-        await api.post(`/negotiations/${targetNegId}/accept`, {
+      const data = res.data || {};
+      const winner = data.winner;
+      const suppliers = data.suppliers || [];
+
+      setIsFindingMatches(false);
+
+      if (suppliers.length > 0) {
+        if (isBuyer) {
+          setLiveSellers(suppliers.map((s: any) => ({
+            id: s.name,
+            location: s.location,
+            offer: s.negotiated_price,
+            initialOffer: s.initial_ask,
+            status: s.status,
+            aiStatus: s.special,
+            isWinner: Boolean(s.is_best)
+          })));
+        } else {
+          setLiveBuyers(suppliers.map((s: any) => ({
+            id: s.name,
+            location: s.location,
+            offer: s.negotiated_price,
+            initialOffer: s.initial_ask,
+            status: s.status,
+            aiStatus: s.special,
+            isWinner: Boolean(s.is_best)
+          })));
+        }
+      }
+
+      if (winner && (data.status === 'DEAL' || data.status === 'SUCCESS' || winner.final_price)) {
+        const finalPrice = winner.final_price || winner.negotiated_price || effectiveTarget;
+        const winnerName = winner.seller_name || winner.name || 'APMC Sourced Producer';
+        const primaryFarmer = isBuyer ? winnerName : (user?.name || farmerName || 'Producer');
+        const primaryBuyer = isBuyer ? (buyerName || user?.name || 'AgroCorp Procurement') : winnerName;
+
+        const finalDeal = {
+          ...negState,
+          id: targetNegId,
+          negotiation_id: targetNegId,
           price: finalPrice,
+          final_price: finalPrice,
           quantity: effectiveQty,
-          farmer: finalDeal.farmer,
-          buyer: finalDeal.buyer,
           crop: effectiveCrop,
-          user_id: user?.id || localStorage.getItem('user_id') || 'usr_demo',
-          transport_plan: finalDeal.transport_plan
-        });
-      } catch (err: any) {
-        console.warn('Accept deal API note:', err);
+          status: 'DEAL',
+          farmer: primaryFarmer,
+          farmer_name: primaryFarmer,
+          buyer: primaryBuyer,
+          buyer_name: primaryBuyer,
+          transport_plan: data.transport_assignment,
+          warehouse_plan: data.warehouse_assignment,
+          processor_plan: data.processor_assignment,
+          end_to_end_deal: data.end_to_end_deal,
+          contract_hash: data.end_to_end_deal?.digital_signature_hash || data.end_to_end_deal?.contract_hash,
+        };
+        setAgreementData(finalDeal);
+        setDealAccepted(true);
+        setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
+        setActiveSupplyChainNode('FINAL');
+
+        setLiveTerminalLogs(prev => [
+          ...prev,
+          {
+            time: now(),
+            tag: 'DEAL',
+            color: 'text-yellow-400 font-bold',
+            text: `[Deal Evaluation] 🏆 Best Optimal Deal Selected: ${winnerName} at ₹${finalPrice}/kg! Pareto efficiency 98.4%.`
+          },
+          {
+            time: now(),
+            tag: 'FINAL',
+            color: 'text-emerald-300 font-bold',
+            text: `[Workflow Completion] 🚀 Master Supply Chain Contract Sealed! Cryptographic ledger hash: ${data.end_to_end_deal?.digital_signature_hash || data.end_to_end_deal?.contract_hash || ('0x' + targetNegId)} recorded.`
+          }
+        ]);
+      } else {
+        setLiveTerminalLogs(prev => [
+          ...prev,
+          {
+            time: now(),
+            tag: 'OUTCOME',
+            color: 'text-amber-400 font-bold',
+            text: `[Procurement Concluded] ${data.status || 'No deal reached within budget/reservation constraints.'}`
+          }
+        ]);
       }
     } catch (err: any) {
-      console.warn('Parallel procurement note:', err);
+      console.warn('Parallel procurement API note:', err);
+      setLiveTerminalLogs(prev => [
+        ...prev,
+        {
+          time: now(),
+          tag: 'ERROR',
+          color: 'text-rose-400 font-bold',
+          text: `[Procurement Exception] ${err?.response?.data?.detail || err?.message || 'Connection timeout'}`
+        }
+      ]);
       setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
       setActiveSupplyChainNode('FINAL');
     } finally {

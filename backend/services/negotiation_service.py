@@ -904,6 +904,13 @@ class NegotiationService:
             "active_buyers": row.get("active_buyers", row.get("market_offers", [])[:3]),
             "selected_buyer": row.get("selected_buyer"),
             "transport_plan": row.get("transport_plan"),
+            "warehouse_plan": row.get("warehouse_plan"),
+            "processor_plan": row.get("processor_plan"),
+            "end_to_end_deal": row.get("end_to_end_deal"),
+            "workflow_mode": row.get("workflow_mode"),
+            "permitted_agents": row.get("permitted_agents"),
+            "logs": row.get("logs", []),
+            "contract_hash": row.get("contract_hash"),
         }
 
     async def list_agents(self):
@@ -1254,10 +1261,38 @@ class NegotiationService:
         }
 
         # Determine workflow mode and permitted agents
-        workflow_mode = (payload and payload.get("workflow_mode")) or (row and row.get("workflow_mode")) or "FULL_SUPPLY_CHAIN"
-        permitted_agents = (payload and payload.get("permitted_agents")) or (
-            ["BUYER", "TRANSPORT", "WAREHOUSE", "PROCESSOR"] if workflow_mode == "FULL_SUPPLY_CHAIN" else ["BUYER"]
-        )
+        workflow_mode_raw = (payload and payload.get("workflow_mode")) or (row and row.get("workflow_mode")) or "FULL_SUPPLY_CHAIN"
+        if str(workflow_mode_raw).upper() in ("BUYER_ONLY", "SINGLE", "SINGLE_AGENT"):
+            workflow_mode = "SINGLE_AGENT"
+            permitted_agents = ["BUYER"]
+            need_transport = False
+            need_storage = False
+            allow_processing = False
+        else:
+            workflow_mode = "FULL_SUPPLY_CHAIN"
+            permitted_agents = (payload and payload.get("permitted_agents")) or (row and row.get("permitted_agents")) or [
+                "BUYER", "TRANSPORT", "WAREHOUSE", "PROCESSOR"
+            ]
+            permitted_agents = [str(a).upper() for a in permitted_agents]
+            
+            # Dynamic downstream needs check
+            need_transport = bool(
+                payload.get("need_transport", payload.get("req_transport", row.get("need_transport", row.get("req_transport", True))))
+            ) and ("TRANSPORT" in permitted_agents)
+            need_storage = bool(
+                payload.get("need_storage", payload.get("need_warehouse", payload.get("req_warehouse", row.get("need_storage", row.get("need_warehouse", True)))))
+            ) and ("WAREHOUSE" in permitted_agents)
+            allow_processing = bool(
+                payload.get("allow_processing", payload.get("need_processor", payload.get("req_processor", row.get("allow_processing", row.get("need_processor", True)))))
+            ) and ("PROCESSOR" in permitted_agents)
+
+            # Check if farmer owns transport or storage
+            if payload.get("has_transport") or (row and row.get("has_transport")):
+                need_transport = False
+            if payload.get("has_storage") or (row and row.get("has_storage")):
+                need_storage = False
+
+        holding_days = int((payload and (payload.get("holding_days") or payload.get("shelf_life"))) or (row and (row.get("holding_days") or row.get("shelf_life"))) or 7)
 
         initial_graph_state = {
             "trace_id": f"trace-{uuid.uuid4().hex[:8]}",
@@ -1273,10 +1308,10 @@ class NegotiationService:
             "strategy": (payload and payload.get("strategy")) or "balanced",
             "workflow_mode": workflow_mode,
             "permitted_agents": permitted_agents,
-            "need_transport": True,
-            "need_storage": True,
-            "allow_processing": True,
-            "holding_days": 7,
+            "need_transport": need_transport,
+            "need_storage": need_storage,
+            "allow_processing": allow_processing,
+            "holding_days": holding_days,
             "sellers": payload.get("sellers") if payload else None,
             "max_rounds": int((payload and payload.get("max_rounds")) or 5),
             "logs": [],
@@ -1355,6 +1390,8 @@ class NegotiationService:
             "warehouse_plan": warehouse_assignment,
             "processor_plan": processor_assignment,
             "end_to_end_deal": end_to_end_deal,
+            "logs": orch_res.get("logs", []),
+            "contract_hash": end_to_end_deal.get("contract_hash") if end_to_end_deal else None,
         })
 
         # Record parallel summary offer

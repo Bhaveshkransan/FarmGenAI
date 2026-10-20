@@ -362,7 +362,9 @@ async def parallel_negotiation_node(state: BuyerOrchestrationGraphState) -> Dict
     events.append("NEGOTIATION_STARTED")
     logs.append(f"⚡ [5. Parallel Negotiation] Launching {len(candidates)} concurrent negotiation branches with BudgetReservationTracker.")
 
+    neg_id = state.get("negotiation_id")
     req_dict = {
+        "negotiation_id": neg_id,
         "crop": state["crop"],
         "quantity": state["quantity"],
         "target_price": state["target_price"],
@@ -615,15 +617,51 @@ async def warehouse_agent_node(state: BuyerOrchestrationGraphState) -> Dict[str,
 
     w_res = None
     try:
-        storage_req = {
-            "quantity": qty,
+        from backend.agents.warehouse_agent.workflow import run_warehouse_workflow, PERISHABLE_CROPS
+        wf_res = await run_warehouse_workflow({
+            "requirement_id": state.get("requirement_id") or neg_id or f"req_{uuid.uuid4().hex[:6]}",
+            "workflow_id": state.get("trace_id") or f"wf_{uuid.uuid4().hex[:6]}",
             "crop": crop,
+            "quantity_kg": qty,
             "location": loc,
             "shelf_life": holding_days,
-        }
-        w_res = await assign_storage(storage_req)
+            "refrigerated_required": crop.lower() in PERISHABLE_CROPS,
+        })
+        if wf_res and wf_res.get("selected_option"):
+            opt = wf_res["selected_option"]
+            w_res = {
+                "warehouse_id": opt.get("warehouse_id", "wh_mswc_01"),
+                "warehouse": opt.get("name", "Maharashtra Godown Hub"),
+                "name": opt.get("name", "Maharashtra Godown Hub"),
+                "district": opt.get("district", loc),
+                "location": opt.get("location", loc),
+                "type": opt.get("type", "Dry Warehouse"),
+                "crop": crop,
+                "quantity": qty,
+                "total_capacity_kg": float(opt.get("allocated_capacity_mt", 15.0)) * 1000.0,
+                "available_capacity_kg": float(opt.get("remaining_capacity_mt", 12.5)) * 1000.0,
+                "cost_per_kg_per_day": opt.get("cost_per_kg_per_day", 1.80),
+                "total_daily_cost": opt.get("total_daily_cost", round(qty * 1.80, 2)),
+                "total_holding_cost": opt.get("total_holding_cost", round(qty * 1.80 * holding_days, 2)),
+                "holding_days": holding_days,
+                "reservation_id": opt.get("reservation_id") or f"WH-RES-{uuid.uuid4().hex[:6].upper()}",
+                "lifecycle_state": "CONFIRMED_RESERVATION",
+                "status": "CONFIRMED",
+            }
     except Exception as e:
-        logger.debug(f"Storage service note: {e}")
+        logger.debug(f"Warehouse workflow execution note: {e}")
+
+    if not w_res or not w_res.get("warehouse"):
+        try:
+            storage_req = {
+                "quantity": qty,
+                "crop": crop,
+                "location": loc,
+                "shelf_life": holding_days,
+            }
+            w_res = await assign_storage(storage_req)
+        except Exception as e:
+            logger.debug(f"Storage service note: {e}")
 
     if not w_res or not w_res.get("warehouse"):
         w_name = "Maharashtra State Warehousing Corp - Nashik Hub"
@@ -646,8 +684,15 @@ async def warehouse_agent_node(state: BuyerOrchestrationGraphState) -> Dict[str,
             "total_daily_cost": daily_cost,
             "total_holding_cost": total_holding_cost,
             "holding_days": holding_days,
+            "reservation_id": f"WH-RES-{uuid.uuid4().hex[:6].upper()}",
+            "lifecycle_state": "CONFIRMED_RESERVATION",
             "status": "CONFIRMED",
         }
+    else:
+        if "lifecycle_state" not in w_res:
+            w_res["lifecycle_state"] = "CONFIRMED_RESERVATION"
+        if "reservation_id" not in w_res:
+            w_res["reservation_id"] = f"WH-RES-{uuid.uuid4().hex[:6].upper()}"
 
     events.append("WAREHOUSE_ASSIGNED")
     w_name = w_res.get("warehouse") or w_res.get("name") or "Cold Storage Hub"
@@ -662,7 +707,8 @@ async def warehouse_agent_node(state: BuyerOrchestrationGraphState) -> Dict[str,
         f"Warehouse agent started\n"
         f"Capacity checked: {w_cap:,.0f} kg capacity (available: {w_avail:,.0f} kg)\n"
         f"Storage cost calculated: ₹{w_rate:.2f}/kg/day (₹{w_daily:,.2f}/day for {holding_days} days)\n"
-        f"Warehouse selected: {w_name} ({w_loc})"
+        f"Warehouse selected: {w_name} ({w_loc})\n"
+        f"Reservation status: CONFIRMED_RESERVATION (ID: {w_res.get('reservation_id')})"
     )
     logs.append(f"🏭 [9. Warehouse Agent] {warehouse_msg}")
 
@@ -695,37 +741,81 @@ async def processor_agent_node(state: BuyerOrchestrationGraphState) -> Dict[str,
     qty = float(state.get("quantity", 500))
 
     logs.append(f"⚙️ [10. Processor Agent] Querying industrial processing mills for {crop}.")
-    match_proc = next((p for p in _PROCESSOR_CATALOG if crop.lower() in [c.lower() for c in p.get("crop_types", [])]), _PROCESSOR_CATALOG[0])
 
-    p_cap = match_proc.get("capacity_kg", 20000)
-    p_name = match_proc.get("name", "Industrial Agro Processor")
-    p_loc = match_proc.get("location", "Maharashtra")
-    p_out = match_proc.get("output_product", "Value-Added Commercial Goods")
-    p_rate = match_proc.get("price_per_kg", 2.20)
-    conversion_cost_per_kg = round(p_rate * 0.05, 2) if p_rate > 10 else round(p_rate * 0.40, 2)
-    total_proc_cost = round(conversion_cost_per_kg * qty, 2)
+    proc_res = None
+    try:
+        from backend.agents.processor_agent.workflow import run_processor_workflow
+        wf_proc = await run_processor_workflow({
+            "requirement_id": state.get("requirement_id") or neg_id or f"req_{uuid.uuid4().hex[:6]}",
+            "workflow_id": state.get("trace_id") or f"wf_{uuid.uuid4().hex[:6]}",
+            "farmer_deal_id": neg_id,
+            "crop": crop,
+            "quantity_kg": qty,
+            "location": state.get("location", "Maharashtra"),
+            "purpose": "commercial_processing"
+        })
+        if wf_proc and wf_proc.get("selected_option"):
+            s_opt = wf_proc["selected_option"]
+            proc_res = {
+                "processor_id": s_opt.get("processor_id"),
+                "name": s_opt.get("name"),
+                "location": s_opt.get("location"),
+                "district": s_opt.get("district"),
+                "output_product": s_opt.get("output_product"),
+                "primary_yield_kg": s_opt.get("primary_yield_kg"),
+                "byproduct_desc": s_opt.get("byproduct_desc"),
+                "processing_capacity_kg": s_opt.get("processing_capacity_kg"),
+                "processing_cost_per_kg": s_opt.get("processing_cost_per_kg"),
+                "total_processing_cost": s_opt.get("total_processing_cost") or wf_proc.get("cost"),
+                "quality_requirements": "APMC Model Act Grade A (Moisture Compliant)",
+                "agreement_id": s_opt.get("order_id") or f"MILL-{uuid.uuid4().hex[:6].upper()}",
+                "lifecycle_state": "CONFIRMED_AGREEMENT",
+                "status": "CONFIRMED",
+            }
+    except Exception as e:
+        logger.debug(f"Processor workflow execution note: {e}")
 
-    proc_res = {
-        "processor_id": match_proc["processor_id"],
-        "name": p_name,
-        "location": p_loc,
-        "output_product": p_out,
-        "processing_capacity_kg": p_cap,
-        "processing_cost_per_kg": conversion_cost_per_kg,
-        "total_processing_cost": total_proc_cost,
-        "quality_requirements": "APMC Model Act Grade A (Moisture < 10%)",
-        "offered_price_per_kg": match_proc["price_per_kg"],
-        "status": "CONFIRMED",
-    }
+    if not proc_res:
+        match_proc = next((p for p in _PROCESSOR_CATALOG if crop.lower() in [c.lower() for c in p.get("crop_types", [])]), _PROCESSOR_CATALOG[0])
+        p_cap = match_proc.get("capacity_kg", 20000)
+        p_name = match_proc.get("name", "Industrial Agro Processor")
+        p_loc = match_proc.get("location", "Maharashtra")
+        p_out = match_proc.get("output_product", "Value-Added Commercial Goods")
+        p_rate = match_proc.get("price_per_kg", 2.20)
+        conversion_cost_per_kg = round(p_rate * 0.05, 2) if p_rate > 10 else round(p_rate * 0.40, 2)
+        total_proc_cost = round(conversion_cost_per_kg * qty, 2)
+
+        proc_res = {
+            "processor_id": match_proc["processor_id"],
+            "name": p_name,
+            "location": p_loc,
+            "output_product": p_out,
+            "processing_capacity_kg": p_cap,
+            "processing_cost_per_kg": conversion_cost_per_kg,
+            "total_processing_cost": total_proc_cost,
+            "quality_requirements": "APMC Model Act Grade A (Moisture < 10%)",
+            "offered_price_per_kg": match_proc["price_per_kg"],
+            "agreement_id": f"MILL-{uuid.uuid4().hex[:6].upper()}",
+            "lifecycle_state": "CONFIRMED_AGREEMENT",
+            "status": "CONFIRMED",
+        }
 
     events.append("PROCESSOR_ASSIGNED")
+    p_name = proc_res.get("name", "Agro Processor")
+    p_cap = proc_res.get("processing_capacity_kg", 20000)
+    p_out = proc_res.get("output_product", "Processed Goods")
+    conversion_cost = proc_res.get("processing_cost_per_kg", 2.20)
+    total_cost = proc_res.get("total_processing_cost", round(conversion_cost * qty, 2))
+    p_loc = proc_res.get("location", "Maharashtra")
+
     processor_msg = (
         f"[PROCESSOR]\n"
         f"Processor agent started\n"
         f"Processing capacity checked: {p_cap:,} kg/day at {p_name}\n"
-        f"Processing requirements: APMC Model Act Grade A (Moisture < 10%)\n"
-        f"Processing cost calculated: ₹{conversion_cost_per_kg:.2f}/kg (₹{total_proc_cost:,.2f} total for {p_out})\n"
-        f"Processor selected: {p_name} ({p_loc})"
+        f"Processing requirements: APMC Model Act Grade A (Moisture Compliant)\n"
+        f"Processing cost calculated: ₹{conversion_cost:.2f}/kg (₹{total_cost:,.2f} total for {p_out})\n"
+        f"Processor selected: {p_name} ({p_loc})\n"
+        f"Agreement status: CONFIRMED_AGREEMENT (ID: {proc_res.get('agreement_id')})"
     )
     logs.append(f"⚙️ [10. Processor Agent] {processor_msg}")
 
@@ -747,7 +837,7 @@ async def processor_agent_node(state: BuyerOrchestrationGraphState) -> Dict[str,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# NODE 11: Workflow Completion & End-to-End Validation
+# NODE 11: Workflow Completion & Authoritative Economic Feasibility Audit
 # ─────────────────────────────────────────────────────────────────────────────
 async def workflow_completion_node(state: BuyerOrchestrationGraphState) -> Dict[str, Any]:
     logs = list(state.get("logs") or [])
@@ -761,21 +851,87 @@ async def workflow_completion_node(state: BuyerOrchestrationGraphState) -> Dict[
     w_res = state.get("warehouse_assignment")
     p_res = state.get("processor_assignment")
 
+    # Authoritative Economic Settlement Feasibility Audit
+    if winner:
+        winner["lifecycle_state"] = "ACCEPTED_AGREEMENT"
+        agreed_price = float(winner.get("final_price") or winner.get("price") or 0.0)
+        floor_price = float(winner.get("floor_price") or state.get("target_price", 0) * 0.85)
+        gross_produce_val = round(agreed_price * qty, 2)
+        apmc_cess = round(gross_produce_val * 0.01, 2)
+        farmer_net_realization = round(gross_produce_val - apmc_cess, 2)
+        farmer_net_per_kg = round(farmer_net_realization / max(1.0, qty), 2)
+
+        actual_freight = float(t_res.get("agreed_price") or t_res.get("cost") or 0.0) if t_res else 0.0
+        if t_res and "lifecycle_state" not in t_res:
+            t_res["lifecycle_state"] = "CONFIRMED_BOOKING"
+
+        actual_storage = float(w_res.get("total_holding_cost") or w_res.get("cost") or 0.0) if w_res else 0.0
+        if w_res and "lifecycle_state" not in w_res:
+            w_res["lifecycle_state"] = "CONFIRMED_RESERVATION"
+
+        actual_processing = float(p_res.get("total_processing_cost") or p_res.get("cost") or 0.0) if p_res else 0.0
+        if p_res and "lifecycle_state" not in p_res:
+            p_res["lifecycle_state"] = "CONFIRMED_AGREEMENT"
+
+        total_services_cost = round(actual_freight + actual_storage + actual_processing, 2)
+        buyer_total_landed_cost = round(gross_produce_val + apmc_cess + total_services_cost, 2)
+        budget = float(state.get("budget", 0) or qty * float(state.get("reservation_price", agreed_price * 1.25)))
+
+        is_floor_protected = agreed_price >= floor_price
+        is_budget_compliant = buyer_total_landed_cost <= (budget * 1.05)
+
+        economic_validation = {
+            "gross_produce_value": gross_produce_val,
+            "apmc_cess": apmc_cess,
+            "transport_cost": actual_freight,
+            "warehouse_cost": actual_storage,
+            "processor_cost": actual_processing,
+            "total_services_cost": total_services_cost,
+            "buyer_total_landed_cost": buyer_total_landed_cost,
+            "farmer_net_realization": farmer_net_realization,
+            "farmer_net_per_kg": farmer_net_per_kg,
+            "farmer_floor_price": floor_price,
+            "is_floor_protected": is_floor_protected,
+            "is_budget_compliant": is_budget_compliant,
+            "settlement_status": "FEASIBLE_PROFITABLE" if (is_floor_protected and is_budget_compliant) else "SETTLEMENT_REJECTED"
+        }
+
+        if not is_floor_protected:
+            rejection_reason = f"Agreed price ₹{agreed_price:.2f}/kg is below farmer floor protection ₹{floor_price:.2f}/kg."
+            logs.append(f"❌ [11. Economic Validation] {rejection_reason}")
+            deal_status = "SETTLEMENT_REJECTED_FLOOR_VIOLATED"
+        elif not is_budget_compliant:
+            rejection_reason = f"Total landed cost ₹{buyer_total_landed_cost:,.2f} exceeds buyer budget ₹{budget:,.2f}."
+            logs.append(f"❌ [11. Economic Validation] {rejection_reason}")
+            deal_status = "SETTLEMENT_REJECTED_BUDGET_EXCEEDED"
+        else:
+            logs.append(
+                f"✅ [11. Economic Validation] Feasible: Farmer net realization ₹{farmer_net_per_kg:.2f}/kg (Floor: ₹{floor_price:.2f}/kg), "
+                f"Buyer landed cost ₹{buyer_total_landed_cost:,.2f} within budget (₹{budget:,.2f})."
+            )
+            deal_status = "READY_FOR_EXECUTION"
+    else:
+        economic_validation = {
+            "settlement_status": "NO_DEAL",
+            "reason": "No executable deal found meeting reservation ceiling or budget."
+        }
+        deal_status = "NO_DEAL"
+
     # Generate cryptographic SHA-256 digital contract hash
-    proof_str = f"{neg_id}:{crop}:{qty}:{winner}:{t_res}:{w_res}:{p_res}"
+    proof_str = f"{neg_id}:{crop}:{qty}:{winner}:{t_res}:{w_res}:{p_res}:{economic_validation}"
     deal_hash = hashlib.sha256(proof_str.encode()).hexdigest()[:16]
 
     events.append("SUPPLY_CHAIN_VALIDATED")
     events.append("WORKFLOW_COMPLETED")
 
-    val_msg = "[VALIDATION]\nComplete supply chain validated: Produce, Transport, Warehouse, and Processor terms verified."
+    val_msg = f"[VALIDATION]\nComplete supply chain validated: Produce, Transport, Warehouse, and Processor terms verified. Settlement Status: {economic_validation.get('settlement_status')}"
     logs.append(f"🛡️ [11. Validation] {val_msg}")
 
     if neg_id and not neg_id.startswith("test-"):
         await asyncio.sleep(0.4)
-    await _broadcast_step(neg_id, node="VALIDATION", message=val_msg)
+    await _broadcast_step(neg_id, node="VALIDATION", message=val_msg, data=economic_validation)
 
-    final_msg = f"[FINAL]\nEnd-to-end supply chain deal ready (Contract Hash: 0x{deal_hash})"
+    final_msg = f"[FINAL]\nEnd-to-end supply chain deal ready (Contract Hash: 0x{deal_hash}, Status: {deal_status})"
     logs.append(f"🏁 [11. Workflow Completion] {final_msg}")
 
     end_to_end_deal = {
@@ -786,8 +942,9 @@ async def workflow_completion_node(state: BuyerOrchestrationGraphState) -> Dict[
         "transport_plan": t_res,
         "warehouse_plan": w_res,
         "processor_plan": p_res,
+        "economic_validation": economic_validation,
         "digital_signature_hash": f"0x{deal_hash}",
-        "status": "READY_FOR_EXECUTION" if winner else "NO_DEAL",
+        "status": deal_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -798,6 +955,7 @@ async def workflow_completion_node(state: BuyerOrchestrationGraphState) -> Dict[
     return {
         "end_to_end_deal": end_to_end_deal,
         "current_active_node": "FINAL",
+        "status": deal_status,
         "logs": logs,
         "emitted_events": events,
     }

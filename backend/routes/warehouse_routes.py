@@ -28,7 +28,7 @@ async def get_warehouses(current_user: dict = Depends(get_current_user)):
 @router.post("/book")
 async def assign_storage_route(payload: dict = Body(...), current_user: dict = Depends(get_current_user)):
     try:
-        assignment = assign_storage(payload)
+        assignment = await assign_storage(payload)
         return assignment
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -37,7 +37,7 @@ async def assign_storage_route(payload: dict = Body(...), current_user: dict = D
 @router.post("/assign-transport")
 async def assign_transport_route(payload: dict = Body(...), current_user: dict = Depends(get_current_user)):
     try:
-        assignment = assign_transport(payload)
+        assignment = await assign_transport(payload)
         return assignment
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -45,5 +45,5 @@ async def assign_transport_route(payload: dict = Body(...), current_user: dict =
 
 @router.get("/fleet")
 async def get_transport_fleet(current_user: dict = Depends(get_current_user)):
-    return {"fleet": list_fleet()}
+    return {"fleet": await list_fleet()}
 
