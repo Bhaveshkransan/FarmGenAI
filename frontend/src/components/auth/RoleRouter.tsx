@@ -18,6 +18,7 @@ export default function RoleRouter() {
     case 'warehouse':
       return <Navigate to="/dashboard/warehouse" replace />;
     case 'transport':
+    case 'transporter':
       return <Navigate to="/dashboard/transport" replace />;
     case 'processor':
       return <Navigate to="/dashboard/processor" replace />;
