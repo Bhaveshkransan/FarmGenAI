@@ -1386,52 +1386,7 @@ export default function NegotiationRoom() {
     }
   };
 
-  const handleAcceptDeal = async (candidate?: any) => {
-    const selected = candidate || (isBuyer ? (liveSellers.length > 0 ? liveSellers[0] : null) : (liveBuyers.length > 0 ? liveBuyers[0] : null));
-    const agreedPrice = selected?.offer ? Number(selected.offer) : (negState?.final_price || negState?.price || currentFloor);
-    const counterParty = selected?.id || (isBuyer ? (farmerName || 'Farmer Producer') : (negState?.buyer_name || negState?.buyer || 'Buyer Enterprise'));
-    
-    const dealPayload = {
-      price: agreedPrice,
-      quantity: cropQty,
-      farmer: isBuyer ? counterParty : (farmerName || user?.name || 'Maharashtra Producer'),
-      buyer: isBuyer ? (buyerName || user?.name || 'Buyer Enterprise') : counterParty,
-      crop: cropName,
-      listing_id: negState?.listing_id
-    };
 
-    try {
-      const targetNegId = activeId || id;
-      if (targetNegId) {
-        const res = await api.post(`/negotiations/${targetNegId}/accept`, dealPayload);
-        const finalizedRecord = res.data?.contract || res.data?.data || dealPayload;
-        setAgreementData({
-          ...negState,
-          ...finalizedRecord,
-          price: agreedPrice,
-          farmer: dealPayload.farmer,
-          buyer: dealPayload.buyer,
-          crop: cropName,
-          quantity: cropQty
-        });
-        setShowValidationModal(true);
-        refetchNeg();
-        return;
-      }
-    } catch (err) {
-      console.warn('Backend deal finalization response:', err);
-    }
-
-    setAgreementData({
-      ...negState,
-      price: agreedPrice,
-      farmer: dealPayload.farmer,
-      buyer: dealPayload.buyer,
-      crop: cropName,
-      quantity: cropQty
-    });
-    setShowValidationModal(true);
-  };
 
   const handleCopilotSubmit = (e: any) => {
     e.preventDefault();
