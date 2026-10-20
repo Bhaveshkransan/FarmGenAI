@@ -6,7 +6,7 @@ class SignupRequest(BaseModel):
     name: str
     email: EmailStr
     password: str
-    location: str
+    location: Optional[str] = "Maharashtra"
     language: str = "Marathi"
     role: str # Added for role-based testing
     buyer_persona: Optional[str] = None # restaurant, food_processing, wholesale_trader, retail_chain, institutional

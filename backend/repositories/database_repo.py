@@ -403,6 +403,8 @@ class Database:
                 db_neg.transport_plan = tp
                 db_neg.peer_node = p.get("peer_node")
                 db_neg.listing_id = p.get("listing_id")
+                db_neg.min_price = p.get("min_price")
+                db_neg.market_price = p.get("market_price")
                 db_neg.logs = p.get("logs", [])
                 db_neg.market_offers = p.get("market_offers", [])
                 db_neg.selected_buyer = p.get("selected_buyer", {})
@@ -422,6 +424,9 @@ class Database:
                         "negotiation_id": db_neg.negotiation_id,
                         "crop": db_neg.crop,
                         "quantity": db_neg.quantity,
+                        "min_price": getattr(db_neg, "min_price", None),
+                        "market_price": getattr(db_neg, "market_price", None),
+                        "target_price": getattr(db_neg, "min_price", None),
                         "farmer_id": db_neg.farmer_id,
                         "buyer_id": db_neg.buyer_id,
                         "user_id": db_neg.user_id,
@@ -457,6 +462,8 @@ class Database:
                         "negotiation_id": r.negotiation_id,
                         "crop": r.crop,
                         "quantity": r.quantity,
+                        "min_price": getattr(r, "min_price", None),
+                        "market_price": getattr(r, "market_price", None),
                         "farmer_id": r.farmer_id,
                         "buyer_id": r.buyer_id,
                         "user_id": r.user_id,
@@ -499,6 +506,8 @@ class Database:
                 if "user_id" in payload: db_neg.user_id = payload["user_id"]
                 if "farmer_name" in payload or "farmer" in payload: db_neg.farmer_name = payload.get("farmer") or payload.get("farmer_name")
                 if "status" in payload: db_neg.status = payload["status"]
+                if "min_price" in payload: db_neg.min_price = payload["min_price"]
+                if "market_price" in payload: db_neg.market_price = payload["market_price"]
                 if "current_round" in payload: db_neg.current_round = payload["current_round"]
                 if "summary" in payload: db_neg.summary = payload["summary"]
                 if "final_price" in payload: db_neg.final_price = payload["final_price"]

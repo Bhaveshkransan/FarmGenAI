@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from agents.buyer_agent import BuyerAgent
 from agents.compost_agent import CompostAgent
-from backend.agents.stakeholders.farmer_agent import FarmerAgent
+from agents.farmer_agent import FarmerAgent
 from agents.processor_agent import ProcessorAgent
 from agents.transporter_agent import TransporterAgent
 from agents.warehouse_agent import WarehouseAgent
@@ -1062,7 +1062,7 @@ class NegotiationService:
 
         # 2. Instantiate FarmerAgent to evaluate the counter offer
         min_p = float(row.get("min_price") or 18.0)
-        farmer_floor = float(row.get("farmer_floor") or round(min_p * 0.75, 2))
+        farmer_floor = float(row.get("farmer_floor") or min_p)
         farmer = FarmerAgent(
             name=farmer_name,
             crop=crop,

@@ -13,13 +13,13 @@ class FarmerAgent(BaseAgent):
 
     def __init__(
         self,
-        name,
-        crop,
-        quantity,
-        min_price,
-        shelf_life,
+        name="FarmerAgent",
+        crop="Produce",
+        quantity=100.0,
+        min_price=10.0,
+        shelf_life=7,
         location=None,
-        min_sale_quantity=100,
+        min_sale_quantity=10.0,
         initial_price=None,
         has_storage_option=True,
         has_processor_option=True

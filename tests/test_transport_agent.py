@@ -37,8 +37,8 @@ async def test_valid_transport_request():
 
 async def test_vehicle_capacity_rejection():
     """Test 2: Rejection when requested quantity exceeds vehicle capacity."""
-    # Requested 20,000 kg when max single vehicle is 12,000 kg
-    res = await filter_suitable_vehicles(quantity_kg=20000.0)
+    # Requested 30,000 kg when max single vehicle is 25,000 kg (BharatBenz 2823C V08)
+    res = await filter_suitable_vehicles(quantity_kg=30000.0)
     assert res["success"] is False
     assert len(res["candidates"]) == 0
     assert len(res["rejected_vehicles"]) > 0

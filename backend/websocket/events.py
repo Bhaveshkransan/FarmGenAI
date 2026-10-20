@@ -6,7 +6,7 @@ Enforces the 20+ named event types rather than unstructured string logs.
 """
 
 from typing import Dict, Any, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -75,8 +75,7 @@ class WSEventSchema(BaseModel):
     payload: Dict[str, Any] = Field(default_factory=dict, description="Structured data associated with the event.")
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional context (e.g., crop, location, latency).")
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 def create_ws_event(

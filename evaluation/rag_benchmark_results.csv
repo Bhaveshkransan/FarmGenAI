@@ -1,0 +1,2 @@
+RAG_Status,Embedding_Model,Collections_Inspected,Sample_Queries_Tested,Retrieval_Latency_Mean_ms,Retrieval_Latency_P50_ms,Retrieval_Latency_P95_ms,IR_Metrics_Status
+Implemented & Local ChromaDB Active,"SentenceTransformer(all-MiniLM-L6-v2, 384 dimensions)","['transport_knowledge', 'agri_knowledge', 'market_history']",5,1699.67,19.96,6742.0,Not Tested (Ground-truth labeled IR query-document pairs not available in repo)

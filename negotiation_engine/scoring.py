@@ -16,9 +16,9 @@ def calculate_scenario_score(scenario_data: dict) -> dict:
     """
     status = scenario_data.get("status", "FAILED")
     scenario_type = scenario_data.get("scenario_type", "direct-sale")
-    final_price = scenario_data.get("final_price", 0)
-    min_price = scenario_data.get("min_price", 1)  # avoid division by zero
-    target_price = scenario_data.get("target_price", final_price or min_price)
+    final_price = scenario_data.get("final_price") or 0
+    min_price = scenario_data.get("min_price") or 1  # avoid division by zero
+    target_price = scenario_data.get("target_price") or final_price or min_price
 
     # 1. Price Satisfaction (40%)
     if status in ("CONTRACT", "DEAL") and final_price:
@@ -40,12 +40,12 @@ def calculate_scenario_score(scenario_data: dict) -> dict:
     waste_score = waste_map.get(scenario_type if status in ("CONTRACT", "DEAL") else "failed", 0)
 
     # 3. Speed / Freshness (20%)
-    shelf_life = scenario_data.get("shelf_life", 1)
+    shelf_life = scenario_data.get("shelf_life") or 1
     freshness_score = min(shelf_life * 20, 100)
     
     # 4. Quantity Fulfillment (20%)
-    requested_quantity = float(scenario_data.get("quantity", 1))
-    offered_quantity = float(scenario_data.get("offered_quantity", requested_quantity))
+    requested_quantity = float(scenario_data.get("quantity") or 1)
+    offered_quantity = float(scenario_data.get("offered_quantity") or requested_quantity)
     quantity_score = min((offered_quantity / max(requested_quantity, 1)) * 100, 100) if status in ("CONTRACT", "DEAL") else 0
 
     # Weighted Average (Farmer-First Index)

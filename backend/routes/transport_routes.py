@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 from database.db import Database
 
 @router.get("/fleet")
+@router.get("/carriers")
+@router.get("")
+@router.get("/")
 async def get_fleet(current_user: dict = Depends(get_current_user)):
     """List all available transport vehicles."""
     fleet = await list_fleet()

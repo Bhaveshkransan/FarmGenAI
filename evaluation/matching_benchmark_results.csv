@@ -1,0 +1,7 @@
+Candidate_Pool_Size,Eligible_Found,Filtering_Latency_ms,Ranking_Latency_ms,Total_Latency_ms,Shortlist_Size,Monotonic_Rank_Consistency,Constraint_Satisfaction_Rate_pct
+10,2,0.005,0.091,0.096,2,PASS,100.0
+50,8,0.009,0.137,0.146,5,PASS,100.0
+100,15,0.011,0.17,0.181,5,PASS,100.0
+200,29,0.026,0.256,0.281,5,PASS,100.0
+500,72,0.028,0.685,0.713,5,PASS,100.0
+1000,143,0.076,1.513,1.588,5,PASS,100.0

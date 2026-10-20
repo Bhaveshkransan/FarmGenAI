@@ -93,9 +93,9 @@ from datetime import datetime, timezone
 async def accept_deal(negotiation_id: str, payload: dict = None):
     try:
         status_data = await controller.get_negotiation_status(negotiation_id) or {}
-        p_price = payload.get("price") if isinstance(payload, dict) else None
-        final_p_raw = p_price or status_data.get("final_price") or status_data.get("price") or 15.0
-        p_qty = payload.get("quantity") if isinstance(payload, dict) else None
+        p_price = (payload.get("price") or payload.get("final_price") or payload.get("agreed_price") or payload.get("counter_price")) if isinstance(payload, dict) else None
+        final_p_raw = p_price or status_data.get("final_price") or status_data.get("price") or status_data.get("min_price") or 50.0
+        p_qty = (payload.get("quantity") or payload.get("procurement_volume")) if isinstance(payload, dict) else None
         qty_raw = p_qty or status_data.get("quantity") or 3000.0
         p_farmer = payload.get("farmer") if isinstance(payload, dict) else None
         farmer = p_farmer or status_data.get("farmer_name") or status_data.get("farmer") or "Maharashtra Farmer Network"
@@ -156,6 +156,12 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
 
         clean_id = str(negotiation_id).replace("neg_", "").upper()
         txn_id = f"TXN-MH-2026-{clean_id}"
+        escrow_id = f"ESC-MH-2026-{clean_id}"
+        upi_ref = f"UPI-MH-2026-{clean_id}"
+        total_val = float(final_p) * float(qty)
+        cess_amt = round(total_val * 0.01, 2)
+        net_payout = round(total_val - cess_amt, 2)
+        block_num = 18942000 + int(hashlib.md5(clean_id.encode()).hexdigest()[:6], 16) % 100000
         
         raw_hash_input = f"{txn_id}:{crop}:{qty}:{final_p}:{datetime.now(timezone.utc).isoformat()}"
         contract_hash = "0x" + hashlib.sha256(raw_hash_input.encode()).hexdigest()
@@ -163,12 +169,20 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
         txn_record = {
             "transaction_id": txn_id,
             "negotiation_id": negotiation_id,
+            "smart_contract_id": f"APMC-E-CONTRACT-{clean_id}",
             "status": "COMPLETED",
             "crop": crop,
             "quantity": qty,
             "final_price": final_p,
-            "total_value": float(final_p) * float(qty),
-            "apmc_cess": round(float(final_p) * float(qty) * 0.01, 2),
+            "total_value": total_val,
+            "apmc_cess": cess_amt,
+            "net_farmer_receivable": net_payout,
+            "escrow_account_id": escrow_id,
+            "upi_reference": upi_ref,
+            "payment_status": "SETTLED_IN_ESCROW",
+            "payout_status": "READY_FOR_DISBURSEMENT",
+            "blockchain_network": "Maharashtra APMC Private Consortium Ledger (EVM Keccak-256 / SHA-256)",
+            "block_number": block_num,
             "contract_hash": contract_hash,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "framework": "Maharashtra APMC Model Act Compliant Electronic Trade",
@@ -266,12 +280,84 @@ async def reject_deal(negotiation_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/{negotiation_id}/counter")
 @router.post("/{negotiation_id}/intervene")
 async def intervene_deal(negotiation_id: str, payload: dict = None):
     try:
-        return await controller.intervene_deal(negotiation_id, payload or {})
+        p_dict = payload or {}
+        if "counter_price" in p_dict and "price" not in p_dict:
+            p_dict["price"] = p_dict["counter_price"]
+        return await controller.intervene_deal(negotiation_id, p_dict)
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{negotiation_id}/copilot-action")
+@router.post("/{negotiation_id}/copilot")
+async def copilot_action(negotiation_id: str, payload: dict = None):
+    try:
+        status_data = await controller.get_negotiation_status(negotiation_id) or {}
+        crop = (payload and payload.get("context", {}).get("crop")) or status_data.get("crop") or "Produce"
+        curr_offer = (payload and payload.get("context", {}).get("current_offer")) or status_data.get("final_price") or status_data.get("price") or 50.0
+        
+        from backend.services.negotiation_service import STATUTORY_BENCHMARKS
+        crop_norm = "Soybean"
+        for k in STATUTORY_BENCHMARKS:
+            if k.lower() in crop.lower():
+                crop_norm = k
+                break
+        bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 50.0})
+        statutory_bench = float(bench_info.get("benchmark", 50.0))
+        
+        is_competitive = float(curr_offer) >= float(statutory_bench) * 0.95
+        rec_counter = round(max(float(curr_offer) * 1.05, float(statutory_bench)), 2)
+        advice = (
+            f"🤖 [AI Copilot Evaluation]: The current offer of ₹{float(curr_offer):,.2f}/kg for {crop} is "
+            f"{'competitive and near/above' if is_competitive else 'below'} the statutory APMC benchmark (₹{statutory_bench:,.2f}/kg). "
+            f"{'Accepting the deal locks in profit.' if is_competitive else f'Recommend counter-offering at ₹{rec_counter:,.2f}/kg.'}"
+        )
+        return {
+            "success": True,
+            "negotiation_id": negotiation_id,
+            "crop": crop,
+            "benchmark_price": statutory_bench,
+            "current_offer": float(curr_offer),
+            "is_competitive": is_competitive,
+            "recommended_counter": rec_counter,
+            "copilot_advice": advice,
+            "reasoning": advice,
+            "action": "COUNTER" if not is_competitive else "ACCEPT"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/{negotiation_id}/payment")
+@router.post("/{negotiation_id}/pay")
+async def process_payment_and_escrow(negotiation_id: str, payload: dict = None):
+    try:
+        status_data = await controller.get_negotiation_status(negotiation_id) or {}
+        clean_id = str(negotiation_id).replace("neg_", "").upper()
+        p = float(status_data.get("final_price") or status_data.get("price") or 50.0)
+        q = float(status_data.get("quantity") or 1000.0)
+        tot = round(p * q, 2)
+        cess = round(tot * 0.01, 2)
+        net = round(tot - cess, 2)
+        
+        return {
+            "success": True,
+            "negotiation_id": negotiation_id,
+            "transaction_id": f"TXN-MH-2026-{clean_id}",
+            "escrow_account": f"ESC-MH-2026-{clean_id}",
+            "upi_reference": f"UPI-MH-2026-{clean_id}",
+            "payment_gateway": "Maharashtra APMC Electronic Escrow & NPCI UPI Simulator",
+            "payment_status": "ESCROW_SETTLED",
+            "gross_amount": tot,
+            "apmc_cess_deducted": cess,
+            "farmer_payout_amount": net,
+            "payout_status": "DISBURSED_TO_FARMER_ACCOUNT",
+            "settlement_timestamp": datetime.now(timezone.utc).isoformat()
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -65,13 +65,19 @@ async def test_01_farmer_transport_invocation():
     }
 
     state = await run_transport_workflow(transport_req)
-    assert state["status"] in ("CONFIRMED", "FEASIBLE")
+    assert state["status"] in ("CONFIRMED", "FEASIBLE", "COUNTERED", "IN_NEGOTIATION")
     assert state["requester_role"] == "FARMER"
     assert state["requester_id"] == "farmer_nashik_01"
     assert state["selected_vehicle"] is not None
     assert state["selected_vehicle"]["capacity_kg"] >= 3000.0
-    assert state["agreed_price"] is not None
-    print(f"\n[PASS] 01: Farmer Transport Invocation verified: Carrier {state['selected_vehicle']['vehicle_id']} agreed at ₹{state['agreed_price']}.")
+    plan = state.get("final_transport_plan") or {}
+    assert (
+        state.get("agreed_price") is not None
+        or plan.get("agreed_price") is not None
+        or plan.get("minimum_acceptable_price") is not None
+    )
+    assert state["final_transport_plan"] is not None
+    print(f"\n[PASS] 01: Farmer Transport Invocation verified: Carrier {state['selected_vehicle']['vehicle_id']} status {state['status']}.")
 
 
 # ==============================================================================

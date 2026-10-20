@@ -6,11 +6,16 @@ from backend.services.security import get_current_user
 router = APIRouter()
 
 @router.get("/list")
+@router.get("/nearby")
+@router.get("")
+@router.get("/")
 async def get_warehouses(current_user: dict = Depends(get_current_user)):
     warehouses = await list_warehouses()
     total_capacity = sum(warehouse["capacity_kg"] for warehouse in warehouses)
     used_capacity = sum(warehouse["used_capacity_kg"] for warehouse in warehouses)
     return {
+        "success": True,
+        "data": warehouses,
         "warehouses": warehouses,
         "summary": {
             "total_capacity_kg": round(total_capacity, 2),

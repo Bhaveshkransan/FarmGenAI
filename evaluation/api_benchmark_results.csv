@@ -1,0 +1,5 @@
+Method,Endpoint,Sample_Count,Status_Code,Mean_Latency_ms,P50_Latency_ms,P95_Latency_ms,P99_Latency_ms,Error_Rate_pct
+GET,/health,30,200,10.63,10.3,13.34,19.37,0.0
+GET,/docs,30,200,4.91,4.86,5.67,5.79,0.0
+GET,/api/v1/market-intelligence/model-metadata,30,200,93.51,95.1,110.69,143.61,0.0
+GET,/api/v1/listings,30,200,21.03,11.87,17.78,198.49,0.0
