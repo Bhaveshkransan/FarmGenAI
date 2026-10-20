@@ -291,6 +291,7 @@ class BuyerOrchestrationService:
                     "special": f"Grade {m.get('quality', 'A')} Listing",
                     "match_score": float(m.get("compatibility_score", 90.0)),
                     "source": "db_listings",
+                    "source_priority": 1,
                 })
         except Exception as e:
             logger.warning(f"Error querying DB listings: {e}")
@@ -330,11 +331,12 @@ class BuyerOrchestrationService:
                         "special": s.get("special", "APMC Certified Lot"),
                         "match_score": float(s.get("match", 95.0 - idx * 2)),
                         "source": "verified_maharashtra_suppliers",
+                        "source_priority": 2,
                     })
 
         if candidates:
-            # Deterministic ranking
-            candidates.sort(key=lambda c: (-c["match_score"], c["distance_km"], c["floor_price"]))
+            # Deterministic ranking: real DB listings prioritized, then by match score (desc), distance (asc), floor price (asc)
+            candidates.sort(key=lambda c: (c.get("source_priority", 1), -c["match_score"], c["distance_km"], c["floor_price"]))
             return candidates[:max_candidates]
 
         return []
