@@ -11,9 +11,9 @@
 | Severity Level | Identified | Resolved | Outstanding Blockers |
 | :--- | :---: | :---: | :---: |
 | **Critical (Sev-1)** | 3 | 3 | **0** |
-| **Major (Sev-2)** | 5 | 5 | **0** |
+| **Major (Sev-2)** | 6 | 6 | **0** |
 | **Minor (Sev-3)** | 4 | 4 | **0** |
-| **Total** | **12** | **12** | **0** |
+| **Total** | **13** | **13** | **0** |
 
 ---
 
@@ -131,4 +131,11 @@
   4. Added `GET /api/v1/negotiations/stream/status` and `POST /api/v1/negotiations/{negotiation_id}/dispatch-worker` diagnostic endpoints.
 - **Verification:** Verified live `xadd` generating stream job IDs in Redis; verified `agent_worker.py` dequeuing `neg_aad5caee` from consumer group `worker_group` and acknowledging with `xack`; all 85 unit and integration tests passed.
 
-
+### DEF-13: Temporal Dead Zone ReferenceError in Negotiation Room Initialization
+- **Severity:** Sev-2 (Major)
+- **Component:** [frontend/src/pages/negotiation/NegotiationRoom.tsx](file:///c:/PROJECT/FarmGenAI/frontend/src/pages/negotiation/NegotiationRoom.tsx)
+- **Description:** `currentTransportPlan`, `currentWarehousePlan`, and `currentProcessorPlan` (lines 285-287) along with `invokeAgentAction` referenced `negState` prior to its declaration via `useQuery` at line 550.
+- **Impact:** Navigating to `/buyer/negotiations/{id}` crashed the React application at component render time with `ReferenceError: Cannot access 'negState' before initialization`, triggering ErrorBoundary and preventing page load.
+- **Root Cause:** ES6 Temporal Dead Zone (TDZ) violation due to variable access preceding `const` declaration.
+- **Resolution:** Relocated the `useQuery` hook for `negState` up to line 256 directly adjacent to WebSocket initialization and preceding all plan evaluation and action handlers.
+- **Verification:** Verified via live browser subagent navigation to `http://localhost:8080/buyer/negotiations/neg_49bdbfad`; page loads cleanly with active statutory APMC bench-marks, live candidate radar, and AI copilot without ErrorBoundary triggers.

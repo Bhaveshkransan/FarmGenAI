@@ -253,6 +253,19 @@ export default function NegotiationRoom() {
   const wsUrl = targetWsId ? `${baseWsUrl}?negotiation_id=${targetWsId}` : `${baseWsUrl}/negotiation`;
   const { isConnected, lastMessage, sendMessage } = useWebSocket(wsUrl);
 
+  // 1. Fetch negotiation session state from database (smooth non-blocking background polling)
+  const { data: negState, isLoading, refetch: refetchNeg } = useQuery({
+    queryKey: ['negotiation', activeId],
+    queryFn: async () => {
+      if (!activeId) return null;
+      const res = await api.get(`/negotiations/${activeId}`);
+      return res.data?.data || res.data;
+    },
+    enabled: Boolean(activeId),
+    refetchInterval: 4000,
+    retry: 1
+  });
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
@@ -545,19 +558,6 @@ export default function NegotiationRoom() {
   const [copilotCommand, setCopilotCommand] = useState('');
   const [copilotMessages, setCopilotMessages] = useState<{sender: string, text: string, time: string}[]>([]);
   const [liveBuyers, setLiveBuyers] = useState<any[]>(() => getInitialBuyers('Rice', 25));
-
-  // 1. Fetch negotiation session state from database (smooth non-blocking background polling)
-  const { data: negState, isLoading, refetch: refetchNeg } = useQuery({
-    queryKey: ['negotiation', activeId],
-    queryFn: async () => {
-      if (!activeId) return null;
-      const res = await api.get(`/negotiations/${activeId}`);
-      return res.data?.data || res.data;
-    },
-    enabled: Boolean(activeId),
-    refetchInterval: 4000,
-    retry: 1
-  });
 
   // State recovery on page reload/reconnection from persisted negotiation state
   useEffect(() => {
