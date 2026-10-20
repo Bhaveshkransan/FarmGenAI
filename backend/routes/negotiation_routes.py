@@ -70,6 +70,13 @@ async def get_agents():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/stream/status")
+@router.get("/stream-status")
+@router.get("/worker/status")
+async def get_stream_status():
+    from backend.core.redis import redis_manager
+    return await redis_manager.get_stream_stats()
+
 @router.get("/{negotiation_id}")
 @router.get("/negotiation-status/{negotiation_id}")
 async def get_negotiation_status(negotiation_id: str):
@@ -455,5 +462,22 @@ async def parallel_procure_route(negotiation_id: str, payload: dict = None):
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/{negotiation_id}/dispatch-worker")
+async def dispatch_negotiation_to_worker(negotiation_id: str):
+    from backend.core.redis import redis_manager
+    status_data = await controller.get_negotiation_status(negotiation_id)
+    if not status_data:
+        raise HTTPException(status_code=404, detail="Negotiation not found")
+    job_id = await redis_manager.enqueue_negotiation_job(negotiation_id, status_data)
+    if not job_id:
+        raise HTTPException(status_code=503, detail="Redis Stream is unavailable or not connected")
+    return {
+        "success": True,
+        "negotiation_id": negotiation_id,
+        "stream_job_id": job_id,
+        "message": f"Negotiation {negotiation_id} dispatched to Redis Stream 'agri:negotiation:jobs'"
+    }
+
 
 

@@ -593,16 +593,39 @@ class NegotiationService:
             initial_offers[0]
         )
 
+        # Check if distributed worker execution is active or requested
+        use_worker = bool(payload.get("use_worker") or payload.get("dispatch_mode") == "worker")
+        active_worker_detected = False
+        stream_job_id = None
+
+        try:
+            from backend.core.redis import redis_manager
+            if redis_manager.client:
+                active_worker_detected = await redis_manager.has_active_stream_workers()
+                stream_job_id = await redis_manager.enqueue_negotiation_job(negotiation_id, payload)
+                if stream_job_id:
+                    negotiation_payload["stream_job_id"] = stream_job_id
+                    negotiation_payload["dispatched_to_stream"] = True
+                    await self.db_repo.update_negotiation_async(negotiation_id, {"stream_job_id": stream_job_id})
+        except Exception as e:
+            logger.warning(f"Redis stream dispatch note for {negotiation_id}: {e}")
+
         # If sync=True is requested, await completion (used for CLI scripts / unit tests)
         if payload.get("sync") is True:
             return await self._run_negotiation_workflow(
                 negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
             )
 
-        # Default async execution: dispatch background task and return immediately (50ms response time)
-        asyncio.create_task(self._run_negotiation_workflow(
-            negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
-        ))
+        # Execution routing:
+        # If an active worker is detected or use_worker was requested and job was enqueued,
+        # let agent_worker.py process the job.
+        # Otherwise, run in-process background task via asyncio.create_task.
+        if (active_worker_detected or use_worker) and stream_job_id:
+            logger.info(f"⚡ Negotiation {negotiation_id} assigned to distributed agent_worker via stream job {stream_job_id}.")
+        else:
+            asyncio.create_task(self._run_negotiation_workflow(
+                negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
+            ))
 
         return {
             "negotiation_id": negotiation_id,
@@ -618,7 +641,10 @@ class NegotiationService:
             "summary": negotiation_payload["summary"],
             "crop": payload["crop"],
             "quantity": float(payload["quantity"]),
-            "farmer": farmer_row["name"]
+            "farmer": farmer_row["name"],
+            "stream_job_id": stream_job_id,
+            "dispatched_to_stream": bool(stream_job_id),
+            "execution_mode": "worker" if ((active_worker_detected or use_worker) and stream_job_id) else "in_process"
         }
 
     async def _run_negotiation_workflow(

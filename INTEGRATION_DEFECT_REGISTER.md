@@ -11,9 +11,9 @@
 | Severity Level | Identified | Resolved | Outstanding Blockers |
 | :--- | :---: | :---: | :---: |
 | **Critical (Sev-1)** | 3 | 3 | **0** |
-| **Major (Sev-2)** | 4 | 4 | **0** |
+| **Major (Sev-2)** | 5 | 5 | **0** |
 | **Minor (Sev-3)** | 4 | 4 | **0** |
-| **Total** | **11** | **11** | **0** |
+| **Total** | **12** | **12** | **0** |
 
 ---
 
@@ -117,4 +117,18 @@
 - **Root Cause:** Placeholder dispatch logic in `invokeAgentAction` and static parameter cards in the modal UI.
 - **Resolution:** Connected `invokeAgentAction` to `POST /api/v1/warehouse/book` and `POST /api/v1/processor/order` (via `GET /api/v1/processor/matching`), populated `liveWarehousePlan` and `liveProcessorPlan` states, bound dynamic facility and pricing data to modal metric cards, and integrated warehouse and processor signatures into `TransactionValidationModal` and downloadable term sheets.
 - **Verification:** Frontend production build passed cleanly (`npm run build`), and contract preview displays dynamic verified signatures.
+
+### DEF-12: Disconnected Redis Stream Producer in Background Negotiations
+- **Severity:** Sev-2 (Major)
+- **Component:** [backend/core/redis.py](file:///c:/PROJECT/FarmGenAI/backend/core/redis.py), [backend/services/negotiation_service.py](file:///c:/PROJECT/FarmGenAI/backend/services/negotiation_service.py), [backend/routes/negotiation_routes.py](file:///c:/PROJECT/FarmGenAI/backend/routes/negotiation_routes.py), [backend/workers/agent_worker.py](file:///c:/PROJECT/FarmGenAI/backend/workers/agent_worker.py)
+- **Description:** `agent_worker.py` and `docker-compose.yml` (`farmgenai-worker`) were designed to consume tasks from Redis Stream `agri:negotiation:jobs`, but no producer in FastAPI called `redis.xadd()`. Background negotiations were executed solely in-process via `asyncio.create_task`, leaving the worker daemon isolated without incoming tasks.
+- **Impact:** Distributed worker scaling was inactive in production deployments, and worker daemon remained idle despite active marketplace volume.
+- **Root Cause:** Missing `xadd()` publisher call in the negotiation creation lifecycle and lack of consumer group health detection.
+- **Resolution:**
+  1. Extended `RedisManager` with `enqueue_negotiation_job()`, `has_active_stream_workers()`, and `get_stream_stats()`.
+  2. Integrated `enqueue_negotiation_job()` into `start_negotiation()` in `NegotiationService`, returning `stream_job_id` and routing to distributed `agent_worker.py` when active workers are detected or requested, with automatic graceful in-process fallback when offline.
+  3. Updated `agent_worker.py`'s `_serialize_result()` to persist downstream `warehouse_plan`, `processor_plan`, and `end_to_end_deal` fields upon job completion.
+  4. Added `GET /api/v1/negotiations/stream/status` and `POST /api/v1/negotiations/{negotiation_id}/dispatch-worker` diagnostic endpoints.
+- **Verification:** Verified live `xadd` generating stream job IDs in Redis; verified `agent_worker.py` dequeuing `neg_aad5caee` from consumer group `worker_group` and acknowledging with `xack`; all 85 unit and integration tests passed.
+
 
