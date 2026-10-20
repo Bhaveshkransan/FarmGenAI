@@ -409,6 +409,10 @@ class Database:
                 db_neg.market_offers = p.get("market_offers", [])
                 db_neg.selected_buyer = p.get("selected_buyer", {})
                 db_neg.signatures = p.get("signatures", {})
+                db_neg.warehouse_plan = p.get("warehouse_plan")
+                db_neg.processor_plan = p.get("processor_plan")
+                db_neg.end_to_end_deal = p.get("end_to_end_deal")
+                db_neg.contract_hash = p.get("contract_hash")
                 await session.commit()
         except Exception:
             pass
@@ -442,7 +446,11 @@ class Database:
                         "logs": db_neg.logs or [],
                         "market_offers": db_neg.market_offers or [],
                         "selected_buyer": db_neg.selected_buyer or {},
-                        "signatures": db_neg.signatures or {}
+                        "signatures": db_neg.signatures or {},
+                        "warehouse_plan": getattr(db_neg, "warehouse_plan", None),
+                        "processor_plan": getattr(db_neg, "processor_plan", None),
+                        "end_to_end_deal": getattr(db_neg, "end_to_end_deal", None),
+                        "contract_hash": getattr(db_neg, "contract_hash", None)
                     }
         except Exception:
             pass
@@ -480,6 +488,10 @@ class Database:
                         "market_offers": r.market_offers or [],
                         "selected_buyer": r.selected_buyer or {},
                         "signatures": r.signatures or {},
+                        "warehouse_plan": getattr(r, "warehouse_plan", None),
+                        "processor_plan": getattr(r, "processor_plan", None),
+                        "end_to_end_deal": getattr(r, "end_to_end_deal", None),
+                        "contract_hash": getattr(r, "contract_hash", None),
                         "created_at": getattr(r, "created_at", None) or datetime.now(timezone.utc).isoformat()
                     } for r in rows]
         except Exception:
@@ -522,6 +534,10 @@ class Database:
                 if "market_offers" in payload: db_neg.market_offers = payload["market_offers"]
                 if "selected_buyer" in payload: db_neg.selected_buyer = payload["selected_buyer"]
                 if "signatures" in payload: db_neg.signatures = payload["signatures"]
+                if "warehouse_plan" in payload: db_neg.warehouse_plan = payload["warehouse_plan"]
+                if "processor_plan" in payload: db_neg.processor_plan = payload["processor_plan"]
+                if "end_to_end_deal" in payload: db_neg.end_to_end_deal = payload["end_to_end_deal"]
+                if "contract_hash" in payload: db_neg.contract_hash = payload["contract_hash"]
                 await session.commit()
         except Exception:
             pass

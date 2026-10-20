@@ -851,6 +851,11 @@ class NegotiationService:
             offers = await self.db_repo.get_offers_for_negotiation_async(target_id)
             if offers:
                 res["offers"] = offers
+            db_row = await self.db_repo.get_negotiation_async(target_id)
+            if db_row:
+                for k in ("warehouse_plan", "processor_plan", "end_to_end_deal", "contract_hash", "transport_plan", "final_price", "status"):
+                    if db_row.get(k) and not res.get(k):
+                        res[k] = db_row[k]
             return res
 
         alt_id = f"neg_{negotiation_id}" if not negotiation_id.startswith("neg_") else negotiation_id[4:]
@@ -859,6 +864,11 @@ class NegotiationService:
             offers = await self.db_repo.get_offers_for_negotiation_async(alt_id)
             if offers:
                 res["offers"] = offers
+            db_row = await self.db_repo.get_negotiation_async(alt_id)
+            if db_row:
+                for k in ("warehouse_plan", "processor_plan", "end_to_end_deal", "contract_hash", "transport_plan", "final_price", "status"):
+                    if db_row.get(k) and not res.get(k):
+                        res[k] = db_row[k]
             return res
 
         # 2. Check in database with exact id, then alternate prefix
@@ -1378,7 +1388,7 @@ class NegotiationService:
                 f"No executable deal found meeting reservation ceiling (₹{reservation_p:.2f}/kg) or budget."
             )
 
-        await self.db_repo.update_negotiation_async(negotiation_id, {
+        update_payload = {
             "crop": crop_norm,
             "quantity": qty,
             "farmer_name": winner["seller_name"] if winner else "No Deal",
@@ -1392,7 +1402,13 @@ class NegotiationService:
             "end_to_end_deal": end_to_end_deal,
             "logs": orch_res.get("logs", []),
             "contract_hash": end_to_end_deal.get("contract_hash") if end_to_end_deal else None,
-        })
+        }
+        await self.db_repo.update_negotiation_async(negotiation_id, update_payload)
+        if negotiation_id in self.active_negotiations:
+            self.active_negotiations[negotiation_id].update(update_payload)
+        alt_id = f"neg_{negotiation_id}" if not negotiation_id.startswith("neg_") else negotiation_id[4:]
+        if alt_id in self.active_negotiations:
+            self.active_negotiations[alt_id].update(update_payload)
 
         # Record parallel summary offer
         parallel_offer = {

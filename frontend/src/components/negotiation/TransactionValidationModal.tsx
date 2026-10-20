@@ -123,7 +123,7 @@ ${!isTransport ? `- APMC Mandi Cess (1.0%): Rs. ${apmcCess.toLocaleString()}\n` 
 LOGISTICS & DISPUTE RESOLUTION:
 - Delivery Window: Scheduled Immediate Dispatch (within 24-48 hours)
 - Logistics Handler: Multi-Modal APMC Certified Freight
-- Quality Dispute Window: 24 Hours post-delivery inspection
+${dealData.transport_plan ? `- Transport Carrier: ${dealData.transport_plan.transporter || dealData.transport_plan.vehicle_type || 'Fleet Assigned'} (Distance: ${dealData.transport_plan.distance_km || 213} km, Cost: Rs. ${dealData.transport_plan.cost || dealData.transport_plan.agreed_price})\n` : ''}${dealData.warehouse_plan ? `- Warehouse Godown: ${dealData.warehouse_plan.warehouse || dealData.warehouse_plan.name} (${dealData.warehouse_plan.location || 'Maharashtra'}, Rate: Rs. ${dealData.warehouse_plan.cost_per_kg_per_day}/kg/day)\n` : ''}${dealData.processor_plan ? `- Industrial Processor: ${dealData.processor_plan.processor_name || dealData.processor_plan.name} (Output: ${dealData.processor_plan.output_product})\n` : ''}- Quality Dispute Window: 24 Hours post-delivery inspection
 - Moisture & Spoilage Standard: APMC Grade A Verified (< 12% moisture)
 
 GOVERNMENT & REGULATORY COMPLIANCE:
@@ -291,16 +291,38 @@ This contract represents a legally binding electronic agricultural trade agreeme
                 <p className="text-slate-400 uppercase font-semibold text-[10px]">Logistics & Delivery Mode</p>
                 <p className="font-bold text-slate-900 text-sm flex items-center gap-1">
                   <Truck size={14} className="text-emerald-600" />
-                  {dealData.transport_plan ? `${dealData.transport_plan.vehicle} • Attached Carrier` : 'Multi-Modal APMC Freight'}
+                  {dealData.transport_plan ? `${dealData.transport_plan.vehicle || dealData.transport_plan.vehicle_type} • Attached Carrier` : 'Multi-Modal APMC Freight'}
                 </p>
                 <p className="text-slate-500 text-[11px]">
                   {dealData.transport_plan ? (
-                    <>Carrier: <span className="font-semibold text-slate-700">{dealData.transport_plan.transporter || 'Registered Transporter'}</span> • Distance: {dealData.transport_plan.distance_km} km • Freight: ₹{Number(dealData.transport_plan.cost).toLocaleString()}</>
+                    <>Carrier: <span className="font-semibold text-slate-700">{dealData.transport_plan.transporter || 'Registered Transporter'}</span> • Distance: {dealData.transport_plan.distance_km || 213} km • Freight: ₹{Number(dealData.transport_plan.cost || dealData.transport_plan.agreed_price).toLocaleString()}</>
                   ) : (
                     'Direct Transit from Farm gate to Buyer Hub • 24hr Inspection Window'
                   )}
                 </p>
               </div>
+              {dealData.warehouse_plan && (
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                  <p className="text-slate-400 uppercase font-semibold text-[10px]">Warehouse Allocation</p>
+                  <p className="font-bold text-slate-900 text-sm flex items-center gap-1 text-indigo-700">
+                    {dealData.warehouse_plan.warehouse || dealData.warehouse_plan.name || 'Warehouse Godown'}
+                  </p>
+                  <p className="text-slate-500 text-[11px]">
+                    Location: {dealData.warehouse_plan.location || 'Maharashtra'} • Rate: ₹{dealData.warehouse_plan.cost_per_kg_per_day || 1.6}/kg/day • Status: {dealData.warehouse_plan.status || 'ASSIGNED'}
+                  </p>
+                </div>
+              )}
+              {dealData.processor_plan && (
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                  <p className="text-slate-400 uppercase font-semibold text-[10px]">Industrial Processing Contract</p>
+                  <p className="font-bold text-slate-900 text-sm flex items-center gap-1 text-amber-700">
+                    {dealData.processor_plan.processor_name || dealData.processor_plan.name || 'Agro Processor'}
+                  </p>
+                  <p className="text-slate-500 text-[11px]">
+                    Product: {dealData.processor_plan.output_product || 'Milling Output'} • Fee: ₹{Number(dealData.processor_plan.total_payment || dealData.processor_plan.total_cost || 0).toLocaleString()}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -313,22 +335,36 @@ This contract represents a legally binding electronic agricultural trade agreeme
               <span className="text-[10px] text-slate-400 font-mono">Consensus Verified (LangGraph)</span>
             </div>
             
-            <div className={`grid grid-cols-1 ${dealData.transport_plan ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3 text-xs font-mono`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs font-mono">
               <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60">
                 <p className="text-[10px] text-slate-400 uppercase font-sans">Seller Digital Signature</p>
-                <p className="text-emerald-400 font-bold mt-0.5">SIGNED: Farmer Agent ({farmerName})</p>
+                <p className="text-emerald-400 font-bold mt-0.5 truncate">SIGNED: Farmer Agent ({farmerName})</p>
                 <p className="text-[10px] text-slate-500 mt-1">Sig: 0x89ab...420e (APMC Key MH-FARM-9024)</p>
               </div>
               <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60">
                 <p className="text-[10px] text-slate-400 uppercase font-sans">Buyer Digital Signature</p>
-                <p className="text-blue-400 font-bold mt-0.5">SIGNED: Buyer Agent ({buyerName})</p>
+                <p className="text-blue-400 font-bold mt-0.5 truncate">SIGNED: Buyer Agent ({buyerName})</p>
                 <p className="text-[10px] text-slate-500 mt-1">Sig: 0x24ef...9811 (Verified {fssaiLicense ? 'FSSAI' : 'GSTIN'})</p>
               </div>
               {dealData.transport_plan && (
                 <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60">
                   <p className="text-[10px] text-slate-400 uppercase font-sans">Carrier Transit Signature</p>
-                  <p className="text-amber-400 font-bold mt-0.5">SIGNED: {dealData.transport_plan.transporter || 'Carrier'}</p>
-                  <p className="text-[10px] text-slate-500 mt-1">Fleet: {dealData.transport_plan.vehicle} (₹{Number(dealData.transport_plan.cost).toLocaleString()})</p>
+                  <p className="text-cyan-400 font-bold mt-0.5 truncate">SIGNED: {dealData.transport_plan.transporter || 'Carrier'}</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Fleet: {dealData.transport_plan.vehicle || dealData.transport_plan.vehicle_type} (₹{Number(dealData.transport_plan.cost || dealData.transport_plan.agreed_price).toLocaleString()})</p>
+                </div>
+              )}
+              {dealData.warehouse_plan && (
+                <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                  <p className="text-[10px] text-slate-400 uppercase font-sans">Warehouse Storage Signature</p>
+                  <p className="text-indigo-400 font-bold mt-0.5 truncate">SIGNED: {dealData.warehouse_plan.warehouse || dealData.warehouse_plan.name || 'Warehouse Godown'}</p>
+                  <p className="text-[10px] text-slate-500 mt-1 truncate">Slot: {dealData.warehouse_plan.warehouse_id || 'WH-ALLOC'} ({dealData.warehouse_plan.location || 'Maharashtra'})</p>
+                </div>
+              )}
+              {dealData.processor_plan && (
+                <div className="p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                  <p className="text-[10px] text-slate-400 uppercase font-sans">Processor Conversion Signature</p>
+                  <p className="text-rose-400 font-bold mt-0.5 truncate">SIGNED: {dealData.processor_plan.processor_name || dealData.processor_plan.name || 'Processor Unit'}</p>
+                  <p className="text-[10px] text-slate-500 mt-1 truncate">Product: {dealData.processor_plan.output_product || 'Value-Added Goods'}</p>
                 </div>
               )}
             </div>

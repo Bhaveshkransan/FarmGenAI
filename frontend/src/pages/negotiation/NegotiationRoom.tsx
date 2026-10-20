@@ -278,6 +278,14 @@ export default function NegotiationRoom() {
   // Dedicated Agent Talk & Invocation Modals (Transport, Warehouse, Processor)
   const [activeAgentModal, setActiveAgentModal] = useState<'TRANSPORT' | 'WAREHOUSE' | 'PROCESSOR' | null>(null);
   const [isInvokingAgent, setIsInvokingAgent] = useState(false);
+  const [liveWarehousePlan, setLiveWarehousePlan] = useState<any>(null);
+  const [liveProcessorPlan, setLiveProcessorPlan] = useState<any>(null);
+  const [liveTransportPlan, setLiveTransportPlan] = useState<any>(null);
+
+  const currentTransportPlan = liveTransportPlan || agreementData?.transport_plan || negState?.transport_plan;
+  const currentWarehousePlan = liveWarehousePlan || agreementData?.warehouse_plan || negState?.warehouse_plan;
+  const currentProcessorPlan = liveProcessorPlan || agreementData?.processor_plan || negState?.processor_plan;
+
   const [agentChatInput, setAgentChatInput] = useState('');
   const [agentChatHistory, setAgentChatHistory] = useState<Record<string, Array<{ sender: 'user' | 'agent', text: string, time: string }>>>({
     TRANSPORT: [
@@ -309,35 +317,96 @@ export default function NegotiationRoom() {
       if (requirementId) {
         await api.post(`/requirements/${requirementId}/workflow/step`, { action: agent });
         await queryClient.invalidateQueries({ queryKey: ['buyerWorkflow', requirementId] });
-      } else {
-        if (agent === 'TRANSPORT') {
-          const res = await api.post('/transport/plan', {
-            request_id: `TR-${id || 'demo'}-${Date.now().toString().slice(-4)}`,
+      }
+
+      let agentResponse = '';
+
+      if (agent === 'TRANSPORT') {
+        const res = await api.post('/transport/plan', {
+          request_id: `TR-${id || 'demo'}-${Date.now().toString().slice(-4)}`,
+          crop: cropName,
+          quantity_kg: cropQty,
+          pickup_location: negState?.location || 'Nashik APMC',
+          delivery_location: 'Pune APMC',
+          delivery_deadline_hours: 24.0,
+          target_price: 10000.0
+        });
+        const plan = res.data?.data;
+        if (plan) {
+          setLiveTransportPlan(plan);
+          setAgreementData((prev: any) => prev ? { ...prev, transport_plan: plan } : prev);
+          const tariff = plan.agreed_price || plan.total_operating_cost || 9099.43;
+          setLiveTerminalLogs(prev => [
+            ...prev,
+            { time: now(), tag: 'TRANSPORT', color: 'text-cyan-400', text: `Transport assigned: ${plan.vehicle_type || 'Tata Ace Gold'} (Distance: ${plan.distance_km || 213}km, Tariff: ₹${tariff.toLocaleString()})` }
+          ]);
+          agentResponse = `Fleet assigned! ${plan.vehicle_type || 'Tata Ace Gold'} scheduled from ${plan.pickup_location || negState?.location || 'Nashik APMC'} to ${plan.delivery_location || 'Pune APMC'} (${plan.distance_km || 213} km). Live negotiated tariff: ₹${tariff.toLocaleString()}.`;
+        } else {
+          agentResponse = `Fleet assigned! Tata Ace Gold (1.5 MT) scheduled from ${negState?.location || 'Nashik APMC'} to Pune APMC (213 km). Live negotiated tariff: ₹9,099.43.`;
+        }
+      } else if (agent === 'WAREHOUSE') {
+        const res = await api.post('/warehouse/book', {
+          quantity: cropQty,
+          location: negState?.location || 'Nashik',
+          crop: cropName,
+          shelf_life: 7
+        });
+        const wh = res.data;
+        if (wh && (wh.warehouse || wh.warehouse_id)) {
+          setLiveWarehousePlan(wh);
+          setAgreementData((prev: any) => prev ? { ...prev, warehouse_plan: wh } : prev);
+          const totalCost = wh.total_daily_cost ? wh.total_daily_cost * (wh.recommended_days || 7) : (cropQty * (wh.cost_per_kg_per_day || 1.6) * 7);
+          setLiveTerminalLogs(prev => [
+            ...prev,
+            { time: now(), tag: 'WAREHOUSE', color: 'text-indigo-400', text: `Storage booked: ${wh.warehouse} (${wh.location}) for ${wh.quantity}kg at ₹${wh.cost_per_kg_per_day}/kg/day (Total: ₹${totalCost.toLocaleString()})` }
+          ]);
+          agentResponse = `Storage secured! Allocated ${wh.quantity.toLocaleString()} kg at ${wh.warehouse} (${wh.location}) for ${wh.recommended_days || 7} days holding. Daily rate: ₹${wh.cost_per_kg_per_day}/kg/day (Holding total: ₹${totalCost.toLocaleString()}).`;
+        } else {
+          agentResponse = `Storage secured! Allocated ${cropQty.toLocaleString()} kg at Pune District Cooperative Dry Godown for 7 days holding. Daily rate: ₹1.6/kg/day.`;
+        }
+      } else if (agent === 'PROCESSOR') {
+        let matchedProc: any = null;
+        try {
+          const matchRes = await api.get(`/processor/matching?crop=${encodeURIComponent(cropName)}`);
+          const procs = matchRes.data?.data || [];
+          if (procs.length > 0) {
+            matchedProc = procs[0];
+          } else {
+            const allRes = await api.get('/processor');
+            matchedProc = allRes.data?.data?.[0];
+          }
+        } catch (fetchErr) {
+          console.warn('Processor matching query fallback:', fetchErr);
+        }
+
+        if (matchedProc) {
+          const procQty = Math.max(cropQty, matchedProc.min_order_kg || 200);
+          const orderRes = await api.post('/processor/order', {
+            negotiation_id: id || undefined,
+            processor_id: matchedProc.processor_id,
             crop: cropName,
-            quantity_kg: cropQty,
-            pickup_location: negState?.location || 'Nashik APMC',
-            delivery_location: 'Pune APMC',
-            delivery_deadline_hours: 24.0,
-            target_price: 10000.0
+            quantity: procQty,
+            notes: `Autonomous processing order for ${cropName}`
           });
-          const plan = res.data?.data;
-          if (plan) {
+          const orderData = orderRes.data?.data;
+          if (orderData) {
+            setLiveProcessorPlan(orderData);
+            setAgreementData((prev: any) => prev ? { ...prev, processor_plan: orderData } : prev);
             setLiveTerminalLogs(prev => [
               ...prev,
-              { time: now(), tag: 'TRANSPORT', color: 'text-cyan-400', text: `Transport assigned: ${plan.vehicle_type || 'Tata Ace Gold'} (Distance: ${plan.distance_km || 213}km, Tariff: ₹${(plan.agreed_price || plan.total_operating_cost || 9099.43).toLocaleString()})` }
+              { time: now(), tag: 'PROCESSOR', color: 'text-amber-400', text: `Processor contracted: ${orderData.processor_name} (Order ID: ${orderData.order_id}, Output: ${orderData.output_product}, Fee: ₹${orderData.total_payment?.toLocaleString()})` }
             ]);
+            agentResponse = `Processor contracted! ${orderData.processor_name} confirmed for milling into ${orderData.output_product}. Total order value: ₹${orderData.total_payment?.toLocaleString()} (Order ID: ${orderData.order_id}).`;
+          } else {
+            agentResponse = `Processor contracted! ${matchedProc.name} confirmed for milling into ${matchedProc.output_product}.`;
           }
+        } else {
+          agentResponse = `Processor contracted! Marathwada Solvent Extractions (Latur) confirmed for milling into Refined Oil & DOC Cake (18% yield). Milling tariff: ₹4,080.00.`;
         }
       }
 
       setCompletedSupplyChainNodes(prev => Array.from(new Set([...prev, agent])));
       setActiveSupplyChainNode(agent);
-
-      const agentResponse = agent === 'TRANSPORT'
-        ? `Fleet assigned! Tata Ace Gold (1.5 MT) scheduled from ${negState?.location || 'Nashik APMC'} to Pune APMC (213 km). Live negotiated tariff: ₹9,099.43.`
-        : agent === 'WAREHOUSE'
-        ? `Storage secured! Allocated 1,000 kg at Pune District Cooperative Dry Godown for 7 days holding. Daily rate: ₹0.015/kg/day (Total: ₹105.00).`
-        : `Processor contracted! Marathwada Solvent Extractions (Latur) confirmed for milling into Refined Oil & DOC Cake (18% yield). Milling tariff: ₹4,080.00.`;
 
       setAgentChatHistory(prev => ({
         ...prev,
@@ -376,28 +445,36 @@ export default function NegotiationRoom() {
       let reply = '';
       const lower = userText.toLowerCase();
       if (agent === 'TRANSPORT') {
+        const transName = currentTransportPlan?.vehicle_type || currentTransportPlan?.vehicle || 'Tata Ace Gold';
         if (lower.includes('refrigerat') || lower.includes('cold') || lower.includes('reefer')) {
           reply = 'Filtering refrigerated fleet in Maharashtra corridor. 2 Reefer 4-ton trucks available with -5°C to 10°C climate control (+₹2,100 surcharge).';
         } else if (lower.includes('price') || lower.includes('rate') || lower.includes('counter') || lower.includes('cost')) {
-          reply = 'Evaluated counter-offer against diesel index (₹90.45/L) and NH-60 tolls (₹426). Carrier accepted revised haulage tariff of ₹8,750 (Saving ₹349.43).';
+          const tariff = Number(currentTransportPlan?.agreed_price || currentTransportPlan?.cost || 9099.43);
+          const counterTariff = Math.round(tariff * 0.96);
+          reply = `Evaluated counter-offer against diesel index (₹90.45/L) and NH-60 tolls. Carrier accepted revised haulage tariff of ₹${counterTariff.toLocaleString()} (Saving ₹${(tariff - counterTariff).toLocaleString()}).`;
         } else if (lower.includes('eta') || lower.includes('time') || lower.includes('deliver') || lower.includes('when')) {
-          reply = 'Estimated transit duration: 5.5 hours via NH-60. Real-time GPS telematics will activate upon mandi gate-out.';
+          const dist = currentTransportPlan?.distance_km || 213;
+          reply = `Estimated transit duration: 5.5 hours for ${dist} km via NH-60. Real-time GPS telematics active on ${transName}.`;
         } else {
-          reply = `Transport Agent acknowledged: "${userText}". Driver dispatch manifest and vehicle parameters updated.`;
+          reply = `Transport Agent acknowledged: "${userText}". Vehicle ${transName} dispatch manifest and carrier parameters confirmed.`;
         }
       } else if (agent === 'WAREHOUSE') {
+        const whName = currentWarehousePlan?.warehouse || currentWarehousePlan?.name || 'Warehouse Godown';
+        const dailyRate = currentWarehousePlan?.cost_per_kg_per_day || 1.6;
         if (lower.includes('day') || lower.includes('extend') || lower.includes('period') || lower.includes('time')) {
-          reply = 'Extended holding duration updated to 14 days at Pune Cooperative Godown. Additional storage fee: ₹105.00 (Total ₹210.00).';
+          const extraCost = Math.round(cropQty * dailyRate * 7);
+          reply = `Extended holding duration updated to 14 days at ${whName}. Additional storage fee: ₹${extraCost.toLocaleString()} (Rate: ₹${dailyRate}/kg/day).`;
         } else if (lower.includes('temp') || lower.includes('moisture') || lower.includes('cold') || lower.includes('humidity')) {
-          reply = 'Humidity & aeration sensors active. Silo chamber maintains internal grain moisture ≤ 10.5% with certified fumigation.';
+          reply = `Humidity & aeration sensors active at ${whName}. Silo chamber maintains internal grain moisture ≤ 10.5% with certified fumigation.`;
         } else {
-          reply = `Warehouse Agent recorded note: "${userText}". Storage slot reserved in Bay C-4.`;
+          reply = `Warehouse Agent recorded note: "${userText}". Storage slot reserved at ${whName} (${currentWarehousePlan?.location || 'Maharashtra'}).`;
         }
       } else {
-        if (lower.includes('yield') || lower.includes('oil') || lower.includes('doc') || lower.includes('cake')) {
-          reply = 'Extraction ratio: 18.0% Refined Oil (180 kg) + 79.5% De-Oiled Cake (795 kg) + 2.5% process loss.';
+        const procName = currentProcessorPlan?.processor_name || currentProcessorPlan?.name || 'Processor Unit';
+        if (lower.includes('yield') || lower.includes('oil') || lower.includes('doc') || lower.includes('cake') || lower.includes('product')) {
+          reply = `Target output: ${currentProcessorPlan?.output_product || 'Refined Product & Byproducts'} contracted with ${procName} for ${cropQty}kg ${cropName}.`;
         } else {
-          reply = `Processor Agent confirmed: "${userText}". Batch scheduling priority set for immediate milling upon delivery.`;
+          reply = `Processor Agent (${procName}) confirmed: "${userText}". Batch scheduling priority set for immediate milling upon delivery.`;
         }
       }
 
@@ -2882,9 +2959,21 @@ export default function NegotiationRoom() {
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    {activeAgentModal === 'TRANSPORT' && `Corridor: ${negState?.location || 'Nashik APMC'} → Pune APMC (213 km) • ${cropQty.toLocaleString()} kg ${cropName}`}
-                    {activeAgentModal === 'WAREHOUSE' && `State Godown Network • Available Slot: Bay C-4 Pune • ${cropQty.toLocaleString()} kg ${cropName}`}
-                    {activeAgentModal === 'PROCESSOR' && `Milling Cluster: Marathwada Agro-Hub • ${cropQty.toLocaleString()} kg ${cropName}`}
+                    {activeAgentModal === 'TRANSPORT' && (
+                      currentTransportPlan
+                        ? `Corridor: ${currentTransportPlan.pickup_location || negState?.location || 'Nashik APMC'} → ${currentTransportPlan.delivery_location || 'Pune APMC'} (${currentTransportPlan.distance_km || 213} km) • ${cropQty.toLocaleString()} kg ${cropName}`
+                        : `Corridor: ${negState?.location || 'Nashik APMC'} → Pune APMC (213 km) • ${cropQty.toLocaleString()} kg ${cropName}`
+                    )}
+                    {activeAgentModal === 'WAREHOUSE' && (
+                      currentWarehousePlan
+                        ? `State Godown Network • ${currentWarehousePlan.warehouse || currentWarehousePlan.name} (${currentWarehousePlan.location || 'Pune'}) • ${cropQty.toLocaleString()} kg ${cropName}`
+                        : `State Godown Network • Available Slot: Bay C-4 Pune • ${cropQty.toLocaleString()} kg ${cropName}`
+                    )}
+                    {activeAgentModal === 'PROCESSOR' && (
+                      currentProcessorPlan
+                        ? `Milling Cluster: ${currentProcessorPlan.processor_name || currentProcessorPlan.name} (${currentProcessorPlan.location || 'Maharashtra'}) • ${cropQty.toLocaleString()} kg ${cropName}`
+                        : `Milling Cluster: Marathwada Agro-Hub • ${cropQty.toLocaleString()} kg ${cropName}`
+                    )}
                   </p>
                 </div>
               </div>
@@ -2903,17 +2992,17 @@ export default function NegotiationRoom() {
                 <>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Fleet</span>
-                    <span className="text-cyan-400 font-bold text-sm">Tata Ace Gold (1.5 MT)</span>
-                    <span className="text-[10px] text-slate-500 block">Fuel Index: ₹90.45/L</span>
+                    <span className="text-cyan-400 font-bold text-sm truncate block">{currentTransportPlan?.vehicle_type || currentTransportPlan?.vehicle || 'Tata Ace Gold (1.5 MT)'}</span>
+                    <span className="text-[10px] text-slate-500 block">{currentTransportPlan?.distance_km ? `${currentTransportPlan.distance_km} km Corridor` : 'Fuel Index: ₹90.45/L'}</span>
                   </div>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Haulage Tariff</span>
-                    <span className="text-emerald-400 font-bold text-sm">₹9,099.43</span>
-                    <span className="text-[10px] text-slate-500 block">Tolls: ₹426 • 213 km</span>
+                    <span className="text-emerald-400 font-bold text-sm">₹{Number(currentTransportPlan?.agreed_price || currentTransportPlan?.cost || currentTransportPlan?.total_operating_cost || 9099.43).toLocaleString('en-IN')}</span>
+                    <span className="text-[10px] text-slate-500 block">Tolls: ₹426 • APMC Permit</span>
                   </div>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Transit Window</span>
-                    <span className="text-amber-300 font-bold text-sm">5.5 Hours</span>
+                    <span className="text-amber-300 font-bold text-sm">{currentTransportPlan?.transit_time_hours ? `${currentTransportPlan.transit_time_hours} Hours` : '5.5 Hours'}</span>
                     <span className="text-[10px] text-slate-500 block">GPS Telematics Active</span>
                   </div>
                 </>
@@ -2923,18 +3012,18 @@ export default function NegotiationRoom() {
                 <>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Facility Name</span>
-                    <span className="text-indigo-400 font-bold text-sm">Pune Co-op Godown</span>
-                    <span className="text-[10px] text-slate-500 block">Capacity: 5,000 MT</span>
+                    <span className="text-indigo-400 font-bold text-sm truncate block">{currentWarehousePlan?.warehouse || currentWarehousePlan?.name || 'Nashik Cold Storage'}</span>
+                    <span className="text-[10px] text-slate-500 block">{currentWarehousePlan?.location ? `${currentWarehousePlan.location} Hub` : 'Capacity: 12,000 kg'}</span>
                   </div>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Holding Tariff</span>
-                    <span className="text-emerald-400 font-bold text-sm">₹105.00 / 7 Days</span>
-                    <span className="text-[10px] text-slate-500 block">Rate: ₹0.015/kg/day</span>
+                    <span className="text-emerald-400 font-bold text-sm">₹{Number(currentWarehousePlan?.total_daily_cost ? currentWarehousePlan.total_daily_cost * (currentWarehousePlan.recommended_days || 7) : (cropQty * (currentWarehousePlan?.cost_per_kg_per_day || 1.6) * 7)).toLocaleString('en-IN')} / {currentWarehousePlan?.recommended_days || 7} Days</span>
+                    <span className="text-[10px] text-slate-500 block">Rate: ₹{currentWarehousePlan?.cost_per_kg_per_day || 1.6}/kg/day</span>
                   </div>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Storage Quality</span>
-                    <span className="text-blue-300 font-bold text-sm">Moisture ≤ 10.5%</span>
-                    <span className="text-[10px] text-slate-500 block">Certified Aeration</span>
+                    <span className="text-blue-300 font-bold text-sm">{currentWarehousePlan?.status === 'ASSIGNED' ? 'Slot Confirmed' : 'Moisture ≤ 10.5%'}</span>
+                    <span className="text-[10px] text-slate-500 block">Certified Aeration & Fumigation</span>
                   </div>
                 </>
               )}
@@ -2943,18 +3032,18 @@ export default function NegotiationRoom() {
                 <>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Matched Unit</span>
-                    <span className="text-amber-400 font-bold text-sm">Marathwada Solvent</span>
-                    <span className="text-[10px] text-slate-500 block">FSSAI & AGMARK Gr-A</span>
+                    <span className="text-amber-400 font-bold text-sm truncate block">{currentProcessorPlan?.processor_name || currentProcessorPlan?.name || 'Marathwada Solvent Extractions'}</span>
+                    <span className="text-[10px] text-slate-500 block">{currentProcessorPlan?.order_id ? `Order #${currentProcessorPlan.order_id}` : (currentProcessorPlan?.location ? `${currentProcessorPlan.location} • FSSAI Gr-A` : 'FSSAI & AGMARK Gr-A')}</span>
                   </div>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Processing Fee</span>
-                    <span className="text-emerald-400 font-bold text-sm">₹4,080.00</span>
-                    <span className="text-[10px] text-slate-500 block">Fixed Contract Rate</span>
+                    <span className="text-emerald-400 font-bold text-sm">₹{Number(currentProcessorPlan?.total_payment || currentProcessorPlan?.total_cost || (cropQty * (currentProcessorPlan?.price_per_kg || 4.5))).toLocaleString('en-IN')}</span>
+                    <span className="text-[10px] text-slate-500 block">{currentProcessorPlan?.price_per_kg ? `Rate: ₹${currentProcessorPlan.price_per_kg}/kg` : 'Fixed Contract Rate'}</span>
                   </div>
                   <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Yield Ratio</span>
-                    <span className="text-amber-300 font-bold text-sm">18% Oil / 79.5% DOC</span>
-                    <span className="text-[10px] text-slate-500 block">2.5% Milling Loss</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Output Yield</span>
+                    <span className="text-amber-300 font-bold text-sm truncate block">{currentProcessorPlan?.output_product || 'Refined Oil / DOC Cake'}</span>
+                    <span className="text-[10px] text-slate-500 block">Certified Milling Conversion</span>
                   </div>
                 </>
               )}

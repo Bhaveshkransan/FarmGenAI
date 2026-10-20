@@ -11,9 +11,9 @@
 | Severity Level | Identified | Resolved | Outstanding Blockers |
 | :--- | :---: | :---: | :---: |
 | **Critical (Sev-1)** | 3 | 3 | **0** |
-| **Major (Sev-2)** | 3 | 3 | **0** |
-| **Minor (Sev-3)** | 2 | 2 | **0** |
-| **Total** | **8** | **8** | **0** |
+| **Major (Sev-2)** | 4 | 4 | **0** |
+| **Minor (Sev-3)** | 4 | 4 | **0** |
+| **Total** | **11** | **11** | **0** |
 
 ---
 
@@ -90,3 +90,31 @@
 - **Root Cause:** Redundant catch block syntax from contiguous code replacement.
 - **Resolution:** Consolidated into a single clean `try-catch-finally` block.
 - **Verification:** `npm run build` passed cleanly in 9.58s.
+
+### DEF-09: Missing PostgreSQL Columns for Downstream Plans in `negotiations` Table
+- **Severity:** Sev-2 (Major)
+- **Component:** [backend/db/models/schema.py](file:///c:/PROJECT/FarmGenAI/backend/db/models/schema.py), [backend/repositories/database_repo.py](file:///c:/PROJECT/FarmGenAI/backend/repositories/database_repo.py)
+- **Description:** Table `negotiations` and model `DBNegotiation` lacked columns for `warehouse_plan`, `processor_plan`, `end_to_end_deal`, and `contract_hash`, persisting them strictly in an in-memory dictionary.
+- **Impact:** Backend process restarts or database-level cold reloads resulted in lost downstream supply-chain agreements.
+- **Root Cause:** Database schema had not been updated after downstream warehouse/processor node integration.
+- **Resolution:** Executed PostgreSQL `ALTER TABLE negotiations ADD COLUMN` for `warehouse_plan` (JSON), `processor_plan` (JSON), `end_to_end_deal` (JSON), and `contract_hash` (VARCHAR); declared columns on `DBNegotiation` model; mapped fields in `create_negotiation_async`, `update_negotiation_async`, `get_negotiation_async`, and `list_negotiations_async`.
+- **Verification:** Verified by clearing in-memory dictionary cache and reading back records directly from PostgreSQL database; all assertions passed.
+
+### DEF-10: In-Memory `active_negotiations` Cache Desynchronization
+- **Severity:** Sev-3 (Minor)
+- **Component:** [backend/services/negotiation_service.py](file:///c:/PROJECT/FarmGenAI/backend/services/negotiation_service.py)
+- **Description:** `run_parallel_procurement` updated the database layer but did not update the `self.active_negotiations` in-memory dictionary, causing `get_negotiation_status` to serve initial negotiation data when hit.
+- **Impact:** REST polling clients occasionally received pre-parallel-procure negotiation dictionaries.
+- **Root Cause:** Dictionary mutation omitted in `run_parallel_procurement` completion block.
+- **Resolution:** Synchronized `self.active_negotiations` with updated payload in `run_parallel_procurement` and added a fallback merge from the database row in `get_negotiation_status` if cached fields are missing.
+- **Verification:** Verified in end-to-end parallel procurement query tests.
+
+### DEF-11: Static Mock Text in Negotiation Room Supply-Chain Modals
+- **Severity:** Sev-3 (Minor)
+- **Component:** [frontend/src/pages/negotiation/NegotiationRoom.tsx](file:///c:/PROJECT/FarmGenAI/frontend/src/pages/negotiation/NegotiationRoom.tsx), [frontend/src/components/negotiation/TransactionValidationModal.tsx](file:///c:/PROJECT/FarmGenAI/frontend/src/components/negotiation/TransactionValidationModal.tsx)
+- **Description:** Direct user invocation of Warehouse and Processor agent buttons (`invokeAgentAction`) generated hardcoded responses ("Pune District Cooperative Dry Godown", "Marathwada Solvent Extractions") without invoking backend REST routes `/api/v1/warehouse/book` and `/api/v1/processor/order`. Furthermore, `TransactionValidationModal` omitted warehouse and processor digital signatures.
+- **Impact:** Interactive operator triggers for storage and processing did not communicate with live agent services or persist their reservations into component state and contract previews.
+- **Root Cause:** Placeholder dispatch logic in `invokeAgentAction` and static parameter cards in the modal UI.
+- **Resolution:** Connected `invokeAgentAction` to `POST /api/v1/warehouse/book` and `POST /api/v1/processor/order` (via `GET /api/v1/processor/matching`), populated `liveWarehousePlan` and `liveProcessorPlan` states, bound dynamic facility and pricing data to modal metric cards, and integrated warehouse and processor signatures into `TransactionValidationModal` and downloadable term sheets.
+- **Verification:** Frontend production build passed cleanly (`npm run build`), and contract preview displays dynamic verified signatures.
+

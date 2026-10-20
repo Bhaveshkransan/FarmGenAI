@@ -113,6 +113,10 @@ class DBNegotiation(Base):
     market_price: Mapped[float] = mapped_column(nullable=True)
     min_price: Mapped[float] = mapped_column(nullable=True)
     listing_id: Mapped[str] = mapped_column(nullable=True)
+    warehouse_plan: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
+    processor_plan: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
+    end_to_end_deal: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
+    contract_hash: Mapped[str] = mapped_column(nullable=True)
 
 class DBOffer(Base):
     __tablename__ = "offers"
