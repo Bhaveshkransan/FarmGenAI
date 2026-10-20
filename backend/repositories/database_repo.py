@@ -405,7 +405,19 @@ class Database:
                 db_neg.listing_id = p.get("listing_id")
                 db_neg.logs = p.get("logs", [])
                 db_neg.market_offers = p.get("market_offers", [])
-                db_neg.selected_buyer = p.get("selected_buyer", {})
+                sb = p.get("selected_buyer") or {}
+                if not isinstance(sb, dict):
+                    sb = {}
+                sb.setdefault("workflow_mode", p.get("workflow_mode", "FULL_SUPPLY_CHAIN"))
+                if p.get("selected_services"):
+                    sb.setdefault("selected_services", p.get("selected_services"))
+                if p.get("district"):
+                    sb.setdefault("district", p.get("district"))
+                if p.get("location"):
+                    sb.setdefault("location", p.get("location"))
+                if p.get("buyer_location"):
+                    sb.setdefault("buyer_location", p.get("buyer_location"))
+                db_neg.selected_buyer = sb
                 db_neg.signatures = p.get("signatures", {})
                 await session.commit()
         except Exception:
@@ -434,10 +446,11 @@ class Database:
                         "transport_plan": db_neg.transport_plan,
                         "warehouse_plan": getattr(db_neg, "warehouse_plan", None),
                         "processor_plan": getattr(db_neg, "processor_plan", None),
-                        "workflow_mode": getattr(db_neg, "workflow_mode", None),
-                        "district": getattr(db_neg, "district", None),
-                        "location": getattr(db_neg, "location", None),
-                        "buyer_name": getattr(db_neg, "buyer_name", None),
+                        "workflow_mode": getattr(db_neg, "workflow_mode", None) or (db_neg.selected_buyer.get("workflow_mode") if isinstance(db_neg.selected_buyer, dict) else None) or "FULL_SUPPLY_CHAIN",
+                        "selected_services": getattr(db_neg, "selected_services", None) or (db_neg.selected_buyer.get("selected_services") if isinstance(db_neg.selected_buyer, dict) else {}),
+                        "district": getattr(db_neg, "district", None) or (db_neg.selected_buyer.get("district") if isinstance(db_neg.selected_buyer, dict) else None),
+                        "location": getattr(db_neg, "location", None) or (db_neg.selected_buyer.get("location") if isinstance(db_neg.selected_buyer, dict) else None),
+                        "buyer_name": getattr(db_neg, "buyer_name", None) or (db_neg.selected_buyer.get("buyer_name") if isinstance(db_neg.selected_buyer, dict) else None),
                         "peer_node": db_neg.peer_node,
                         "listing_id": getattr(db_neg, "listing_id", None),
                         "logs": db_neg.logs or [],

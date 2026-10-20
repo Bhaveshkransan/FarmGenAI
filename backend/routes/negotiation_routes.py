@@ -303,6 +303,16 @@ async def feedback_deal(negotiation_id: str, payload: dict = None):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/{negotiation_id}/parallel-branches")
+async def get_parallel_branches_route(negotiation_id: str):
+    try:
+        branches = await controller.get_parallel_branches(negotiation_id)
+        return {"status": "SUCCESS", "negotiation_id": negotiation_id, "branches": branches}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.post("/{negotiation_id}/parallel-procure")
 async def parallel_procure_route(negotiation_id: str, payload: dict = None):
     try:

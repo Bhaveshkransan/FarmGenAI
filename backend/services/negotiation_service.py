@@ -904,30 +904,6 @@ class NegotiationService:
     async def get_negotiation_status(self, negotiation_id: str):
         if not negotiation_id.startswith("neg_"):
             negotiation_id = f"neg_{negotiation_id}"
-        offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
-        if negotiation_id in self.active_negotiations:
-            res = dict(self.active_negotiations[negotiation_id])
-            if offers:
-                res["offers"] = offers
-            try:
-                row = await self.db_repo.get_negotiation_async(negotiation_id)
-                if row:
-                    if row.get("transport_plan"):
-                        res["transport_plan"] = row.get("transport_plan")
-                    if row.get("warehouse_plan"):
-                        res["warehouse_plan"] = row.get("warehouse_plan")
-                    if row.get("processor_plan"):
-                        res["processor_plan"] = row.get("processor_plan")
-                    if row.get("status") in ("DEAL", "ACCEPTED", "FAILED", "CANCELLED"):
-                        res["status"] = row.get("status")
-                    if row.get("final_price"):
-                        res["final_price"] = row.get("final_price")
-                    if row.get("farmer_name"):
-                        res["farmer_name"] = row.get("farmer_name")
-                        res["farmer"] = row.get("farmer_name")
-            except Exception:
-                pass
-            return res
 
         row = await self.db_repo.get_negotiation_async(negotiation_id)
         if not row:
@@ -942,7 +918,8 @@ class NegotiationService:
         mkt_p = float(row.get("market_price") or (min_p + 2.0))
         tgt_p = float(row.get("target_price") or ((selected_b.get("target_price") or selected_b.get("offered_price")) if isinstance(selected_b, dict) else None) or min_p)
 
-        return {
+        # Baseline dictionary loaded from PostgreSQL
+        res = {
             "id": negotiation_id,
             "negotiation_id": negotiation_id,
             "user_id": row.get("user_id"),
@@ -952,27 +929,37 @@ class NegotiationService:
             "farmer_name": farmer_name,
             "buyer": buyer_name,
             "buyer_name": buyer_name,
-            "crop": row.get("crop", "Tomato"),
+            "crop": row.get("crop", "Soybean"),
             "quantity": float(row.get("quantity", 500)),
             "market_price": mkt_p,
             "min_price": min_p,
             "target_price": tgt_p,
             "agents_involved": row.get("agents_involved", []),
-            "offers": offers,
+            "offers": offers or [],
             "next_action": row.get("next_action"),
-            "final_price": row.get("final_price") or next((c.get("price") for c in self.db_repo.contracts.values() if c.get("negotiation_id") == negotiation_id), None),
+            "final_price": row.get("final_price"),
             "market_offers": row.get("market_offers", []),
             "active_buyers": row.get("active_buyers", row.get("market_offers", [])[:3]),
-            "selected_buyer": row.get("selected_buyer"),
+            "selected_buyer": selected_b,
             "transport_plan": row.get("transport_plan"),
             "warehouse_plan": row.get("warehouse_plan"),
             "processor_plan": row.get("processor_plan"),
-            "workflow_mode": row.get("workflow_mode") or "FULL_SUPPLY_CHAIN",
-            "selected_services": row.get("selected_services") or {},
+            "workflow_mode": row.get("workflow_mode") or (selected_b.get("workflow_mode") if isinstance(selected_b, dict) else None) or "FULL_SUPPLY_CHAIN",
+            "selected_services": row.get("selected_services") or (selected_b.get("selected_services") if isinstance(selected_b, dict) else {}),
             "district": row.get("district") or (selected_b.get("district") if isinstance(selected_b, dict) else None),
             "location": row.get("location") or (selected_b.get("location") if isinstance(selected_b, dict) else None),
-            "buyer_location": row.get("buyer_location") or (selected_b.get("location") if isinstance(selected_b, dict) else None),
+            "buyer_location": row.get("buyer_location") or (selected_b.get("buyer_location") if isinstance(selected_b, dict) else None) or row.get("location"),
+            "parallel_branches": self.active_negotiations.get(negotiation_id, {}).get("parallel_branches") or row.get("market_offers") or [],
         }
+
+        # Merge active memory state if present without overwriting database truth
+        if negotiation_id in self.active_negotiations:
+            active = self.active_negotiations[negotiation_id]
+            for k, v in active.items():
+                if v is not None:
+                    res[k] = v
+
+        return res
 
     async def list_agents(self):
         return [
@@ -1252,6 +1239,27 @@ class NegotiationService:
             "offers": all_offers
         }
 
+    async def get_parallel_branches(self, negotiation_id: str):
+        if not negotiation_id.startswith("neg_"):
+            negotiation_id = f"neg_{negotiation_id}"
+        # 1. From active in-memory state
+        if negotiation_id in self.active_negotiations:
+            branches = self.active_negotiations[negotiation_id].get("parallel_branches")
+            if branches and isinstance(branches, list) and len(branches) > 0 and "chat_messages" in branches[0]:
+                return branches[:5]
+        # 2. From database market_offers
+        try:
+            row = await self.db_repo.get_negotiation_async(negotiation_id)
+            if row and row.get("market_offers"):
+                offers = row.get("market_offers")
+                if offers and isinstance(offers, list) and len(offers) > 0 and "chat_messages" in offers[0]:
+                    return offers[:5]
+        except Exception:
+            pass
+        # 3. Dynamic run if not already present
+        res = await self.run_parallel_procurement(negotiation_id)
+        return (res.get("suppliers", []))[:5]
+
     async def run_parallel_procurement(self, negotiation_id: str, payload: dict = None):
         """
         Executes Autonomous Parallel Buying across top candidate Maharashtra suppliers:
@@ -1333,10 +1341,17 @@ class NegotiationService:
                 "total_landed_cost": neg["total_landed_cost"],
                 "match_score": neg["match_score"],
                 "special": f"Rounds: {neg['rounds_count']} | Status: {neg['status']}",
-                "is_disqualified": not neg["is_valid_deal"],
+                                "is_disqualified": not neg["is_valid_deal"],
                 "disqualification_reason": neg.get("rejection_reason"),
                 "status": "🏆 Auto-Selected Best Deal" if (winner and neg.get("session_id") == winner.get("session_id")) else neg["status"],
                 "is_best": bool(winner and neg.get("session_id") == winner.get("session_id")),
+                "session_id": neg.get("session_id"),
+                "seller_id": neg.get("seller_id"),
+                "branch_index": neg.get("branch_index", rank_idx - 1),
+                "chat_messages": neg.get("chat_messages", []),
+                "rounds": neg.get("rounds", []),
+                "messages": neg.get("messages", []),
+                "contract": neg.get("contract"),
             })
 
         # Update negotiation record in Database
@@ -1356,6 +1371,8 @@ class NegotiationService:
                 f"No executable deal found meeting reservation ceiling (₹{reservation_p:.2f}/kg) or budget."
             )
 
+        self.active_negotiations.setdefault(negotiation_id, {})["parallel_branches"] = ranked_suppliers
+        self.active_negotiations[negotiation_id]["parallel_results"] = negotiations
         await self.db_repo.update_negotiation_async(negotiation_id, {
             "crop": crop_norm,
             "quantity": qty,
@@ -1364,6 +1381,7 @@ class NegotiationService:
             "final_price": final_p,
             "status": db_status,
             "summary": summary_text,
+            "market_offers": ranked_suppliers,
         })
 
         # Record parallel summary offer

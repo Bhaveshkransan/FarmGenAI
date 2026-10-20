@@ -49,6 +49,7 @@ from .routes.workflow_routes import router as workflow_router
 from .routes.transport_routes import router as transport_router
 from .routes.processor_routes import router as processor_router
 from .routes.dashboard_routes import router as dashboard_router
+from .routes.dataset_routes import router as dataset_router
 from .websocket.agent_updates import agent_update_hub
 from database.db import Database, init_db, engine
 from sqlalchemy import text
@@ -209,6 +210,7 @@ app.include_router(rag_router, prefix="/api/v1/rag", tags=["RAG"])
 
 # Agents Telemetry
 app.include_router(agents_router, prefix="/api/v1/agents", tags=["Agents"])
+app.include_router(dataset_router, prefix="/api/v1", tags=["Datasets"])
 
 # Health check
 @app.get("/health", tags=["System"])

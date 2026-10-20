@@ -158,8 +158,7 @@ class BudgetReservationTracker:
 
     async def reserve(self, branch_idx: int, amount: float) -> bool:
         async with self._lock:
-            other_pending = sum(v for k, v in self.pending_commitments.items() if k != branch_idx)
-            if self.committed_budget + other_pending + amount <= self.total_budget + 1e-6:
+            if self.committed_budget + amount <= self.total_budget + 1e-6:
                 self.pending_commitments[branch_idx] = amount
                 return True
             return False
@@ -313,18 +312,47 @@ class BuyerOrchestrationService:
         persona = requirement.get("persona") or requirement.get("buyer_persona") or "bulk_wholesaler"
         strategy = requirement.get("recommended_strategy") or requirement.get("strategy") or "balanced"
 
-        # 1. Instantiate Isolated BuyerAgent
-        buyer_agent = BuyerAgent(
-            name=f"{buyer_name} [{seller['name']}]",
-            budget=budget,
-            max_quantity=req_qty,
-            target_price=target_p,
-            reservation_price=max_price,
-            location=location,
-            strategy=strategy,
-            persona=persona,
-            crop=crop,
-        )
+        # 1. Instantiate Isolated BuyerAgent (incorporates RestaurantAgent when applicable)
+        if persona in ("restaurant", "restaurant_kitchen", "premium_restaurant"):
+            try:
+                from agents.restaurant_agent import RestaurantAgent
+                buyer_agent = RestaurantAgent(
+                    name=f"{buyer_name} [{seller['name']}]",
+                    budget=budget,
+                    max_quantity=req_qty,
+                    target_price=target_p,
+                    min_shelf_life=int(requirement.get("min_shelf_life", 3)),
+                    premium_ratio=float(requirement.get("premium_ratio", 1.15)),
+                    location=location
+                )
+                buyer_agent.reservation_price = max_price
+                buyer_agent.current_bid = target_p
+                buyer_agent.crop = crop
+            except Exception as e:
+                logger.warning(f"Failed to load RestaurantAgent, falling back to BuyerAgent: {e}")
+                buyer_agent = BuyerAgent(
+                    name=f"{buyer_name} [{seller['name']}]",
+                    budget=budget,
+                    max_quantity=req_qty,
+                    target_price=target_p,
+                    reservation_price=max_price,
+                    location=location,
+                    strategy=strategy,
+                    persona=persona,
+                    crop=crop,
+                )
+        else:
+            buyer_agent = BuyerAgent(
+                name=f"{buyer_name} [{seller['name']}]",
+                budget=budget,
+                max_quantity=req_qty,
+                target_price=target_p,
+                reservation_price=max_price,
+                location=location,
+                strategy=strategy,
+                persona=persona,
+                crop=crop,
+            )
         if requirement.get("calibrated_opening_bid"):
             try:
                 buyer_agent.current_bid = float(requirement["calibrated_opening_bid"])
@@ -367,11 +395,21 @@ class BuyerOrchestrationService:
                 "rounds_count": 0,
                 "rounds": [],
                 "messages": [f"❌ Disqualified: {rejection_reason}"],
+                "chat_messages": [{
+                    "id": f"msg_{session_id}_disqual",
+                    "sender": "Platform Guardrail",
+                    "sender_role": "system",
+                    "text": f"Candidate excluded by feasibility constraint: {rejection_reason}",
+                    "price": None,
+                    "round": 0,
+                    "time": datetime.now(timezone.utc).strftime("%H:%M")
+                }],
                 "contract": None,
             }
 
         rounds_history = []
         messages = []
+        chat_messages = []
         branch_status = "ACTIVE"
         outcome = "UNKNOWN"
         final_price = None
@@ -491,6 +529,30 @@ class BuyerOrchestrationService:
 
             messages.append(f"Round {r} | Seller: ₹{seller_ask:.2f}/kg ({executable_qty:.0f}kg)")
             messages.append(f"Round {r} | Buyer: {decision_type} - {resp_msg}")
+
+            # Record structured WhatsApp-style chat bubbles for this candidate branch
+            chat_messages.append({
+                "id": f"msg_{session_id}_{r}_seller",
+                "sender": seller["name"],
+                "sender_role": "seller",
+                "text": f"Offering {executable_qty:,.0f}kg of {crop} at ₹{seller_ask:.2f}/kg from {seller['location']}. Transit distance: {dist_km:.0f} km.",
+                "price": seller_ask,
+                "quantity": executable_qty,
+                "round": r,
+                "decision": "OFFER",
+                "time": datetime.now(timezone.utc).strftime("%H:%M")
+            })
+            chat_messages.append({
+                "id": f"msg_{session_id}_{r}_buyer",
+                "sender": requirement.get("buyer_name", "Buyer Agent"),
+                "sender_role": "buyer",
+                "text": resp_msg or (f"Accepted offer at ₹{seller_ask:.2f}/kg." if decision_type == "ACCEPT" else (f"Rejected offer of ₹{seller_ask:.2f}/kg." if decision_type == "REJECT" else f"Counter-offering ₹{buyer_bid_val:.2f}/kg.")),
+                "price": buyer_bid_val if decision_type != "REJECT" else seller_ask,
+                "quantity": resp_qty,
+                "round": r,
+                "decision": decision_type,
+                "time": datetime.now(timezone.utc).strftime("%H:%M")
+            })
 
             # Broadcast Buyer Turn via WebSocket
             if negotiation_id:
@@ -637,6 +699,7 @@ class BuyerOrchestrationService:
             "rounds_count": len(rounds_history),
             "rounds": rounds_history,
             "messages": messages,
+            "chat_messages": chat_messages,
             "contract": final_contract,
         }
 

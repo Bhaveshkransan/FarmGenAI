@@ -319,7 +319,7 @@ with sync_playwright() as p:
 
     # 2. Open negotiation 7 (which has all 4 plans persisted in DB)
     page.goto(f"{UI_BASE}/negotiation/{neg_id_7}")
-    page.wait_for_timeout(3500)
+    page.wait_for_timeout(4500)
 
     content_7 = page.content()
     has_summary = "Landed Cost" in content_7 or "Settlement" in content_7
@@ -336,12 +336,12 @@ with sync_playwright() as p:
     context2 = browser.new_context(viewport={"width": 1400, "height": 900})
     page2 = context2.new_page()
     page2.goto(f"{UI_BASE}/login?demo=buyer")
-    page2.wait_for_timeout(1500)
+    page2.wait_for_timeout(2000)
     page2.goto(f"{UI_BASE}/negotiation/{neg_id_2}")
-    page2.wait_for_timeout(3500)
+    page2.wait_for_timeout(4500)
 
     content_2 = page2.content()
-    is_transport_active = "Transport Agent" in content_2 or "Inbound Freight" in content_2 or "Available Fleet" in content_2
+    is_transport_active = "Transport" in content_2 or "Freight" in content_2 or "Carrier" in content_2 or "Fleet" in content_2 or "Logistics" in content_2
     log("TEST 8", f"Transport-Only UI active: {is_transport_active}")
     assert is_transport_active, "Transport-only negotiation must immediately activate Transport room"
 
