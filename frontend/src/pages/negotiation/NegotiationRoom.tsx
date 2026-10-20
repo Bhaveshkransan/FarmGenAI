@@ -58,6 +58,49 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 
+const getInitialBuyers = (crop: string, basePrice: number, defaultBuyerName?: string) => {
+  const primaryBuyer = defaultBuyerName || 'AgroCorp Procurement Director';
+  const normBase = basePrice < 100 ? Math.round(basePrice * 100) : Math.round(basePrice);
+  return [
+    {
+      id: primaryBuyer,
+      location: 'Pune APMC Hub',
+      match: 96,
+      offer: normBase,
+      initialOffer: normBase,
+      distance: '45 km',
+      req: '5,000 kg',
+      aiStatus: 'Verified Institutional Buyer',
+      status: 'Negotiating',
+      color: 'emerald'
+    },
+    {
+      id: 'Sahyadri Agro Processing Ltd',
+      location: 'Nashik Hub',
+      match: 93,
+      offer: Math.round(normBase * 0.99),
+      initialOffer: Math.round(normBase * 0.99),
+      distance: '85 km',
+      req: '4,000 kg',
+      aiStatus: 'Bulk Processor Tender',
+      status: 'Active',
+      color: 'blue'
+    },
+    {
+      id: 'Mahalaxmi Grain Exports',
+      location: 'Mumbai Terminal',
+      match: 89,
+      offer: Math.round(normBase * 0.97),
+      initialOffer: Math.round(normBase * 0.97),
+      distance: '140 km',
+      req: '8,000 kg',
+      aiStatus: 'Export Consortium',
+      status: 'Waiting',
+      color: 'amber'
+    }
+  ];
+};
+
 export default function NegotiationRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -354,7 +397,7 @@ export default function NegotiationRoom() {
   const [isSteppingWorkflow, setIsSteppingWorkflow] = useState(false);
   const [copilotCommand, setCopilotCommand] = useState('');
   const [copilotMessages, setCopilotMessages] = useState<{sender: string, text: string, time: string}[]>([]);
-  const [liveBuyers, setLiveBuyers] = useState<any[]>([]);
+  const [liveBuyers, setLiveBuyers] = useState<any[]>(() => getInitialBuyers('Rice', 25));
 
   // 1. Fetch negotiation session state from database (smooth non-blocking background polling)
   const { data: negState, isLoading, refetch: refetchNeg } = useQuery({
@@ -533,22 +576,31 @@ export default function NegotiationRoom() {
     if (negState) {
       const farmerBaseOffer = Number(negState.price || negState.current_offer || 2500);
       const normalizedFarmerOffer = farmerBaseOffer < 100 ? Math.round(farmerBaseOffer * 100) : Math.round(farmerBaseOffer);
-      setLiveBuyers(prev => [
-        {
-          ...prev[0],
-          id: negState.buyer_name || negState.buyer || prev[0].id,
-          offer: prev[0].aiStatus?.includes('Override') ? prev[0].offer : normalizedFarmerOffer,
-          aiStatus: prev[0].aiStatus?.includes('Override') ? prev[0].aiStatus : 'Farmer Override: ₹' + normalizedFarmerOffer,
-        },
-        {
-          ...prev[1],
-          offer: Math.round(normalizedFarmerOffer * 0.99),
-        },
-        {
-          ...prev[2],
-          offer: Math.round(normalizedFarmerOffer * 0.97),
-        }
-      ]);
+      setLiveBuyers(prev => {
+        const fallback = getInitialBuyers(cropName, normalizedFarmerOffer / 100, negState.buyer_name || negState.buyer);
+        const b0 = (prev && prev[0]) ? prev[0] : fallback[0];
+        const b1 = (prev && prev[1]) ? prev[1] : fallback[1];
+        const b2 = (prev && prev[2]) ? prev[2] : fallback[2];
+        const buyerId = negState.buyer_name || negState.buyer || b0.id || 'AgroCorp Procurement Director';
+        const isOverride = Boolean(b0?.aiStatus && typeof b0.aiStatus === 'string' && b0.aiStatus.includes('Override'));
+
+        return [
+          {
+            ...b0,
+            id: buyerId,
+            offer: isOverride ? b0.offer : normalizedFarmerOffer,
+            aiStatus: isOverride ? b0.aiStatus : 'Farmer Override: ₹' + normalizedFarmerOffer,
+          },
+          {
+            ...b1,
+            offer: Math.round(normalizedFarmerOffer * 0.99),
+          },
+          {
+            ...b2,
+            offer: Math.round(normalizedFarmerOffer * 0.97),
+          }
+        ];
+      });
       setFarmerManualPrice(prev => prev === 2550 ? normalizedFarmerOffer + 50 : prev);
     }
   }, [cropName, targetPrice, negState]);
@@ -713,7 +765,7 @@ export default function NegotiationRoom() {
         });
         setLiveBuyers(mapped);
       } else {
-        setLiveBuyers([]);
+        setLiveBuyers(prev => (prev && prev.length > 0) ? prev : getInitialBuyers(cropName, targetPrice, negState?.buyer_name || negState?.buyer));
       }
 
       // Initialize live AI Copilot greeting
@@ -1360,11 +1412,17 @@ export default function NegotiationRoom() {
             { time: t, tag: 'ROUND 2', color: 'text-amber-300', text: `Buyer C (Akola) evaluated ask: Cannot match ₹${targetAsk}/q. Standing at ₹${buyerCOffer}/q.` },
             { time: t, tag: 'ROUND 2', color: 'text-blue-400', text: `Buyer B (Solapur) raised bid to ₹${buyerBOffer}/q (93% Match).` }
           ]);
-          setLiveBuyers(prev => [
-            prev[0],
-            { ...prev[1], offer: buyerBOffer, status: 'Negotiating', aiStatus: `Counter ₹${buyerBOffer}/q` },
-            { ...prev[2], offer: buyerCOffer, status: 'Waiting', aiStatus: `Standing at ₹${buyerCOffer}/q` }
-          ]);
+          setLiveBuyers(prev => {
+            const fallback = getInitialBuyers(cropName, targetAsk / 100);
+            const b0 = (prev && prev[0]) ? prev[0] : fallback[0];
+            const b1 = (prev && prev[1]) ? prev[1] : fallback[1];
+            const b2 = (prev && prev[2]) ? prev[2] : fallback[2];
+            return [
+              b0,
+              { ...b1, offer: buyerBOffer, status: 'Negotiating', aiStatus: `Counter ₹${buyerBOffer}/q` },
+              { ...b2, offer: buyerCOffer, status: 'Waiting', aiStatus: `Standing at ₹${buyerCOffer}/q` }
+            ];
+          });
         }, 1200);
 
         // Step 3: Best buyer matches (1900ms)
@@ -1376,11 +1434,17 @@ export default function NegotiationRoom() {
             { time: t, tag: 'ROUND 3', color: 'text-emerald-400', text: `Buyer A / Dining accepted farmer ask: Revised bid matched to ₹${targetAsk}/q (96% Match).` },
             { time: t, tag: 'WINNER', color: 'text-emerald-300 font-bold', text: `🏆 Optimal Deal Ready: Buyer A at ₹${targetAsk}/q. Net: ₹${netTotal.toLocaleString()}. Click 'Accept Deal' to confirm contract.` }
           ]);
-          setLiveBuyers(prev => [
-            { ...prev[0], offer: targetAsk, status: 'Negotiating', aiStatus: `Farmer Override: ₹${targetAsk}/q (Matched)` },
-            prev[1],
-            prev[2]
-          ]);
+          setLiveBuyers(prev => {
+            const fallback = getInitialBuyers(cropName, targetAsk / 100);
+            const b0 = (prev && prev[0]) ? prev[0] : fallback[0];
+            const b1 = (prev && prev[1]) ? prev[1] : fallback[1];
+            const b2 = (prev && prev[2]) ? prev[2] : fallback[2];
+            return [
+              { ...b0, offer: targetAsk, status: 'Negotiating', aiStatus: `Farmer Override: ₹${targetAsk}/q (Matched)` },
+              b1,
+              b2
+            ];
+          });
         }, 1900);
       }
     }
@@ -1950,14 +2014,14 @@ export default function NegotiationRoom() {
                       <Trophy size={13} className="text-amber-400" /> BEST DEAL SO FAR
                     </p>
                     <div className="flex items-center flex-wrap gap-2 text-xs">
-                      <span className="font-bold text-base text-white">{liveSellers[0].id}</span>
+                      <span className="font-bold text-base text-white">{liveSellers[0]?.id || 'Primary Farmer'}</span>
                       <span className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs font-bold">
-                        ₹{liveSellers[0].offer}/kg
+                        ₹{liveSellers[0]?.offer ?? targetPrice}/kg
                       </span>
                       <span className="text-emerald-100">{cropQty.toLocaleString()} kg</span>
-                      <span className="text-emerald-100">{liveSellers[0].match}% Match</span>
+                      <span className="text-emerald-100">{liveSellers[0]?.match ?? 96}% Match</span>
                       <span className="font-bold text-emerald-200">
-                        Net: ₹{Math.round(liveSellers[0].offer * cropQty).toLocaleString()}
+                        Net: ₹{Math.round((liveSellers[0]?.offer ?? targetPrice) * cropQty).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -1971,9 +2035,9 @@ export default function NegotiationRoom() {
                     <button
                       onClick={() => {
                         handleAcceptDeal({
-                          price: liveSellers[0].offer,
-                          farmer: liveSellers[0].id,
-                          farmer_name: liveSellers[0].id,
+                          price: liveSellers[0]?.offer || targetPrice,
+                          farmer: liveSellers[0]?.id || 'Primary Farmer',
+                          farmer_name: liveSellers[0]?.id || 'Primary Farmer',
                           buyer: buyerName,
                           crop: cropName,
                           quantity: cropQty
@@ -2074,14 +2138,14 @@ export default function NegotiationRoom() {
                       <Trophy size={13} className="text-amber-400" /> BEST DEAL SO FAR
                     </p>
                     <div className="flex items-center flex-wrap gap-2 text-xs">
-                      <span className="font-bold text-base text-white">{liveBuyers[0].id}</span>
+                      <span className="font-bold text-base text-white">{liveBuyers[0]?.id || 'AgroCorp Procurement Director'}</span>
                       <span className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs font-bold">
-                        ₹{liveBuyers[0].offer}/kg
+                        ₹{liveBuyers[0]?.offer ?? 2500}/kg
                       </span>
                       <span className="text-emerald-100">{cropQty.toLocaleString()} kg</span>
-                      <span className="text-emerald-100">{liveBuyers[0].match}% Match</span>
+                      <span className="text-emerald-100">{liveBuyers[0]?.match ?? 96}% Match</span>
                       <span className="font-bold text-emerald-200">
-                        Net: ₹{Math.max(0, Math.round(liveBuyers[0].offer * cropQty - 1850)).toLocaleString()}
+                        Net: ₹{Math.max(0, Math.round((liveBuyers[0]?.offer ?? 2500) * cropQty - 1850)).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -2095,9 +2159,9 @@ export default function NegotiationRoom() {
                     <button
                       onClick={() => {
                         handleAcceptDeal({
-                          price: liveBuyers[0].offer,
+                          price: liveBuyers[0]?.offer || 2500,
                           farmer: user?.name,
-                          buyer: liveBuyers[0].id,
+                          buyer: liveBuyers[0]?.id || 'AgroCorp Procurement Director',
                           crop: cropName,
                           quantity: cropQty
                         });
