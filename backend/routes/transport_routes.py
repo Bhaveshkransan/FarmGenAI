@@ -152,9 +152,12 @@ async def track_booking(booking_id: str, current_user: dict = Depends(get_curren
 
 @router.get("/bookings")
 async def list_bookings(current_user: dict = Depends(get_current_user)):
-    """List transport bookings for the current user."""
-    uid = current_user["sub"]
+    """List transport bookings for the current user or all transport bookings for operators."""
+    uid = current_user.get("sub")
+    role = current_user.get("role")
     all_bookings = await Database.list_bookings_async()
+    if role in ("transport", "transporter", "admin"):
+        return {"success": True, "data": all_bookings, "count": len(all_bookings)}
     my_bookings = [b for b in all_bookings if b.get("booked_by") == uid]
     return {"success": True, "data": my_bookings, "count": len(my_bookings)}
 

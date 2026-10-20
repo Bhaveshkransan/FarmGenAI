@@ -220,14 +220,14 @@ export default function TransportNegotiationRoom() {
 
     let finalData: any = null;
     try {
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 4500));
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 35000));
       const apiPromise = api.post('/transport/parallel-negotiate', payload);
       const res: any = await Promise.race([apiPromise, timeoutPromise]);
       if (res?.data?.success && res.data.all_negotiations?.length > 0) {
         finalData = res.data;
       }
     } catch (e) {
-      console.info('Swift responsive transport fallback activated');
+      console.info('Swift responsive transport fallback activated', e);
     }
 
     if (!finalData || !finalData.all_negotiations || finalData.all_negotiations.length === 0) {
@@ -355,14 +355,33 @@ export default function TransportNegotiationRoom() {
     return { text: `${rounds} rounds`, color: 'bg-slate-100 text-slate-600' };
   };
 
-  const handleValidationDone = () => {
+  const handleValidationDone = async () => {
     if (activeWinnerHistoryId) {
       updateTransportNegotiationHistory(user, activeWinnerHistoryId, {
         status: 'ACCEPTED',
         decisionAt: new Date().toISOString()
       });
     }
-    navigate('/dashboard/transport', { state: { activeTab: 'my_fleet' } });
+
+    try {
+      await api.post('/transport/book', {
+        negotiation_id: bestNeg?.vehicle?.vehicle_id ? `neg_trn_${bestNeg.vehicle.vehicle_id}` : `neg_trn_${Date.now()}`,
+        crop: payload?.crop || 'Produce',
+        quantity: Number(payload?.quantity_kg || 1000),
+        origin_location: payload?.pickup_location || 'Nashik APMC',
+        destination_location: payload?.delivery_location || 'Mumbai Hub',
+        distance_km: Number(payload?.distance_km || 120),
+        shelf_life: Number(payload?.shelf_life_hours || 48),
+        vehicle_id: bestNeg?.vehicle?.vehicle_id || undefined,
+        agreed_freight: bestPrice,
+        requester_role: 'TRANSPORT',
+        idempotency_key: `booking_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+      });
+    } catch (err) {
+      console.warn('Real backend booking persistence warning:', err);
+    }
+
+    navigate('/dashboard/transport/transactions');
   };
 
   return (

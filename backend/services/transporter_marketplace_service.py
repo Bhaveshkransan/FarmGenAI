@@ -744,10 +744,10 @@ async def reserve_vehicle_and_create_booking_async(
     idempotency_key = booking_payload.get("idempotency_key")
     vehicle_id = booking_payload.get("vehicle_id")
     provider_id = booking_payload.get("provider_id", "prov_default")
-    agreed_freight = float(booking_payload.get("agreed_freight", 0.0))
-    transport_floor = float(booking_payload.get("transport_floor", agreed_freight * 0.85))
-    farmer_net = float(booking_payload.get("farmer_net_realization", 25.0))
-    farmer_floor = float(booking_payload.get("farmer_floor", 20.0))
+    agreed_freight = float(booking_payload.get("agreed_freight") or 0.0)
+    transport_floor = float(booking_payload.get("transport_floor") or (agreed_freight * 0.85))
+    farmer_net = float(booking_payload.get("farmer_net_realization") or 25.0)
+    farmer_floor = float(booking_payload.get("farmer_floor") or 20.0)
     booking_id = booking_payload.get("booking_id") or f"booking_{uuid.uuid4().hex[:8]}"
 
     async def _execute_reservation(sess: AsyncSession) -> Dict[str, Any]:

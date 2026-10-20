@@ -124,6 +124,22 @@ async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, deliv
         
     import json
     
+    def _extract_rag_docs(val):
+        if isinstance(val, dict):
+            docs = val.get("documents", [])
+            if docs and isinstance(docs[0], list):
+                return docs[0][:2]
+            elif isinstance(docs, list):
+                return docs[:2]
+            return []
+        elif isinstance(val, list):
+            return val[:2]
+        return []
+
+    strat_docs = _extract_rag_docs(rag_results.get("reflection_memory"))
+    trans_docs = _extract_rag_docs(rag_results.get("transport_knowledge"))
+    crop_docs = _extract_rag_docs(rag_results.get("crop_knowledge"))
+
     prompt = f"""
     Simulate a realistic, organic business negotiation between a Stakeholder (who wants to transport {vehicle.get('capacity_kg', 1000)}kg of {crop} from {pickup} to {delivery} - {distance_km}km) and a Transporter Agent owning a {v_name} ({v_type}).
 
@@ -134,9 +150,9 @@ async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, deliv
     - Max Rounds: up to 5.
     
     RAG CONTEXT (Real World Knowledge):
-    - Strategies: {json.dumps(rag_results.get("reflection_memory", [])[:2])}
-    - Transport Logistics: {json.dumps(rag_results.get("transport_knowledge", [])[:2])}
-    - Crop Knowledge: {json.dumps(rag_results.get("crop_knowledge", [])[:2])}
+    - Strategies: {json.dumps(strat_docs)}
+    - Transport Logistics: {json.dumps(trans_docs)}
+    - Crop Knowledge: {json.dumps(crop_docs)}
     
     Rules for Realism & Maximum Profit:
     - YOU ARE THE TRANSPORTER AGENT. Your primary objective is to MAXIMIZE PROFIT.
