@@ -24,13 +24,18 @@ async def redis_pubsub_listener(redis_client):
                     event_type = event.get("type")
                     event_data = event.get("data", {})
 
+                    stakeholder_role = event_data.get("stakeholder", "FARMER")
+                    workflow_mode = event_data.get("workflow", "FULL_SUPPLY_CHAIN")
+
                     if event_type == "scenario_ready":
                         await agent_update_hub.broadcast({
                             "event": "SCENARIO_READY",
                             "negotiation_id": neg_id,
                             "farmer": event_data.get("farmer"),
                             "crop": event_data.get("crop"),
-                            "status": event_data.get("status")
+                            "status": event_data.get("status"),
+                            "stakeholder": stakeholder_role,
+                            "workflow": workflow_mode
                         })
                     elif event_type == "counter_offer":
                         agent_name = str(event_data.get("agent", "")).lower()
@@ -42,6 +47,8 @@ async def redis_pubsub_listener(redis_client):
                             "agent_type": agent_type,
                             "agent_name": str(event_data.get("agent", "")),
                             "offer": event_data.get("price"),
+                            "stakeholder": stakeholder_role,
+                            "workflow": workflow_mode
                         })
                     elif event_type == "agreement":
                         await agent_update_hub.broadcast({
@@ -49,7 +56,9 @@ async def redis_pubsub_listener(redis_client):
                             "negotiation_id": neg_id,
                             "message": f"Deal reached at ₹{event_data.get('price')}/kg for {event_data.get('quantity')}kg",
                             "agent_type": "system",
-                            "offer": event_data.get("price")
+                            "offer": event_data.get("price"),
+                            "stakeholder": stakeholder_role,
+                            "workflow": workflow_mode
                         })
                     elif event_type == "negotiation_finished":
                         await agent_update_hub.broadcast({
@@ -60,7 +69,11 @@ async def redis_pubsub_listener(redis_client):
                             "summary": event_data.get("summary"),
                             "logs": event_data.get("logs", []),
                             "market_offers": event_data.get("market_offers", []),
-                            "selected_buyer": event_data.get("selected_buyer")
+                            "selected_buyer": event_data.get("selected_buyer"),
+                            "recommendation": event_data.get("recommendation"),
+                            "reflection": event_data.get("reflection"),
+                            "stakeholder": stakeholder_role,
+                            "workflow": workflow_mode
                         })
                     elif event_type in ("market_offers_matched", "matching_completed"):
                         await agent_update_hub.broadcast({
@@ -90,9 +103,16 @@ async def redis_pubsub_listener(redis_client):
 @router.websocket("/ws")
 @router.websocket("/api/v1/ws")
 @router.websocket("/ws/negotiation")
-async def negotiation_updates(websocket: WebSocket, token: str = None):
+@router.websocket("/api/v1/ws/negotiation")
+@router.websocket("/ws/negotiate/{negotiation_id}")
+@router.websocket("/api/v1/ws/negotiate/{negotiation_id}")
+@router.websocket("/ws/negotiation/{negotiation_id}")
+@router.websocket("/api/v1/ws/negotiation/{negotiation_id}")
+async def negotiation_updates(websocket: WebSocket, token: str = None, negotiation_id: str = None):
     if not token:
         token = websocket.query_params.get("token")
+    if not negotiation_id:
+        negotiation_id = websocket.query_params.get("negotiation_id")
     
     from backend.services.security import verify_token
     from fastapi import WebSocketException, status
@@ -105,16 +125,45 @@ async def negotiation_updates(websocket: WebSocket, token: str = None):
         except Exception:
             pass
 
-    await agent_update_hub.connect(websocket)
+    await agent_update_hub.connect(websocket, negotiation_id=negotiation_id)
     try:
         while True:
-            await websocket.receive_text()
+            text = await websocket.receive_text()
+            if text:
+                try:
+                    msg = json.loads(text)
+                    if isinstance(msg, dict):
+                        if msg.get("type") == "ping":
+                            await websocket.send_json({"type": "pong"})
+                            continue
+                        # Support sync request for state reconciliation
+                        if msg.get("type") == "sync" and msg.get("negotiation_id"):
+                            neg_id = msg.get("negotiation_id")
+                            from backend.services.negotiation_service import service as controller
+                            status_data = await controller.get_negotiation_status(neg_id)
+                            if status_data:
+                                await websocket.send_json({
+                                    "event": "SYNC_STATE",
+                                    "negotiation_id": neg_id,
+                                    "data": status_data
+                                })
+                        # Support room subscribe/unsubscribe actions
+                        action = msg.get("action")
+                        target_neg = msg.get("negotiation_id")
+                        if action == "subscribe" and target_neg:
+                            agent_update_hub.subscribe(websocket, target_neg)
+                        elif action == "unsubscribe" and target_neg:
+                            agent_update_hub.unsubscribe(websocket, target_neg)
+                except Exception as e:
+                    logger.warning(f"Error handling WS client message: {e}")
     except WebSocketDisconnect:
         await agent_update_hub.disconnect(websocket)
 
 
 @router.websocket("/ws/{token}")
 @router.websocket("/api/v1/ws/{token}")
+@router.websocket("/ws/negotiation/{token}")
+@router.websocket("/api/v1/ws/negotiation/{token}")
 async def negotiation_updates_fallback(websocket: WebSocket, token: str):
     """Fallback route for frontend clients attempting connection with path parameter tokens."""
     await negotiation_updates(websocket, token)

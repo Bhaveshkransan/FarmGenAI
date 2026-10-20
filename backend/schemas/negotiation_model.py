@@ -48,6 +48,8 @@ class NegotiationStatusResponse(BaseModel):
     summary: Optional[str] = None
     final_price: Optional[float] = None
     next_action: Optional[str] = None
+    recommendation: Optional[str] = None
+    reflection: Optional[str] = None
 
 
 class SimulationRequest(BaseModel):

@@ -108,12 +108,26 @@ DEFAULT_FLEET = [
         "refrigerated": False,
         "status": "AVAILABLE",
         "rating": 4.5
+    },
+    {
+        "vehicle_id": "V08",
+        "transporter_id": "TRANS-05",
+        "vehicle_type": "Multi-Axle Heavy Truck",
+        "vehicle_name": "BharatBenz 2823C",
+        "capacity_kg": 25000.0,
+        "fuel_type": "Diesel",
+        "fuel_efficiency_kmpl": 4.0,
+        "current_location": "Kolhapur",
+        "refrigerated": False,
+        "status": "AVAILABLE",
+        "rating": 4.75
     }
 ]
 
 
 async def get_all_vehicles(status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
     """Query vehicles from DB with fallback to default fleet."""
+    db_vehicles = []
     try:
         async with AsyncSessionLocal() as session:
             stmt = select(DBVehicle)
@@ -122,7 +136,7 @@ async def get_all_vehicles(status_filter: Optional[str] = None) -> List[Dict[str
             res = await session.execute(stmt)
             rows = res.scalars().all()
             if rows:
-                return [{
+                db_vehicles = [{
                     "vehicle_id": r.vehicle_id,
                     "transporter_id": r.transporter_id,
                     "vehicle_type": r.vehicle_type,
@@ -141,7 +155,13 @@ async def get_all_vehicles(status_filter: Optional[str] = None) -> List[Dict[str
     except Exception as e:
         logger.warning(f"Failed to query DBVehicle: {e}")
 
-    fleet = DEFAULT_FLEET
+    fleet = list(DEFAULT_FLEET)
+    
+    # Merge DB vehicles into fleet, overriding default ones with same ID
+    db_ids = {v["vehicle_id"] for v in db_vehicles}
+    fleet = [v for v in fleet if v["vehicle_id"] not in db_ids]
+    fleet.extend(db_vehicles)
+    
     if status_filter:
         fleet = [v for v in fleet if v["status"].upper() == status_filter.upper()]
     return fleet
@@ -206,3 +226,107 @@ async def filter_suitable_vehicles(
         "best_vehicle": candidates[0] if candidates else None,
         "rejected_vehicles": rejected
     }
+
+
+async def get_vehicle_by_id(vehicle_id: str) -> Optional[Dict[str, Any]]:
+    """Get a vehicle by ID."""
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = select(DBVehicle).where(DBVehicle.vehicle_id == vehicle_id)
+            res = await session.execute(stmt)
+            r = res.scalar_one_or_none()
+            if r:
+                return {
+                    "vehicle_id": r.vehicle_id,
+                    "transporter_id": r.transporter_id,
+                    "vehicle_type": r.vehicle_type,
+                    "vehicle_name": r.vehicle_name or r.vehicle_type,
+                    "capacity_kg": r.capacity_kg,
+                    "fuel_type": r.fuel_type,
+                    "fuel_efficiency_kmpl": r.fuel_efficiency_kmpl,
+                    "current_location": r.current_location or "Ahmednagar",
+                    "refrigerated": r.refrigerated,
+                    "temperature_min_c": r.temperature_min_c,
+                    "temperature_max_c": r.temperature_max_c,
+                    "status": r.status,
+                    "rating": r.rating,
+                    "contact_number": r.contact_number,
+                    "owner_contact": r.owner_contact,
+                    "image_url": r.image_url
+                }
+    except Exception as e:
+        logger.error(f"Failed to fetch vehicle {vehicle_id}: {e}")
+
+    # Fallback to default fleet
+    for v in DEFAULT_FLEET:
+        if v["vehicle_id"] == vehicle_id:
+            return v
+    return None
+
+
+async def create_vehicle(vehicle_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Create a new vehicle."""
+    try:
+        async with AsyncSessionLocal() as session:
+            new_vehicle = DBVehicle(**vehicle_data)
+            session.add(new_vehicle)
+            await session.commit()
+            await session.refresh(new_vehicle)
+            return vehicle_data # In a real app, serialize new_vehicle
+    except Exception as e:
+        logger.error(f"Failed to create vehicle: {e}")
+        return None
+
+
+async def update_vehicle(vehicle_id: str, vehicle_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Update an existing vehicle."""
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = select(DBVehicle).where(DBVehicle.vehicle_id == vehicle_id)
+            res = await session.execute(stmt)
+            vehicle = res.scalar_one_or_none()
+            if vehicle:
+                for k, v in vehicle_data.items():
+                    setattr(vehicle, k, v)
+                await session.commit()
+                return vehicle_data
+    except Exception as e:
+        logger.error(f"Failed to update vehicle {vehicle_id}: {e}")
+    return None
+
+
+async def delete_vehicle(vehicle_id: str) -> bool:
+    """Delete a vehicle."""
+    try:
+        async with AsyncSessionLocal() as session:
+            stmt = select(DBVehicle).where(DBVehicle.vehicle_id == vehicle_id)
+            res = await session.execute(stmt)
+            vehicle = res.scalar_one_or_none()
+            if vehicle:
+                await session.delete(vehicle)
+                await session.commit()
+                return True
+    except Exception as e:
+        logger.error(f"Failed to delete vehicle {vehicle_id}: {e}")
+    return False
+
+
+async def search_vehicles(filters: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Search vehicles based on provided filters."""
+    # Simplified search using existing get_all_vehicles
+    all_vehicles = await get_all_vehicles()
+    
+    results = []
+    for v in all_vehicles:
+        match = True
+        if "capacity_min" in filters and v["capacity_kg"] < filters["capacity_min"]:
+            match = False
+        if "refrigerated" in filters and v.get("refrigerated", False) != filters["refrigerated"]:
+            match = False
+        if "status" in filters and v.get("status") != filters["status"]:
+            match = False
+            
+        if match:
+            results.append(v)
+            
+    return results

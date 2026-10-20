@@ -3,22 +3,22 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class CropListingCreate(BaseModel):
-    crop: str = Field(..., example="Soybean")
-    crop_category: Optional[str] = Field(None, example="Oilseeds")
-    variety: str = Field(..., example="JS-335")
-    grade: str = Field(..., example="A")
-    quantity: float = Field(..., gt=0, example=1500.0)
-    unit: str = Field("kg", example="kg")
-    min_sale_quantity: float = Field(..., gt=0, example=100.0)
-    expected_price: float = Field(..., gt=0, example=78.0)
-    min_price: float = Field(..., gt=0, example=70.0)
-    price_unit: str = Field("per_kg", example="per_kg")
+    crop: str = Field(..., json_schema_extra={"example": "Soybean"})
+    crop_category: Optional[str] = Field(None, json_schema_extra={"example": "Oilseeds"})
+    variety: str = Field(..., json_schema_extra={"example": "JS-335"})
+    grade: str = Field(..., json_schema_extra={"example": "A"})
+    quantity: float = Field(..., gt=0, json_schema_extra={"example": 1500.0})
+    unit: str = Field("kg", json_schema_extra={"example": "kg"})
+    min_sale_quantity: float = Field(..., gt=0, json_schema_extra={"example": 100.0})
+    expected_price: float = Field(..., gt=0, json_schema_extra={"example": 78.0})
+    min_price: float = Field(..., gt=0, json_schema_extra={"example": 70.0})
+    price_unit: str = Field("per_kg", json_schema_extra={"example": "per_kg"})
     quality_info: Optional[Dict[str, Any]] = None
     harvest_date: Optional[str] = None
     availability_date: Optional[str] = None
     preferred_selling_date: Optional[str] = None
-    shelf_life: int = Field(..., ge=1, example=7)
-    location: str = Field(..., example="Nashik")
+    shelf_life: int = Field(..., ge=1, json_schema_extra={"example": 7})
+    location: str = Field(..., json_schema_extra={"example": "Nashik"})
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     storage_info: Optional[Dict[str, Any]] = None
@@ -26,7 +26,7 @@ class CropListingCreate(BaseModel):
     transport_reqs: Optional[Dict[str, Any]] = None
     selected_services: Optional[Dict[str, Any]] = None
     images: Optional[List[str]] = None
-    description: str = Field("", example="Organic grade A")
+    description: str = Field("", json_schema_extra={"example": "Organic grade A"})
 
     @model_validator(mode='after')
     def validate_logic(self):

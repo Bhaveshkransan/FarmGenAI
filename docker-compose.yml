@@ -1,4 +1,3 @@
-
 networks:
   agri-net:
     driver: bridge
@@ -13,30 +12,48 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://admin:admin_password@postgres:5432/agrinegotiator
-      - REDIS_URL=redis://redis:6379/0
-      - CHROMA_URL=http://chromadb:8000
-      - OLLAMA_URL=http://ollama:11434
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-agrinegotiator}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CHROMA_URL=${CHROMA_URL:-http://chromadb:8000}
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:1.5b}
-      - LLM_PROVIDER=ollama
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - ENABLE_LLM=${ENABLE_LLM:-true}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeyforagrinegotiatorsigningtokens12345}
-      - JWT_ALGORITHM=HS256
-      - ACCESS_TOKEN_EXPIRE_MINUTES=1440
-      - ENVIRONMENT=production
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - DATA_GOV_API_KEY=${DATA_GOV_API_KEY:-}
+      - DATA_GOV_IN_API_KEY=${DATA_GOV_IN_API_KEY:-}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
     volumes:
       - ./backend:/app/backend
       - ./shared:/app/shared
       - ./data:/app/data
       - ./node_storage:/app/node_storage
+      - ./database:/app/database
+      - ./agents:/app/agents
+      - ./negotiation_engine:/app/negotiation_engine
+      - ./nodes:/app/nodes
+      - ./config:/app/config
+      - ./intelligence:/app/intelligence
+      - ./llm:/app/llm
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./pytest.ini:/app/pytest.ini
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - ~/.cache/huggingface:/root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -53,26 +70,47 @@ services:
     container_name: farmgenai-worker
     command: ["python", "-m", "backend.workers.agent_worker"]
     environment:
-      - DATABASE_URL=postgresql+asyncpg://admin:admin_password@postgres:5432/agrinegotiator
-      - REDIS_URL=redis://redis:6379/0
-      - CHROMA_URL=http://chromadb:8000
-      - OLLAMA_URL=http://ollama:11434
+      - PYTHONPATH=/app
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-agrinegotiator}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - CHROMA_URL=${CHROMA_URL:-http://chromadb:8000}
+      - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:1.5b}
-      - LLM_PROVIDER=ollama
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - ENABLE_LLM=${ENABLE_LLM:-true}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-supersecretkeyforagrinegotiatorsigningtokens12345}
-      - JWT_ALGORITHM=HS256
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY must be set}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
     volumes:
       - ./backend:/app/backend
       - ./shared:/app/shared
       - ./data:/app/data
       - ./node_storage:/app/node_storage
+      - ./database:/app/database
+      - ./agents:/app/agents
+      - ./negotiation_engine:/app/negotiation_engine
+      - ./nodes:/app/nodes
+      - ./config:/app/config
+      - ./intelligence:/app/intelligence
+      - ./llm:/app/llm
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./pytest.ini:/app/pytest.ini
+      - ./tests:/app/tests
+      - ./scripts:/app/scripts
+      - ~/.cache/huggingface:/root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import sys; sys.exit(0)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
     networks:
       - agri-net
@@ -82,15 +120,15 @@ services:
     image: postgres:16-alpine
     container_name: farmgenai-postgres
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin_password
-      - POSTGRES_DB=agrinegotiator
+      - POSTGRES_USER=${POSTGRES_USER:-admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - POSTGRES_DB=${POSTGRES_DB:-agrinegotiator}
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin -d agrinegotiator"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-agrinegotiator}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -150,6 +188,12 @@ services:
       - "8080:80"
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped
     networks:
       - agri-net
@@ -181,8 +225,8 @@ services:
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     depends_on:
       - prometheus
@@ -197,3 +241,4 @@ volumes:
   ollama_data:
   prometheus_data:
   grafana_data:
+  hf_cache:

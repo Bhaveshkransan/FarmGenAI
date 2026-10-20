@@ -6,9 +6,18 @@ const NotificationContext = createContext(null);
 export function NotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
 
-  const addNotification = useCallback((message, type = 'info') => {
-    const id = Date.now().toString();
-    setNotifications(prev => [...prev, { id, message, type }]);
+  const addNotification = useCallback((messageOrType, typeOrMessage = 'info') => {
+    let message = messageOrType;
+    let type = typeOrMessage;
+
+    const knownTypes = ['success', 'error', 'info', 'warning'];
+    if (knownTypes.includes(messageOrType) && typeof typeOrMessage === 'string' && !knownTypes.includes(typeOrMessage)) {
+      type = messageOrType;
+      message = typeOrMessage;
+    }
+
+    const id = Date.now().toString() + '-' + Math.random().toString(36).slice(2, 6);
+    setNotifications(prev => [...prev, { id, message: String(message || ''), type }]);
     
     // Auto-dismiss after 5 seconds
     setTimeout(() => {

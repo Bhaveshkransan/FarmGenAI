@@ -67,6 +67,11 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=As
 
 async def init_db():
     async with engine.begin() as conn:
+        try:
+            import backend.db.models.schema
+            import backend.db.models.transport_agent_models
+        except Exception:
+            pass
         await conn.run_sync(Base.metadata.create_all)
         
         try:
@@ -74,5 +79,70 @@ async def init_db():
             await conn.run_sync(V1Base.metadata.create_all)
         except Exception as e:
             logging.warning(f"Failed to create V1 tables: {e}")
+
+        # Safe automatic migrations for newly added columns in Postgres
+        alter_statements = [
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS trace_id VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS workflow_mode VARCHAR DEFAULT 'FULL_SUPPLY_CHAIN';",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS user_id VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS farmer_name VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS crop VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS crop_category VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS variety VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS grade VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS quantity FLOAT;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS unit VARCHAR DEFAULT 'kg';",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS min_sale_quantity FLOAT;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS expected_price FLOAT;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS min_price FLOAT;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS price_unit VARCHAR DEFAULT 'per_kg';",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS quality_info JSONB;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS harvest_date VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS availability_date VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS preferred_selling_date VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS shelf_life INTEGER;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS location VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS latitude FLOAT;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS longitude FLOAT;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS storage_info JSONB;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS processing_info JSONB;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS transport_reqs JSONB;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS selected_services JSONB;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS images JSONB;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS description VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS language VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'ACTIVE';",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS created_at VARCHAR;",
+            "ALTER TABLE produce ADD COLUMN IF NOT EXISTS updated_at VARCHAR;",
+            
+            "ALTER TABLE buyers ADD COLUMN IF NOT EXISTS trace_id VARCHAR;",
+            "ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS trace_id VARCHAR;",
+            "ALTER TABLE offers ADD COLUMN IF NOT EXISTS trace_id VARCHAR;",
+            "ALTER TABLE contracts ADD COLUMN IF NOT EXISTS trace_id VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS trace_id VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS market_price FLOAT;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS negotiation_rounds INTEGER;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS successful BOOLEAN;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS failure_reason VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS farmer_strategy VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS farmer_reward FLOAT;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS buyer_strategy VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS buyer_reward FLOAT;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS warehouse_strategy VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS warehouse_reward FLOAT;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS transport_strategy VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS transport_reward FLOAT;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS processor_strategy VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS processor_reward FLOAT;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS compost_strategy VARCHAR;",
+            "ALTER TABLE history ADD COLUMN IF NOT EXISTS compost_reward FLOAT;",
+            "ALTER TABLE transport_carrier_bookings ADD COLUMN IF NOT EXISTS negotiation_id VARCHAR;",
+            "ALTER TABLE transport_carrier_bookings ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR;"
+        ]
+        for stmt in alter_statements:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass
 
 

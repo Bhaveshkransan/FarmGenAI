@@ -91,6 +91,9 @@ async def get_current_user(
         except Exception:
             pass
 
+    if "user_id" not in payload and "sub" in payload:
+        payload["user_id"] = payload["sub"]
+
     return payload
 
 

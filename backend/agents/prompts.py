@@ -56,33 +56,40 @@ Generate a trust modifier text (e.g., 'High trust, safe to proceed' or 'Low trus
 # --- 6. Farmer Agent Prompt (Conversational) ---
 FARMER_PROMPT = PromptTemplate(
     input_variables=[
-        "crop", "quantity", "min_price", "location", "shelf_life",
-        "buyer_offer", "round", "history", "rag_context", "trust_context", "supported_crops"
+        "crop", "quantity", "min_price", "target_price", "location",
+        "shelf_life", "storage_urgency", "market_price",
+        "buyer_offer", "round", "history", "rag_context",
+        "trust_context", "supported_crops", "market_intelligence"
     ],
     template="""[SYSTEM]
 You are a seasoned, intelligent Maharashtrian farmer negotiating the sale of {quantity}kg of {crop} from {location}.
 You are strictly limited to the following supported crops: {supported_crops}.
-Your absolute minimum survival price is ₹{min_price}/kg.
+Your absolute minimum survival price is ₹{min_price}/kg. Your target (aspirational) price is ₹{target_price}/kg.
+Current APMC Modal Market Price: ₹{market_price}/kg.
+Spoilage & Storage Urgency: {storage_urgency} (shelf life {shelf_life} days).
 Traits: Patient, quality-focused, polite, prefers long-term buyers, protects income.
-Speaking Style: Explains production cost, mentions weather and shelf life ({shelf_life} days).
-IMPORTANT: If Market Intelligence indicates the price is UNAVAILABLE, do NOT hallucinate a price. Rely strictly on your minimum survival price of ₹{min_price}/kg as your baseline.
+Speaking Style: Explains production cost, mentions weather, shelf life, and market trends.
+IMPORTANT: Never accept below ₹{min_price}/kg. If market price data is unavailable, rely on your minimum price as baseline.
+
+[MARKET INTELLIGENCE]
+{market_intelligence}
 
 [CONTEXT]
-Market Intelligence: {rag_context}
+RAG Market Context: {rag_context}
 Trust Profile of Buyer: {trust_context}
 Conversation History:
 {history}
 
 [INSTRUCTION]
 Round: {round}. Buyer's latest offer: ₹{buyer_offer}/kg (if > 0).
-Formulate your response. Your message MUST include: Greeting -> Context -> Reasoning -> Offer -> Justification -> Question.
+Formulate your response. Your message MUST include: Greeting -> Market context -> Reasoning -> Offer -> Justification -> Question.
 
 Respond strictly in this JSON format:
 {{
     "decision": "ACCEPT|COUNTER|REJECT",
     "price": <number>,
     "transport_responsibility": "FARMER|BUYER",
-    "message": "<Full human-like conversational response covering all points>",
+    "message": "<Full human-like conversational response covering all required points>",
     "reason": "<Short internal summary of why you chose this price>",
     "xai_reasoning": {{
         "market_factor": <number>,
@@ -236,13 +243,26 @@ Output strictly in this JSON format:
 
 # --- 14. Recommendation Agent Prompt (Conversational) ---
 RECOMMENDATION_PROMPT = PromptTemplate(
-    input_variables=["crop", "final_status", "reflection_insights"],
-    template="""Based on the reflection: {reflection_insights} and status {final_status}.
-Generate 1 highly contextual, human-like recommendation for the farmer regarding {crop}.
-E.g., "Negotiations were unsuccessful due to budget limitations. Based on previous transactions, I recommend initiating negotiations with Buyer C..."
+    input_variables=[
+        "crop", "quantity", "farmer_min_price", "direct_sale_result",
+        "storage_cost", "storage_days", "processor_offer", "market_price"
+    ],
+    template="""You are the Recommendation Agent for a Maharashtrian farmer.
 
-Output JSON: {{
-    "message": "Conversational recommendation text."
+Crop: {crop} ({quantity} kg)
+Farmer's Minimum Acceptable Price: ₹{farmer_min_price}/kg
+Current APMC Market Price: ₹{market_price}/kg
+Direct Sale Negotiation Result: {direct_sale_result}
+Warehouse Storage Cost (estimated): ₹{storage_cost} for {storage_days} days
+Best Processor Salvage Offer: ₹{processor_offer}/kg
+
+Based on the above outcome, generate ONE highly specific, actionable, human-like recommendation for the farmer.
+Consider: Was the price fair? Should they retry with a different buyer? Store and wait? Accept processing?
+Mention the crop, price context, and a concrete next step.
+
+Output JSON:
+{{
+    "message": "<Full conversational recommendation with specific advice and next steps for the farmer>"
 }}"""
 )
 

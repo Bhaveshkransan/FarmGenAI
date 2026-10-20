@@ -1,21 +1,23 @@
 """Unit tests for NegotiationManager and negotiation flow."""
 
 import unittest
-
+from unittest.mock import patch
+import agents.farmer_agent as _fa_mod
+import agents.buyer_agent as _ba_mod
 from agents.farmer_agent import FarmerAgent
 from agents.buyer_agent import BuyerAgent
 from agents.warehouse_agent import WarehouseAgent
 from negotiation_engine.negotiation_manager import NegotiationManager
 
 
-def _make_manager(min_price=18, target_price=16, max_rounds=5):
+def _make_manager(min_price=18, target_price=16, max_rounds=5, crop="Onion"):
     farmer = FarmerAgent(
-        name="TestFarmer", crop="Tomato", quantity=500,
+        name="TestFarmer", crop=crop, quantity=500,
         min_price=min_price, shelf_life=4
     )
     buyer = BuyerAgent(
         name="TestBuyer", budget=12000, max_quantity=600,
-        target_price=target_price
+        target_price=target_price, crop=crop
     )
     warehouse = WarehouseAgent(
         name="TestWarehouse", capacity=5000,
@@ -28,6 +30,26 @@ def _make_manager(min_price=18, target_price=16, max_rounds=5):
 
 
 class TestNegotiationManager(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        from llm.llm_client import client as global_llm_client
+        cls._orig_llm_enabled = global_llm_client.enabled
+        global_llm_client.enabled = False
+        cls._orig_fa_llm = _fa_mod.llm_client
+        cls._orig_ba_llm = _ba_mod.llm_client
+        _fa_mod.llm_client = None
+        _ba_mod.llm_client = None
+        cls._http_patcher = patch("backend.services.external_apis._http_get", return_value=None)
+        cls._http_patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        from llm.llm_client import client as global_llm_client
+        global_llm_client.enabled = cls._orig_llm_enabled
+        _fa_mod.llm_client = cls._orig_fa_llm
+        _ba_mod.llm_client = cls._orig_ba_llm
+        cls._http_patcher.stop()
 
     def test_negotiation_returns_result_dict(self):
         mgr = _make_manager()

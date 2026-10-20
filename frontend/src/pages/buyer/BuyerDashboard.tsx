@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { API_CONFIG } from '@/config/api';
 import { 
   ShoppingCart, 
   Target, 
@@ -35,6 +37,7 @@ import {
 } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import PostRequirementModal from '@/components/forms/PostRequirementModal';
+import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
 import { matchCrops } from '@/utils/validation';
 
 export const CANONICAL_7_CROPS = [
@@ -72,11 +75,22 @@ export default function BuyerDashboard() {
   const [activeTab, setActiveTab] = useState<'lots' | 'requirements'>('lots');
   const [isPostReqModalOpen, setIsPostReqModalOpen] = useState<boolean>(false);
 
+  // Real-time WebSocket connection matching Farmer Dashboard
+  const wsUrl = `${API_CONFIG.WS_URL}/negotiation`;
+  const { isConnected, lastMessage } = useWebSocket(wsUrl);
+
+  // Fallback crop for Mandi Radar & Forecast when "All Crops" is viewed in table
+  const radarCrop = selectedCrop || 'Soybean';
+
   // Negotiation Modal State
   const [selectedListing, setSelectedListing] = useState<any | null>(null);
   const [targetOfferPrice, setTargetOfferPrice] = useState<number>(45);
   const [maxCeilingPrice, setMaxCeilingPrice] = useState<number>(52);
   const [isStartingNeg, setIsStartingNeg] = useState<boolean>(false);
+
+  // Contract Modal State matching Farmer Dashboard
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [contractModalDeal, setContractModalDeal] = useState<any>(null);
 
   // Derive Buyer Persona
   const storedUser = useMemo(() => {
@@ -101,10 +115,10 @@ export default function BuyerDashboard() {
 
   // 1. Fetch Mandi Comparison Radar Data (MandiMitra for Buyers)
   const { data: mandiData, isLoading: isLoadingMandi } = useQuery({
-    queryKey: ['mandi_comparison', selectedCrop, buyerLocation],
+    queryKey: ['mandi_comparison', radarCrop, buyerLocation],
     queryFn: async () => {
       try {
-        const res = await api.get(`/buyers/mandi-comparison?crop=${encodeURIComponent(selectedCrop)}&buyer_location=${encodeURIComponent(buyerLocation)}`);
+        const res = await api.get(`/buyers/mandi-comparison?crop=${encodeURIComponent(radarCrop)}&buyer_location=${encodeURIComponent(buyerLocation)}`);
         return res.data;
       } catch (err) {
         return null;
@@ -114,10 +128,10 @@ export default function BuyerDashboard() {
 
   // 2. Fetch 7-Day ML Price Forecast Data
   const { data: forecastData } = useQuery({
-    queryKey: ['price_forecast', selectedCrop, buyerLocation],
+    queryKey: ['price_forecast', radarCrop, buyerLocation],
     queryFn: async () => {
       try {
-        const res = await api.get(`/buyers/price-forecast?crop=${encodeURIComponent(selectedCrop)}&location=${encodeURIComponent(buyerLocation)}`);
+        const res = await api.get(`/buyers/price-forecast?crop=${encodeURIComponent(radarCrop)}&location=${encodeURIComponent(buyerLocation)}`);
         return res.data;
       } catch (err) {
         return null;
@@ -164,6 +178,19 @@ export default function BuyerDashboard() {
     },
     refetchInterval: 5000
   });
+
+  // Real-Time Event Listener matching Farmer Dashboard
+  useEffect(() => {
+    if (lastMessage) {
+      if (lastMessage.event === 'NEGOTIATION_FINISHED' || lastMessage.event === 'DEAL_ACCEPTED') {
+        refetchNegotiations();
+        refetchListings();
+        refetchRequirements();
+      } else if (lastMessage.event === 'OFFER_MADE' || lastMessage.event === 'COUNTER_OFFER' || lastMessage.event === 'SYNC_STATE') {
+        refetchNegotiations();
+      }
+    }
+  }, [lastMessage, refetchNegotiations, refetchListings, refetchRequirements]);
 
   // Filter listings
   const allListings = useMemo(() => {
@@ -243,7 +270,7 @@ export default function BuyerDashboard() {
       setSelectedListing(null);
 
       if (negId) {
-        navigate(`/negotiations/${negId}`);
+        navigate(`/negotiations/${negId}`, { state: { autoStart: true } });
       }
     } catch (err: any) {
       addNotification(err.response?.data?.detail || 'Failed to dispatch Buyer Agent', 'error');
@@ -294,12 +321,26 @@ export default function BuyerDashboard() {
       addNotification(`Autonomous Buyer Agent dispatched! Room: ${negId || 'Active'}`, 'success');
       refetchNegotiations?.();
       if (negId) {
-        navigate(`/negotiations/${negId}`);
+        navigate(`/negotiations/${negId}`, { state: { autoStart: true } });
       }
     } catch (err: any) {
       addNotification(err.response?.data?.detail || 'Failed to dispatch Buyer Agent', 'error');
     } finally {
       setIsStartingNeg(false);
+    }
+  };
+
+  // Delete / Archive Requirement matching Farmer Listing expiration
+  const handleDeleteRequirement = async (reqId: string, cropName: string) => {
+    if (!window.confirm(`Are you sure you want to remove the procurement requirement for ${cropName}?`)) {
+      return;
+    }
+    try {
+      await api.delete(`/requirements/${reqId}`);
+      addNotification(`Requirement for ${cropName} removed successfully`, 'success');
+      refetchRequirements();
+    } catch (err: any) {
+      addNotification(err.response?.data?.detail || 'Failed to remove requirement', 'error');
     }
   };
 
@@ -359,9 +400,11 @@ export default function BuyerDashboard() {
           </button>
 
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>APMC Live</span>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium ${
+              isConnected ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+              <span>{isConnected ? 'APMC Live Sync' : 'Connecting...'}</span>
             </div>
             <div className="text-right">
               <p className="text-[10px] text-slate-400 font-medium">Trust Score</p>
@@ -412,7 +455,35 @@ export default function BuyerDashboard() {
           <span className="text-xs text-slate-500">Strict 7-Crop Statutory Allowlist</span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+          {/* All Crops Card */}
+          <button
+            onClick={() => {
+              setSelectedCrop('');
+              setSearchTerm('');
+            }}
+            className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
+              !selectedCrop 
+                ? 'bg-emerald-800 text-white border-emerald-900 shadow-md ring-2 ring-emerald-500/20' 
+                : 'bg-white text-slate-800 border-slate-200/90 hover:border-emerald-300 hover:shadow-sm'
+            }`}
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-2xl">🌱</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                !selectedCrop ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-100 text-slate-600'
+              }`}>
+                ALL
+              </span>
+            </div>
+            <div className="mt-2">
+              <p className="font-bold text-sm truncate">All Crops</p>
+              <p className={`text-[11px] mt-0.5 ${!selectedCrop ? 'text-emerald-200' : 'text-slate-500'}`}>
+                {allListings.length} lots total
+              </p>
+            </div>
+          </button>
+
           {CANONICAL_7_CROPS.map((crop) => {
             const isSelected = selectedCrop === crop.id;
             const count = cropListingCounts[crop.id] || 0;
@@ -420,7 +491,7 @@ export default function BuyerDashboard() {
               <button
                 key={crop.id}
                 onClick={() => {
-                  setSelectedCrop(crop.id);
+                  setSelectedCrop(isSelected ? '' : crop.id);
                   setSearchTerm('');
                 }}
                 className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
@@ -525,7 +596,7 @@ export default function BuyerDashboard() {
                   ) : !mandiData?.mandis || mandiData.mandis.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-8 text-center text-slate-400">
-                        No active APMC mandis reporting for {selectedCrop}.
+                        No active APMC mandis reporting for {radarCrop}.
                       </td>
                     </tr>
                   ) : (
@@ -624,14 +695,14 @@ export default function BuyerDashboard() {
               <span className="font-bold text-blue-950 flex items-center gap-1.5 mb-1">
                 <ShieldCheck size={14} className="text-blue-700" /> AI Strategic Procurement Advice:
               </span>
-              {forecastData?.ai_advice || `Loading procurement intelligence for ${selectedCrop}...`}
+              {forecastData?.ai_advice || `Loading procurement intelligence for ${radarCrop}...`}
             </div>
 
             {/* Interactive 7-Day Forecast Chart */}
             <div className="mt-5">
               <div className="flex justify-between items-center mb-1">
                 <p className="text-xs font-bold text-slate-800">
-                  {selectedCrop} Price Forecast (Next 7 Days)
+                  {radarCrop} Price Forecast (Next 7 Days)
                 </p>
                 <span className="text-[10px] text-slate-400">Hover points for price</span>
               </div>
@@ -743,7 +814,7 @@ export default function BuyerDashboard() {
           <div>
             {/* Tab Header */}
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/60">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setActiveTab('lots')}
                   className={`px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-2 ${
@@ -764,6 +835,17 @@ export default function BuyerDashboard() {
                 >
                   <Target size={15} /> Your Requirements ({requirementsData?.length || 0})
                 </button>
+
+                {selectedCrop && (
+                  <button
+                    onClick={() => setSelectedCrop('')}
+                    className="text-[11px] text-emerald-800 hover:text-emerald-950 font-semibold bg-emerald-100/80 border border-emerald-300 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition shadow-xs"
+                    title="Click to view all produce lots"
+                  >
+                    Crop: {selectedCrop} • <span className="underline">View All ({allListings.length})</span>
+                    <X size={12} className="ml-0.5 text-emerald-700" />
+                  </button>
+                )}
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -809,7 +891,7 @@ export default function BuyerDashboard() {
                     ) : filteredListings.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-slate-400">
-                          No active lots found for {selectedCrop} matching your filters.
+                          No active lots found for {selectedCrop || 'your search'} matching your filters.
                         </td>
                       </tr>
                     ) : (
@@ -904,7 +986,7 @@ export default function BuyerDashboard() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex items-center justify-center gap-1.5">
                               <button
                                 onClick={() => handleLaunchNegotiationForRequirement(req)}
                                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer"
@@ -921,6 +1003,13 @@ export default function BuyerDashboard() {
                                 className="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-semibold text-xs transition cursor-pointer"
                               >
                                 Lots →
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRequirement(req.id || req._id, req.crop)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
+                                title="Remove requirement"
+                              >
+                                <Trash2 size={13} />
                               </button>
                             </div>
                           </td>
@@ -940,87 +1029,195 @@ export default function BuyerDashboard() {
           </div>
         </div>
 
-        {/* ── Right Column: Active Negotiations & Live Updates (4 Cols) ── */}
+        {/* ── Right Column: Live Market Feeds & Strategic Insights (4 Cols) ── */}
         <div className="lg:col-span-4 space-y-6">
-
-          {/* Active Negotiations */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
-            <h2 className="font-bold text-base text-slate-900 mb-3 flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Activity size={18} className="text-emerald-600" /> Your Active Negotiations
-              </span>
-              <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                {negotiationsData?.length || 0} Live
-              </span>
-            </h2>
-
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-              {!negotiationsData || negotiationsData.length === 0 ? (
-                <div className="text-center py-8 text-slate-400 text-xs">
-                  No active negotiations found.<br />Click "Negotiate with AI" on any lot above to launch.
-                </div>
-              ) : (
-                negotiationsData.slice(0, 5).map((neg: any, idx: number) => {
-                  const negId = neg.id || neg.negotiation_id;
-                  return (
-                    <div 
-                      key={negId || idx} 
-                      className="p-3 bg-slate-50 hover:bg-slate-100/90 rounded-xl border border-slate-200/70 transition cursor-pointer flex justify-between items-center group"
-                      onClick={() => navigate(`/negotiations/${negId}`)}
-                    >
-                      <div>
-                        <p className="font-bold text-xs text-slate-900 group-hover:text-emerald-700 transition">{neg.crop || 'Produce Lot'}</p>
-                        <p className="text-[11px] text-slate-500">
-                          {neg.quantity ? `${Number(neg.quantity).toLocaleString()} kg` : '1,000 kg'} • {neg.location || 'Maharashtra'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' :
-                          neg.status === 'ACTIVE' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {neg.status || 'ACTIVE'}
-                        </span>
-                        <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-0.5 justify-end group-hover:underline">
-                          Enter Room <ChevronRight size={12} />
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
 
           {/* Live Market Updates Sidebar */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
-            <h2 className="font-bold text-base text-slate-900 mb-3 flex items-center gap-2">
-              <AlertCircle size={18} className="text-blue-600" /> Live Market Feeds
+            <h2 className="font-bold text-base text-slate-900 mb-3 flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <AlertCircle size={18} className="text-emerald-600" /> Live Market Feeds
+              </span>
+              <span className="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-100">
+                APMC Realtime
+              </span>
             </h2>
             <div className="space-y-3 text-xs">
-              <div className="p-3 bg-emerald-50/70 border border-emerald-100 rounded-xl">
-                <p className="font-bold text-emerald-900">MandiMitra Alert</p>
-                <p className="text-slate-600 mt-1">
+              <div className="p-3.5 bg-emerald-50/70 border border-emerald-100 rounded-xl">
+                <p className="font-bold text-emerald-900 flex items-center gap-1.5">
+                  <TrendingUp size={13} className="text-emerald-600" /> MandiMitra Alert
+                </p>
+                <p className="text-slate-600 mt-1 leading-relaxed">
                   Pune APMC: Soybean modal rate settled at ₹33.29/kg with 180 MT inbound arrivals.
                 </p>
               </div>
-              <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl">
-                <p className="font-bold text-blue-900">Buyer Agent Matching</p>
-                <p className="text-slate-600 mt-1">
+              <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl">
+                <p className="font-bold text-blue-900 flex items-center gap-1.5">
+                  <Bot size={13} className="text-blue-600" /> Buyer Agent Matching
+                </p>
+                <p className="text-slate-600 mt-1 leading-relaxed">
                   Matching against 6 criteria: Crop, Quantity, Quality Grade, Location, Price & Freight.
                 </p>
               </div>
-              <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl">
-                <p className="font-bold text-slate-800">Processing Industry Insight</p>
-                <p className="text-slate-600 mt-1">
+              <div className="p-3.5 bg-slate-50 border border-slate-200/70 rounded-xl">
+                <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                  <Building2 size={13} className="text-slate-600" /> Processing Industry Insight
+                </p>
+                <p className="text-slate-600 mt-1 leading-relaxed">
                   Crushing units in Solapur & Latur are paying premium for Grade A low-moisture oilseeds.
                 </p>
               </div>
             </div>
           </div>
 
+          {/* Quick Negotiation Stats Card */}
+          <div className="bg-gradient-to-br from-emerald-900 to-slate-900 rounded-2xl p-5 text-white shadow-sm">
+            <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <Activity size={14} className="text-emerald-400" /> Multi-Agent Engine
+            </p>
+            <h3 className="font-bold text-lg text-white">
+              {negotiationsData?.length || 0} Negotiations Active
+            </h3>
+            <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+              LangGraph autonomous orchestrator automatically aligns buyer reservations with farmer listings.
+            </p>
+            <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+              <span className="text-slate-400">Contracts Executed:</span>
+              <span className="font-bold text-emerald-400">
+                {(negotiationsData || []).filter((n: any) => n.status === 'DEAL' || n.status === 'ACCEPTED').length} Signed
+              </span>
+            </div>
+          </div>
+
         </div>
 
+      </div>
+
+      {/* ── 6. Your Active Negotiations Table (Identical Full-Width Section to Farmer Dashboard) ── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-slate-50/60">
+          <div>
+            <h2 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+              <Activity size={20} className="text-emerald-600" /> Your Active Negotiations
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live status, negotiated price points, carrier dispatch, and official APMC smart contracts.
+            </p>
+          </div>
+          <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
+            {negotiationsData?.length || 0} Total Active
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+              <tr>
+                <th className="px-5 py-3.5 font-medium text-xs">Crop</th>
+                <th className="px-5 py-3.5 font-medium text-xs">Volume</th>
+                <th className="px-5 py-3.5 font-medium text-xs">Latest Price</th>
+                <th className="px-5 py-3.5 font-medium text-xs">Logistics / Carrier</th>
+                <th className="px-5 py-3.5 font-medium text-xs">Status</th>
+                <th className="px-5 py-3.5 font-medium text-xs">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {!negotiationsData || negotiationsData.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-10 text-center text-slate-400 text-xs">
+                    No active negotiations found. Click "Negotiate with AI" on any produce lot above to launch.
+                  </td>
+                </tr>
+              ) : (
+                negotiationsData.map((neg: any) => {
+                  const tp = typeof neg.transport_plan === 'string' && neg.transport_plan.startsWith('{')
+                    ? JSON.parse(neg.transport_plan)
+                    : neg.transport_plan;
+
+                  const negId = neg.negotiation_id || neg.id;
+
+                  return (
+                    <tr key={negId} className="hover:bg-slate-50/60 transition">
+                      <td className="px-5 py-4 font-medium text-slate-800">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-900">{neg.crop || 'Soybean'}</span>
+                          {(neg.listing_id || neg.requirement_id) && (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              Lot #{(neg.listing_id || neg.requirement_id).substring(0, 8)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-slate-600 font-medium">
+                        {Number(neg.quantity || 1000).toLocaleString()} kg
+                      </td>
+                      <td className="px-5 py-4 font-bold text-emerald-600">
+                        ₹{neg.final_price || neg.current_offer || neg.market_price || neg.min_price || neg.target_price || 0}/kg
+                      </td>
+                      <td className="px-5 py-4">
+                        {tp ? (
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-slate-800 text-xs flex items-center gap-1">
+                              <Truck size={12} className="text-emerald-600" />
+                              {typeof tp === 'object' ? (tp.vehicle_name || tp.agent || tp.vehicle || 'Assigned Carrier') : String(tp)}
+                            </span>
+                            {typeof tp === 'object' && (
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                ₹{(tp.cost || tp.agreed_freight || tp.agreed_price || tp.final_cost || 0).toLocaleString()} • {tp.distance_km || tp.distance || '0'} km
+                              </span>
+                            )}
+                          </div>
+                        ) : neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? (
+                          <span className="text-[11px] text-slate-400 italic">Dispatch Scheduled</span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Coordinating...</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4">
+                        <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${
+                          neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-700' :
+                          neg.status === 'NO_DEAL' || neg.status === 'FAILED' ? 'bg-red-100 text-red-700' :
+                          neg.status === 'NO_EXECUTABLE_DEAL' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {neg.status || 'ACTIVE'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 flex items-center flex-wrap gap-2">
+                        <button 
+                          onClick={() => navigate(`/negotiations/${negId}`)} 
+                          className="text-blue-600 font-bold hover:underline text-xs cursor-pointer"
+                        >
+                          View Room
+                        </button>
+                        {(neg.status === 'DEAL' || neg.status === 'ACCEPTED') && (
+                          <button
+                            onClick={() => {
+                              setContractModalDeal(neg);
+                              setIsContractModalOpen(true);
+                            }}
+                            className="text-emerald-700 font-bold hover:underline text-xs flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200 transition cursor-pointer"
+                            title="View & Download Official APMC Contract"
+                          >
+                            <FileText size={11} /> Contract
+                          </button>
+                        )}
+                        {tp && (
+                          <button 
+                            onClick={() => navigate('/dashboard/transport')} 
+                            className="text-emerald-600 font-semibold hover:underline text-xs flex items-center gap-0.5 ml-1 cursor-pointer"
+                          >
+                            <Truck size={11} /> Fleet
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ── 6. Autonomous Buyer Agent Negotiation Launch Modal (from Lot) ── */}
@@ -1154,14 +1351,22 @@ export default function BuyerDashboard() {
       <PostRequirementModal
         isOpen={isPostReqModalOpen}
         onClose={() => setIsPostReqModalOpen(false)}
-        initialCrop={selectedCrop}
+        initialCrop={radarCrop}
         onSuccess={(data) => {
           refetchRequirements();
           refetchNegotiations();
           if (data?.negId) {
-            navigate(`/negotiations/${data.negId}`);
+            navigate(`/negotiations/${data.negId}`, { state: { autoStart: true } });
           }
         }}
+      />
+
+      {/* ── 8. APMC Validated Smart Contract Modal matching Farmer Dashboard ── */}
+      <TransactionValidationModal
+        isOpen={isContractModalOpen}
+        onClose={() => setIsContractModalOpen(false)}
+        dealData={contractModalDeal}
+        buyerUser={user}
       />
 
     </div>

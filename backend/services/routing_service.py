@@ -57,6 +57,8 @@ def calculate_transport_route(
         "total_travel_duration_hours": total_travel_duration_hours,
         "estimated_arrival_iso": estimated_arrival_utc.isoformat(),
         "routing_source": routing_source,
+        "route_waypoints": trip_route.get("route_waypoints", []),
+        "route_path": trip_route.get("route_path", ""),
         "terminology": {
             "duration_label": "estimated travel duration",
             "arrival_label": "estimated arrival time"

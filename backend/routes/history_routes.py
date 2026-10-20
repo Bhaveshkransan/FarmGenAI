@@ -8,15 +8,17 @@ from backend.core.security import get_current_user
 router = APIRouter(tags=["History"])
 
 
+@router.get("/all", response_model=HistoryResponse)
+@router.get("/{user_id}", response_model=HistoryResponse)
 @router.get("/history/{user_id}", response_model=HistoryResponse)
 async def history(
-    user_id: str,
+    user_id: str = "all",
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    auth_user_id = current_user["sub"]
+    auth_user_id = current_user.get("sub")
     role = current_user.get("role")
     # Enforce history boundaries
-    if auth_user_id != user_id and role != "admin":
+    if user_id != "all" and auth_user_id != user_id and role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden: You cannot access history for other users.")
     return await get_user_history(user_id, db=db)

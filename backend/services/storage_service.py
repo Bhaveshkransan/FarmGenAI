@@ -46,7 +46,7 @@ async def _get_storage_loads() -> dict:
 
 
 async def list_warehouses():
-    loads = _get_storage_loads()
+    loads = await _get_storage_loads()
     result = []
 
     for profile in _WAREHOUSE_PROFILES:
@@ -75,12 +75,12 @@ async def assign_storage(produce: dict):
     shelf_life = int(produce.get("shelf_life", 3) or 3)
     crop = str(produce.get("crop", "produce"))
 
-    warehouses = list_warehouses()
+    warehouses = await list_warehouses()
     viable = [w for w in warehouses if w["available_capacity_kg"] >= quantity]
     if not viable:
         raise ValueError("No warehouse has enough available capacity for this quantity")
 
-    async def _rank_key(wh):
+    def _rank_key(wh):
         location_bonus = 0 if wh["location"].lower() == location.lower() else 1
         urgency_penalty = 0.25 if shelf_life <= 2 else 0
         effective_cost = wh["base_cost_per_kg_per_day"] + urgency_penalty

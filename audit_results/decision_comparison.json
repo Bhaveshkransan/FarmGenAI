@@ -1,0 +1,30 @@
+[
+  {
+    "candidate": "Buyer D (Local Direct, Zero Freight)",
+    "net_take_home": 24195.33,
+    "opportunity_cost_vs_winner": 0.0,
+    "decision": "SELECTED_OPTIMAL",
+    "explanation": "Provides maximum net take-home realization after road freight and statutory deductions."
+  },
+  {
+    "candidate": "Buyer B (Moderate Price, Low Freight)",
+    "net_take_home": 23855.8,
+    "opportunity_cost_vs_winner": -339.53,
+    "decision": "REJECTED_SUBOPTIMAL",
+    "explanation": "Produces \u20b9339.53 less net revenue due to higher freight/risk despite nominal price."
+  },
+  {
+    "candidate": "Buyer A (High Price, High Freight)",
+    "net_take_home": 14662.5,
+    "opportunity_cost_vs_winner": -9532.83,
+    "decision": "REJECTED_SUBOPTIMAL",
+    "explanation": "Produces \u20b99532.83 less net revenue due to higher freight/risk despite nominal price."
+  },
+  {
+    "candidate": "Buyer C (Highest Nominal, High Risk)",
+    "net_take_home": 7708.6,
+    "opportunity_cost_vs_winner": -16486.73,
+    "decision": "REJECTED_SUBOPTIMAL",
+    "explanation": "Produces \u20b916486.73 less net revenue due to higher freight/risk despite nominal price."
+  }
+]

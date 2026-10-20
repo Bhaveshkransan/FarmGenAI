@@ -56,6 +56,8 @@ api.interceptors.response.use(
     }
 
     let errorMessage = 'An unexpected error occurred.';
+    const isBackgroundPoll = originalRequest?.url?.includes('/negotiations') && originalRequest?.method?.toLowerCase() === 'get';
+
     if (!error.response) {
       errorMessage = 'Network Error: Cannot connect to server.';
     } else if (error.response.status >= 500) {
@@ -74,7 +76,9 @@ api.interceptors.response.use(
       }
     }
 
-    window.dispatchEvent(new CustomEvent('api_error', { detail: errorMessage }));
+    if (!isBackgroundPoll) {
+      window.dispatchEvent(new CustomEvent('api_error', { detail: errorMessage }));
+    }
 
     return Promise.reject(error);
   }

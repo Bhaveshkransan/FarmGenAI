@@ -2,12 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Truck, Navigation, Route, Droplets, Cpu, Fuel, RefreshCw, CheckCircle, ShieldAlert, Sprout, Handshake, ExternalLink } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import TransportAgentStudio from '@/features/transport/TransportAgentStudio';
+import TransporterDashboard from './TransporterDashboard';
 import { api } from '@/services/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function TransportDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'agent' | 'fleet' | 'farmer_consignments'>('agent');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'agent' | 'my_fleet' | 'fleet' | 'farmer_consignments'>(
+    () => location.state?.activeTab === 'my_fleet' ? 'my_fleet' : 'agent'
+  );
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [trips, setTrips] = useState<any[]>([]);
   const [farmerDeals, setFarmerDeals] = useState<any[]>([]);
@@ -81,7 +85,7 @@ export default function TransportDashboard() {
           </div>
 
           {/* Tab Selector */}
-          <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+          <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-200 overflow-x-auto">
             <button
               onClick={() => setActiveTab('agent')}
               className={`px-3.5 py-2 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
@@ -91,12 +95,20 @@ export default function TransportDashboard() {
               <Cpu size={14} /> Studio
             </button>
             <button
+              onClick={() => setActiveTab('my_fleet')}
+              className={`px-3.5 py-2 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
+                activeTab === 'my_fleet' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Truck size={14} /> My Fleet & Deals
+            </button>
+            <button
               onClick={() => setActiveTab('fleet')}
               className={`px-3.5 py-2 text-xs font-bold rounded-lg transition flex items-center gap-1.5 ${
                 activeTab === 'fleet' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Truck size={14} /> Live Fleet ({vehicles.length})
+              <Truck size={14} /> Global Fleet ({vehicles.length})
             </button>
             <button
               onClick={() => setActiveTab('farmer_consignments')}
@@ -113,6 +125,11 @@ export default function TransportDashboard() {
       {/* Tab 1: Transport Agent Studio */}
       {activeTab === 'agent' && (
         <TransportAgentStudio />
+      )}
+
+      {/* Tab 1.5: My Fleet & Deals */}
+      {activeTab === 'my_fleet' && (
+        <TransporterDashboard />
       )}
 
       {/* Tab 2: Fleet Overview */}

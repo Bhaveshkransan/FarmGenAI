@@ -1,0 +1,93 @@
+{
+  "Sugarcane": {
+    "crop": "Sugarcane",
+    "quantity_kg": 5000,
+    "statutory_msp": 3.4,
+    "target_price": 3.9,
+    "modal_price": 3.9,
+    "deal_price": 2.6,
+    "winner": "Sugarcane Agro Mills",
+    "status": "ESCALATED_PROCESSING",
+    "floor_respected": true,
+    "net_price_per_kg": 2.6,
+    "duration_sec": 99.686
+  },
+  "Soybean": {
+    "crop": "Soybean",
+    "quantity_kg": 1000,
+    "statutory_msp": 48.92,
+    "target_price": 56.0,
+    "modal_price": 56.0,
+    "deal_price": 42.5,
+    "winner": "Soybean Agro Mills",
+    "status": "ESCALATED_PROCESSING",
+    "floor_respected": true,
+    "net_price_per_kg": 42.5,
+    "duration_sec": 81.743
+  },
+  "Cotton": {
+    "crop": "Cotton",
+    "quantity_kg": 1500,
+    "statutory_msp": 71.21,
+    "target_price": 78.0,
+    "modal_price": 78.0,
+    "deal_price": 58.5,
+    "winner": "Cotton Agro Mills",
+    "status": "ESCALATED_PROCESSING",
+    "floor_respected": true,
+    "net_price_per_kg": 58.5,
+    "duration_sec": 51.832
+  },
+  "Jowar": {
+    "crop": "Jowar",
+    "quantity_kg": 800,
+    "statutory_msp": 33.71,
+    "target_price": 38.0,
+    "modal_price": 38.0,
+    "deal_price": 28.5,
+    "winner": "Jowar Agro Mills",
+    "status": "ESCALATED_PROCESSING",
+    "floor_respected": true,
+    "net_price_per_kg": 28.5,
+    "duration_sec": 64.492
+  },
+  "Onion": {
+    "crop": "Onion",
+    "quantity_kg": 2000,
+    "statutory_msp": 18.0,
+    "target_price": 26.0,
+    "modal_price": 26.0,
+    "deal_price": 14.5,
+    "winner": "Onion Agro Mills",
+    "status": "ESCALATED_PROCESSING",
+    "floor_respected": true,
+    "net_price_per_kg": 14.5,
+    "duration_sec": 92.543
+  },
+  "Bajra": {
+    "crop": "Bajra",
+    "quantity_kg": 1000,
+    "statutory_msp": 26.25,
+    "target_price": 31.0,
+    "modal_price": 31.0,
+    "deal_price": 24.5,
+    "winner": "Bajra Agro Mills",
+    "status": "ESCALATED_PROCESSING",
+    "floor_respected": true,
+    "net_price_per_kg": 24.5,
+    "duration_sec": 71.58
+  },
+  "Rice": {
+    "crop": "Rice",
+    "quantity_kg": 1200,
+    "statutory_msp": 23.0,
+    "target_price": 29.0,
+    "modal_price": 29.0,
+    "deal_price": 26.0,
+    "winner": "Rice Agro Mills",
+    "status": "ESCALATED_PROCESSING",
+    "floor_respected": true,
+    "net_price_per_kg": 26.0,
+    "duration_sec": 56.472
+  }
+}

@@ -9,6 +9,15 @@ import operator
 
 
 class TransportAgentState(TypedDict):
+    # Stakeholder Requester Context (Shared Ecosystem Service)
+    requester_role: Optional[str]  # FARMER | BUYER | WAREHOUSE | PROCESSOR
+    requester_id: Optional[str]
+    workflow_id: Optional[str]
+    listing_id: Optional[str]
+    budget: Optional[float]
+    requester_constraints: Optional[Dict[str, Any]]
+    allowed_agents: Optional[List[str]]
+
     # Request Input
     request_id: str
     crop: str
@@ -37,6 +46,7 @@ class TransportAgentState(TypedDict):
     deadhead_km: float
     routing_source: str
     estimated_arrival_iso: str
+    route: Dict[str, Any]
 
     # Financial Cost State (Deterministic)
     cost_breakdown: Dict[str, float]
@@ -56,6 +66,10 @@ class TransportAgentState(TypedDict):
     expected_profit: Optional[float]
     llm_explanation: Optional[str]
     negotiation_history: Annotated[List[Dict[str, Any]], operator.add]
+    
+    # RAG Context
+    rag_query: Optional[str]
+    rag_results: Optional[Dict[str, List[Dict[str, Any]]]]
 
     # Workflow Logs & Status
     logs: Annotated[List[str], operator.add]

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from backend.services.security import get_current_user, get_current_user_optional
 from database.db import Database
+from backend.core.constants import validate_crop
 
 router = APIRouter(tags=["Crop Listings"])
 
@@ -55,6 +56,12 @@ class CropListingCreate(BaseModel):
         exp_p = values.get('expected_price')
         if min_p is not None and exp_p is not None and min_p > exp_p:
             raise ValueError('minimum price cannot be greater than expected price')
+            
+        crop = values.get('crop')
+        if crop:
+            is_valid, msg = validate_crop(crop)
+            if not is_valid:
+                raise ValueError(msg)
         
         return values
 
@@ -135,8 +142,10 @@ async def create_crop_listing(
 ):
     """Create a new crop listing for the authenticated farmer."""
     listing_id = str(uuid.uuid4())[:12]
+    trace_id = f"TRC-LST-{listing_id}"
     listing = {
         "id": listing_id,
+        "trace_id": trace_id,
         "user_id": current_user["sub"],
         "farmer_name": current_user.get("name", "Farmer"),
         "status": "ACTIVE",
@@ -157,7 +166,7 @@ async def update_crop_listing(
     listing = await Database.get_produce_async(listing_id)
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
-    if listing["user_id"] != current_user["sub"]:
+    if listing.get("user_id") and listing.get("user_id") != current_user["sub"] and current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="You do not own this listing")
 
     updates = {k: v for k, v in payload.dict().items() if v is not None}

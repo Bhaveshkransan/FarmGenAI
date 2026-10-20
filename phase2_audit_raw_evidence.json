@@ -1,0 +1,538 @@
+{
+  "candidate_scaling": {
+    "10": {
+      "total_candidates": 10,
+      "crop_compatible": 2,
+      "location_compatible": 2,
+      "quantity_compatible": 2,
+      "price_compatible": 1,
+      "final_eligible": 1,
+      "shortlisted": 1,
+      "top_candidate": {
+        "candidate_id": "buyer_10_0006",
+        "name": "Procurement Corp 6",
+        "score": 63.9,
+        "distance_km": 270,
+        "offered_price": 24.0,
+        "trust": 2.6
+      }
+    },
+    "50": {
+      "total_candidates": 50,
+      "crop_compatible": 9,
+      "location_compatible": 9,
+      "quantity_compatible": 9,
+      "price_compatible": 8,
+      "final_eligible": 8,
+      "shortlisted": 5,
+      "top_candidate": {
+        "candidate_id": "buyer_50_0036",
+        "name": "Procurement Corp 36",
+        "score": 86.98,
+        "distance_km": 0.0,
+        "offered_price": 25.52,
+        "trust": 2.6
+      }
+    },
+    "100": {
+      "total_candidates": 100,
+      "crop_compatible": 17,
+      "location_compatible": 17,
+      "quantity_compatible": 17,
+      "price_compatible": 15,
+      "final_eligible": 15,
+      "shortlisted": 5,
+      "top_candidate": {
+        "candidate_id": "buyer_100_0036",
+        "name": "Procurement Corp 36",
+        "score": 86.98,
+        "distance_km": 0.0,
+        "offered_price": 25.52,
+        "trust": 2.6
+      }
+    },
+    "200": {
+      "total_candidates": 200,
+      "crop_compatible": 34,
+      "location_compatible": 34,
+      "quantity_compatible": 34,
+      "price_compatible": 30,
+      "final_eligible": 30,
+      "shortlisted": 5,
+      "top_candidate": {
+        "candidate_id": "buyer_200_0198",
+        "name": "Procurement Corp 198",
+        "score": 87.79,
+        "distance_km": 0.0,
+        "offered_price": 32.0,
+        "trust": 3.8
+      }
+    },
+    "500": {
+      "total_candidates": 500,
+      "crop_compatible": 84,
+      "location_compatible": 84,
+      "quantity_compatible": 84,
+      "price_compatible": 75,
+      "final_eligible": 75,
+      "shortlisted": 5,
+      "top_candidate": {
+        "candidate_id": "buyer_500_0432",
+        "name": "Procurement Corp 432",
+        "score": 90.6,
+        "distance_km": 0.0,
+        "offered_price": 18.4,
+        "trust": 3.2
+      }
+    }
+  },
+  "candidate_sample_audit": [
+    {
+      "candidate_id": "buyer_100_0036",
+      "name": "Procurement Corp 36",
+      "score": 86.98,
+      "distance_km": 0.0,
+      "offered_price": 25.52,
+      "trust": 2.6
+    },
+    {
+      "candidate_id": "buyer_100_0072",
+      "name": "Procurement Corp 72",
+      "score": 80.6,
+      "distance_km": 0.0,
+      "offered_price": 23.0,
+      "trust": 3.2
+    },
+    {
+      "candidate_id": "buyer_100_0018",
+      "name": "Procurement Corp 18",
+      "score": 80.4,
+      "distance_km": 0.0,
+      "offered_price": 22.0,
+      "trust": 3.8
+    }
+  ],
+  "matching_vs_negotiation_vs_best_deal": {
+    "matching_stage_scores": {
+      "Local Retailer": 95.4,
+      "Nagpur Exporter": 78.53,
+      "Pune Wholesaler": 87.63
+    },
+    "negotiated_offers": {
+      "Local Retailer": {
+        "opening": 20.5,
+        "final_conceded": 21.5,
+        "status": "ACCEPT"
+      },
+      "Nagpur Exporter": {
+        "opening": 23.0,
+        "final_conceded": 26.5,
+        "status": "ACCEPT"
+      },
+      "Pune Wholesaler": {
+        "opening": 22.0,
+        "final_conceded": 24.2,
+        "status": "ACCEPT"
+      }
+    },
+    "graph_orchestrator_nominal_best": {
+      "buyer_id": "b_B",
+      "buyer_name": "Nagpur Exporter",
+      "price": 26.5,
+      "status": "ACCEPT"
+    },
+    "net_farmer_value_analysis": {
+      "Local Retailer": {
+        "gross_revenue": 21500.0,
+        "distance_km": 0.0,
+        "transport_cost": 0.0,
+        "net_revenue": 21500.0,
+        "effective_price_per_kg": 21.5
+      },
+      "Nagpur Exporter": {
+        "gross_revenue": 26500.0,
+        "distance_km": 450,
+        "transport_cost": 1350.0,
+        "net_revenue": 25150.0,
+        "effective_price_per_kg": 25.15
+      },
+      "Pune Wholesaler": {
+        "gross_revenue": 24200.0,
+        "distance_km": 210,
+        "transport_cost": 630.0,
+        "net_revenue": 23570.0,
+        "effective_price_per_kg": 23.57
+      }
+    },
+    "net_value_optimal_buyer": "Nagpur Exporter",
+    "gap_analysis": "graph_orchestrator ranks solely on nominal price max(price), whereas true supply-chain optimization requires Net Farmer Value (Gross Revenue - Transport - Storage)."
+  },
+  "adaptive_expansion": {
+    "initial_offers_status": "All 5 buyers REJECT",
+    "ranker_output_status": "REJECT",
+    "did_system_expand_to_next_batch": false,
+    "audit_finding": "In current graph_orchestrator.py, when all 5 active_buyers reject, status returns 'REJECT' and workflow halts. It does NOT automatically query buyers[5:10] from the candidate pool. This is documented as a known architectural limitation."
+  },
+  "negotiation_intelligence": [
+    {
+      "scenario": "Valid Deal Above Floor",
+      "offer": 22.0,
+      "floor": 20.0,
+      "budget": 25000,
+      "status": "DEAL",
+      "floor_protected": true,
+      "budget_protected": true
+    },
+    {
+      "scenario": "Aggressive Offer Below Floor",
+      "offer": 17.5,
+      "floor": 20.0,
+      "budget": 25000,
+      "status": "REJECT",
+      "floor_protected": true,
+      "budget_protected": true
+    },
+    {
+      "scenario": "Exceeds Buyer Budget",
+      "offer": 28.0,
+      "floor": 20.0,
+      "budget": 20000,
+      "status": "REJECT",
+      "floor_protected": false,
+      "budget_protected": true
+    },
+    {
+      "scenario": "Negative Price / Tamper",
+      "offer": -5.0,
+      "floor": 20.0,
+      "budget": 20000,
+      "status": "REJECT",
+      "floor_protected": true,
+      "budget_protected": true
+    },
+    {
+      "scenario": "Zero Price",
+      "offer": 0.0,
+      "floor": 20.0,
+      "budget": 20000,
+      "status": "REJECT",
+      "floor_protected": true,
+      "budget_protected": true
+    }
+  ],
+  "seven_crops": [
+    {
+      "crop": "Sugarcane",
+      "canonical_status": "VALID",
+      "statutory_benchmark": 315.0,
+      "xgboost_model_type": "XGBRegressor",
+      "xgboost_forecast": 3.98,
+      "sample_match_score": 91.5
+    },
+    {
+      "crop": "Soybean",
+      "canonical_status": "VALID",
+      "statutory_benchmark": 43.36,
+      "xgboost_model_type": "XGBRegressor",
+      "xgboost_forecast": 72.33,
+      "sample_match_score": 91.5
+    },
+    {
+      "crop": "Cotton",
+      "canonical_status": "VALID",
+      "statutory_benchmark": 70.21,
+      "xgboost_model_type": "XGBRegressor",
+      "xgboost_forecast": 70.71,
+      "sample_match_score": 91.5
+    },
+    {
+      "crop": "Jowar",
+      "canonical_status": "VALID",
+      "statutory_benchmark": 33.71,
+      "xgboost_model_type": "XGBRegressor",
+      "xgboost_forecast": 61.65,
+      "sample_match_score": 91.5
+    },
+    {
+      "crop": "Onion",
+      "canonical_status": "VALID",
+      "statutory_benchmark": 15.0,
+      "xgboost_model_type": "XGBRegressor",
+      "xgboost_forecast": 23.61,
+      "sample_match_score": 91.5
+    },
+    {
+      "crop": "Bajra",
+      "canonical_status": "VALID",
+      "statutory_benchmark": 25.5,
+      "xgboost_model_type": "XGBRegressor",
+      "xgboost_forecast": 34.98,
+      "sample_match_score": 91.5
+    },
+    {
+      "crop": "Rice",
+      "canonical_status": "VALID",
+      "statutory_benchmark": 23.0,
+      "xgboost_model_type": "XGBRegressor",
+      "xgboost_forecast": 34.48,
+      "sample_match_score": 91.5
+    }
+  ],
+  "workflow_modes": [
+    {
+      "mode": "BUYER_ONLY",
+      "config": {
+        "mode": "BUYER_ONLY",
+        "has_transport": false,
+        "requires_storage": false,
+        "requires_processing": false
+      },
+      "third_party_transport_procured": false,
+      "self_transport_detected": false,
+      "storage_invoked": false,
+      "processor_invoked": false,
+      "scope_enforced": true
+    },
+    {
+      "mode": "FULL_SUPPLY_CHAIN",
+      "config": {
+        "mode": "FULL_SUPPLY_CHAIN",
+        "has_transport": true,
+        "requires_storage": false,
+        "requires_processing": false
+      },
+      "third_party_transport_procured": false,
+      "self_transport_detected": false,
+      "storage_invoked": true,
+      "processor_invoked": false,
+      "scope_enforced": false
+    },
+    {
+      "mode": "FULL_SUPPLY_CHAIN",
+      "config": {
+        "mode": "FULL_SUPPLY_CHAIN",
+        "has_transport": false,
+        "requires_storage": true,
+        "requires_processing": false
+      },
+      "third_party_transport_procured": true,
+      "self_transport_detected": false,
+      "storage_invoked": true,
+      "processor_invoked": false,
+      "scope_enforced": true
+    },
+    {
+      "mode": "FULL_SUPPLY_CHAIN",
+      "config": {
+        "mode": "FULL_SUPPLY_CHAIN",
+        "has_transport": false,
+        "requires_storage": false,
+        "requires_processing": true
+      },
+      "third_party_transport_procured": true,
+      "self_transport_detected": false,
+      "storage_invoked": true,
+      "processor_invoked": true,
+      "scope_enforced": true
+    }
+  ],
+  "scope_enforcement_matrix": {
+    "FARMER": {
+      "FULL_SUPPLY_CHAIN": [
+        "buyer_agent",
+        "dynamic_routing_agent",
+        "farmer_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "processor_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
+      ],
+      "BUYER_ONLY": [
+        "buyer_agent",
+        "farmer_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "validator_agent"
+      ],
+      "TRANSPORT_ONLY": [
+        "dynamic_routing_agent",
+        "farmer_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent"
+      ]
+    },
+    "BUYER": {
+      "FULL_SUPPLY_CHAIN": [
+        "buyer_agent",
+        "dynamic_routing_agent",
+        "farmer_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "processor_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
+      ],
+      "BUYER_ONLY": [
+        "buyer_agent",
+        "farmer_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "validator_agent"
+      ],
+      "TRANSPORT_ONLY": [
+        "buyer_agent",
+        "dynamic_routing_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent"
+      ]
+    },
+    "TRANSPORTER": {
+      "FULL_SUPPLY_CHAIN": [
+        "buyer_agent",
+        "dynamic_routing_agent",
+        "farmer_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent"
+      ],
+      "BUYER_ONLY": [
+        "dynamic_routing_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent"
+      ],
+      "TRANSPORT_ONLY": [
+        "dynamic_routing_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent"
+      ]
+    },
+    "WAREHOUSE": {
+      "FULL_SUPPLY_CHAIN": [
+        "buyer_agent",
+        "dynamic_routing_agent",
+        "farmer_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "processor_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
+      ],
+      "BUYER_ONLY": [
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "validator_agent",
+        "warehouse_agent"
+      ],
+      "TRANSPORT_ONLY": [
+        "dynamic_routing_agent",
+        "market_intelligence_agent",
+        "matching_agent",
+        "planner_agent",
+        "rank_responses_agent",
+        "reflection_agent",
+        "transport_agent",
+        "validator_agent",
+        "warehouse_agent"
+      ]
+    }
+  },
+  "rag_causal_influence": {
+    "query": "Onion mandi modal price Nashik",
+    "collection": "mandi_knowledge",
+    "retrieved_count": 2,
+    "sample_snippet": "{'text': 'temperature is above 35\u00b0C. Onions are stored at a temperature of 25-35\u00b0C with relative humidity of \\n65-70% but for cold storage, onions are kept under temperature between 0 -2 \u00b0C at relativ",
+    "causal_mechanism": "RAG context is injected into PLANNER_PROMPT and MARKET_INTELLIGENCE_PROMPT under 'Market Intelligence Context'. Downstream agents use the extracted reference price to establish opening bids and target price bands."
+  },
+  "xgboost_causal_influence": {
+    "scenario_A_high_future_price_long_shelf_life": {
+      "decision": "HOLD",
+      "langgraph_conditional_edge_target": "hold_decision_node",
+      "bypasses_buyer_matching": true
+    },
+    "scenario_B_short_shelf_life": {
+      "decision": "SELL",
+      "langgraph_conditional_edge_target": "matching_agent",
+      "activates_matching_agent": true
+    },
+    "causal_proof": "XGBoost 7-day projection directly toggles 'sell_hold_decision', which switches the LangGraph execution path between matching_agent and hold_decision_node."
+  },
+  "failure_recovery": [
+    {
+      "component": "Government data.gov.in Mandi API",
+      "failure_simulated": "Network Timeout / 503 Service Unavailable",
+      "recovery_strategy": "Fallback to local buyer_current_mandi_prices.json snapshot",
+      "status": "GRACEFUL_FALLBACK",
+      "benchmark_price": 42.11
+    },
+    {
+      "component": "ChromaDB HTTP Server",
+      "failure_simulated": "Connection Refused (Port 8001 Down)",
+      "recovery_strategy": "Ephemeral in-memory vector store fallback",
+      "status": "GRACEFUL_FALLBACK",
+      "heartbeat": 1791352182762682800
+    },
+    {
+      "component": "Ollama / Cloud LLM",
+      "failure_simulated": "Non-JSON unstructured prose returned",
+      "recovery_strategy": "Regex extraction & heuristic fallback",
+      "status": "GRACEFUL_FALLBACK",
+      "parsed_result": null
+    }
+  ],
+  "concurrency_10": {
+    "operations": 10,
+    "elapsed_seconds": 0.001,
+    "ops_per_sec": 10000.0
+  },
+  "concurrency_50": {
+    "operations": 50,
+    "elapsed_seconds": 0.006,
+    "ops_per_sec": 8676.7
+  }
+}

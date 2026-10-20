@@ -11,7 +11,7 @@ export default function ProcessorDashboard() {
     queryKey: ['salvage-offers'],
     queryFn: async () => {
       const res = await api.get('/negotiations/?status=ESCALATED_PROCESSING');
-      return res.data?.data || [];
+      return Array.isArray(res.data) ? res.data : (res.data?.data || []);
     }
   });
 

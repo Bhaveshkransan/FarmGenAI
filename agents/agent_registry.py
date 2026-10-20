@@ -1,6 +1,6 @@
 from agents.buyer_agent import BuyerAgent
 from agents.compost_agent import CompostAgent
-from agents.farmer_agent import FarmerAgent
+from backend.agents.stakeholders.farmer_agent import FarmerAgent
 from agents.processor_agent import ProcessorAgent
 from agents.warehouse_agent import WarehouseAgent
 from agents.transporter_agent import TransporterAgent
@@ -22,10 +22,13 @@ class AgentRegistry:
             "buyer",
             BuyerAgent(name="BuyerAgent", budget=24000, max_quantity=1200, target_price=19)
         )
-        self.register_agent(
-            "farmer",
-            FarmerAgent(name="FarmerAgent", crop="Tomato", quantity=1000, min_price=18, shelf_life=3)
-        )
+        farmer_agent = FarmerAgent()
+        farmer_agent.name = "FarmerAgent"
+        farmer_agent.crop = "Tomato"
+        farmer_agent.quantity = 1000
+        farmer_agent.min_price = 18
+        farmer_agent.shelf_life = 3
+        self.register_agent("farmer", farmer_agent)
         self.register_agent(
             "processor",
             ProcessorAgent(

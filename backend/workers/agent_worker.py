@@ -102,7 +102,13 @@ async def _build_initial_state(payload: dict, neg_id: str) -> dict:
         "market_intelligence": None,
         "recommendation": None,
         "farmer_agent_obj": farmer_obj,
-        "buyer_agent_objs": buyer_objs
+        "buyer_agent_objs": buyer_objs,
+        "workflow_mode": payload.get("workflow_mode", "FULL_SUPPLY_CHAIN"),
+        "permitted_agents": payload.get("permitted_agents", ["buyer_agent", "dynamic_routing_agent"]),
+        "has_transport": bool(payload.get("has_transport", False)),
+        "has_storage": bool(payload.get("has_storage", False)),
+        "requires_processing": bool(payload.get("requires_processing", False)),
+        "sell_hold_decision": payload.get("sell_hold_decision"),
     }
 
 

@@ -27,40 +27,86 @@ logger = logging.getLogger("LLMClient")
 
 OLLAMA_URL: str = os.getenv("OLLAMA_URL", os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
 OLLAMA_MODEL: str = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "ollama").lower()
 ENABLE_LLM: bool = os.getenv("ENABLE_LLM", "true").lower() in {"1", "true", "yes"}
 
 
 class LLMClient:
-    """Unified LLM client supporting Cloud Gemini (Zero-setup) and Ollama (Local)."""
+    """Unified LLM client supporting Cloud Gemini, Groq, and Ollama (Local)."""
 
     def __init__(self):
         self.enabled = ENABLE_LLM
         self.provider = LLM_PROVIDER
         self.ollama_url = OLLAMA_URL
         self.ollama_model = OLLAMA_MODEL
-        self.gemini_key = GEMINI_API_KEY
+        self.gemini_key = os.getenv("GEMINI_API_KEY", GEMINI_API_KEY)
+        self.groq_key = os.getenv("GROQ_API_KEY", GROQ_API_KEY)
 
     def _generate_gemini(self, prompt: str) -> str | None:
-        if not self.gemini_key:
+        key = self.gemini_key if self.gemini_key is not None else os.getenv("GEMINI_API_KEY", "")
+        if not key:
             return None
+        # Try REST endpoint first for gemini-3.6-flash / gemini-flash-lite-latest
+        for model in ["gemini-3.6-flash", "gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                res = requests.post(url, json=payload, timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if text:
+                            return text.strip()
+            except Exception as e:
+                logger.debug(f"Gemini REST {model} failed: {e}")
+
+        # Try SDK fallback
         try:
             import google.generativeai as genai
-            genai.configure(api_key=self.gemini_key)
-            g_model = genai.GenerativeModel("gemini-2.0-flash")
-            res = g_model.generate_content(prompt)
-            if res and res.text:
-                return res.text.strip()
+            genai.configure(api_key=key)
+            for m_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
+                try:
+                    g_model = genai.GenerativeModel(m_name)
+                    res = g_model.generate_content(prompt)
+                    if res and res.text:
+                        return res.text.strip()
+                except Exception:
+                    continue
         except Exception as e:
+            logger.warning(f"Gemini generation failed: {e}")
+        return None
+
+    def _generate_groq(self, prompt: str, temperature: float = 0.7, max_tokens: int = 150) -> str | None:
+        key = self.groq_key if self.groq_key is not None else os.getenv("GROQ_API_KEY", "")
+        if not key:
+            return None
+        models = [
+            os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b"),
+            "qwen/qwen3.8-27b",
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+        ]
+        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+        for model_name in dict.fromkeys(models):
             try:
-                # Fallback to gemini-1.5-flash if 2.0 isn't available
-                g_model = genai.GenerativeModel("gemini-1.5-flash")
-                res = g_model.generate_content(prompt)
-                if res and res.text:
-                    return res.text.strip()
-            except Exception:
-                logger.warning(f"Gemini generation failed: {e}")
+                url = "https://api.groq.com/openai/v1/chat/completions"
+                payload = {
+                    "model": model_name,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                }
+                res = requests.post(url, json=payload, headers=headers, timeout=10)
+                if res.status_code == 200:
+                    choices = res.json().get("choices", [])
+                    if choices:
+                        return choices[0].get("message", {}).get("content", "").strip()
+            except Exception as e:
+                logger.debug(f"Groq model {model_name} failed: {e}")
         return None
 
     def _generate_ollama(self, prompt: str, model: str = None, temperature: float = 0.7, max_tokens: int = 120) -> str | None:
@@ -75,7 +121,6 @@ class LLMClient:
                     "num_predict": min(max_tokens, 120),
                 }
             }
-            # 12s timeout allows fast generation while avoiding hangs on CPU
             response = requests.post(url, json=payload, timeout=12)
             if response.status_code == 200:
                 text = response.json().get("response", "")
@@ -87,15 +132,33 @@ class LLMClient:
 
     def generate(self, prompt: str, model: str = None, temperature: float = 0.7, max_tokens: int = 120) -> str | None:
         """
-        Generate text completion with local Ollama routing.
+        Generate text completion with multi-provider routing (configured provider -> fallback chain).
         """
         if not self.enabled:
             return None
 
-        # Prioritize local Ollama (qwen2.5:1.5b)
-        res = self._generate_ollama(prompt, model, temperature, max_tokens)
-        if res:
-            return res
+        # Build order based on LLM_PROVIDER
+        prov = (self.provider or "").lower()
+        if prov == "gemini":
+            order = ["gemini", "groq", "ollama"]
+        elif prov == "groq":
+            order = ["groq", "gemini", "ollama"]
+        else:
+            order = ["gemini", "groq", "ollama"]  # Default cloud priority for hosted runs
+
+        for p in order:
+            if p == "gemini":
+                res = self._generate_gemini(prompt)
+                if res:
+                    return res
+            elif p == "groq":
+                res = self._generate_groq(prompt, temperature=temperature, max_tokens=max_tokens)
+                if res:
+                    return res
+            elif p == "ollama":
+                res = self._generate_ollama(prompt, model, temperature, max_tokens)
+                if res:
+                    return res
 
         return None
 

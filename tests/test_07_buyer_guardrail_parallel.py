@@ -56,6 +56,20 @@ def test_parallel_procurement_auto_selects_best():
         }
         await Database.create_negotiation_async(payload)
 
+        # Seed real produce listings in Database to be discovered
+        for i in range(5):
+            await Database.upsert_produce_async({
+                "id": f"list_test_soy_{i+1}",
+                "farmer_name": f"Latur Farmer {i+1}",
+                "crop": "Soybean",
+                "quantity": 5000,
+                "min_price": 45.0 + i * 0.5,
+                "location": "Latur",
+                "status": "ACTIVE",
+                "shelf_life": 10,
+                "quality": "A",
+            })
+
         res = await service.run_parallel_procurement(neg_id, {"quantity": 5000, "target_price": 48.92})
         assert res["success"] is True
         assert len(res["suppliers"]) == 5

@@ -1,5 +1,7 @@
 import asyncio
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, "c:/PROJECT/FarmGenAI")
 
 from backend.agents.graph_orchestrator import knowledge_manager_node, market_intelligence_node

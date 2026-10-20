@@ -359,13 +359,13 @@ async def seed():
             await conn.execute(
                 text("""
                     INSERT INTO produce (
-                        id, user_id, farmer_name, crop, crop_category, variety, grade,
+                        id, workflow_mode, selected_services, user_id, farmer_name, crop, crop_category, variety, grade,
                         quantity, unit, min_sale_quantity, expected_price, min_price,
                         price_unit, quality_info, harvest_date, availability_date,
                         preferred_selling_date, shelf_life, location, latitude, longitude,
                         images, description, language, status, created_at
                     ) VALUES (
-                        :id, :user_id, :farmer_name, :crop, :crop_category, :variety, :grade,
+                        :id, :workflow_mode, :selected_services, :user_id, :farmer_name, :crop, :crop_category, :variety, :grade,
                         :quantity, :unit, :min_sale_quantity, :expected_price, :min_price,
                         :price_unit, :quality_info, :harvest_date, :availability_date,
                         :preferred_selling_date, :shelf_life, :location, :latitude, :longitude,
@@ -374,6 +374,8 @@ async def seed():
                 """),
                 {
                     "id": p["id"],
+                    "workflow_mode": "FULL_SUPPLY_CHAIN",
+                    "selected_services": json.dumps(["STORAGE", "LOGISTICS"]),
                     "user_id": p["user_id"],
                     "farmer_name": p["farmer_name"],
                     "crop": p["crop"],

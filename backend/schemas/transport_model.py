@@ -17,6 +17,16 @@ class TransportBookingRequest(BaseModel):
     distance_km: float = Field(60.0, gt=0)
     shelf_life: int = Field(3, ge=1)
     preferred_pickup_time: Optional[str] = None
+    requester_role: Optional[str] = Field("FARMER", description="FARMER | BUYER | WAREHOUSE | PROCESSOR")
+    requester_id: Optional[str] = None
+    listing_id: Optional[str] = None
+    budget: Optional[float] = None
+    refrigerated_required: Optional[bool] = False
+    vehicle_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    agreed_freight: Optional[float] = None
+    transport_floor: Optional[float] = None
+    farmer_floor: Optional[float] = None
 
 
 class TransportBookingResponse(BaseModel):

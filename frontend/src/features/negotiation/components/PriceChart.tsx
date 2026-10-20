@@ -1,7 +1,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function PriceChart({ data }) {
+export default function PriceChart({ data, isTransport = false }) {
   // Fallback data if none provided
   const chartData = data || [
     { name: 'Day 1', price: 18 },
@@ -23,7 +23,7 @@ export default function PriceChart({ data }) {
           <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dx={-10} tickFormatter={(val) => `₹${val}`} />
           <Tooltip 
             contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-            formatter={(value) => [`₹${value}/kg`, 'Modal Price']}
+            formatter={(value) => [isTransport ? `₹${value}` : `₹${value}/kg`, isTransport ? 'Freight Cost' : 'Modal Price']}
           />
         </LineChart>
       </ResponsiveContainer>

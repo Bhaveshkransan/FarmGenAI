@@ -215,26 +215,60 @@ class RealMandiDatasetClient:
     ]
 
     _cache: Dict[str, Any] = {}
+    _district_cache: Dict[tuple, List[float]] = {}
     _history_cache: Dict[str, List[dict]] = {}
 
     @classmethod
     def _load_dataset(cls):
-        if not cls._cache:
-            dataset_path = os.path.join(os.path.dirname(__file__), "..", "dataset", "maharashtra_historical_prices.json")
-            if os.path.exists(dataset_path):
-                try:
-                    with open(dataset_path, "r", encoding="utf-8") as f:
-                        records = json.load(f)
-                    for r in records:
-                        c_key = r["crop"].lower()
-                        m_key = r["mandi_name"]
+        if cls._cache:
+            return
+
+        # 1. Load authoritative current mandi dataset (data.gov.in Agmarknet snapshot)
+        current_path = os.path.join(os.path.dirname(__file__), "..", "dataset", "buyer_current_mandi_prices.json")
+        if os.path.exists(current_path):
+            try:
+                with open(current_path, "r", encoding="utf-8") as f:
+                    curr_records = json.load(f)
+                for r in curr_records:
+                    c_key = (r.get("commodity") or r.get("crop", "")).lower()
+                    m_key = r.get("market") or r.get("mandi") or ""
+                    d_key = (r.get("district") or "").lower()
+                    p = float(r.get("modal_price_kg") or r.get("modal_price") or 0.0)
+                    if c_key and p > 0:
+                        if m_key:
+                            cls._cache[(c_key, m_key)] = {
+                                "crop": c_key,
+                                "mandi_name": m_key,
+                                "district": r.get("district", ""),
+                                "price_per_kg": p,
+                                "min_price": float(r.get("min_price_kg") or r.get("min_price") or p * 0.92),
+                                "max_price": float(r.get("max_price_kg") or r.get("max_price") or p * 1.08),
+                            }
+                        if d_key:
+                            cls._district_cache.setdefault((c_key, d_key), []).append(p)
+            except Exception as e:
+                logger.error(f"Failed to load buyer_current_mandi_prices.json: {e}")
+
+        # 2. Load historical series dataset
+        dataset_path = os.path.join(os.path.dirname(__file__), "..", "dataset", "maharashtra_historical_prices.json")
+        if os.path.exists(dataset_path):
+            try:
+                with open(dataset_path, "r", encoding="utf-8") as f:
+                    records = json.load(f)
+                for r in records:
+                    c_key = r["crop"].lower()
+                    m_key = r["mandi_name"]
+                    d_key = (r.get("district") or "").lower()
+                    p = float(r.get("price_per_kg") or 0.0)
+                    if (c_key, m_key) not in cls._cache:
                         cls._cache[(c_key, m_key)] = r
-                        cls._cache[c_key] = r
-                        if c_key not in cls._history_cache:
-                            cls._history_cache[c_key] = []
-                        cls._history_cache[c_key].append(r)
-                except Exception as e:
-                    logger.error(f"Failed to load maharashtra_historical_prices.json: {e}")
+                    if d_key and p > 0:
+                        cls._district_cache.setdefault((c_key, d_key), []).append(p)
+                    if c_key not in cls._history_cache:
+                        cls._history_cache[c_key] = []
+                    cls._history_cache[c_key].append(r)
+            except Exception as e:
+                logger.error(f"Failed to load maharashtra_historical_prices.json: {e}")
 
     @classmethod
     def get_historical_series(cls, crop: str, location: str = "", days: int = 7) -> List[dict]:
@@ -284,21 +318,49 @@ class RealMandiDatasetClient:
         
         CROP_BENCHMARKS = {
             "sugarcane": {"modal": 3.75, "min": 3.40, "max": 4.50},
-            "soybean":   {"modal": 69.64,"min": 62.00,"max": 78.00},
+            "soybean":   {"modal": 54.50,"min": 48.00,"max": 62.00},
             "cotton":    {"modal": 65.00,"min": 58.00,"max": 72.00},
-            "jowar":     {"modal": 60.00,"min": 52.00,"max": 68.00},
+            "jowar":     {"modal": 36.00,"min": 32.00,"max": 42.00},
             "onion":     {"modal": 22.00,"min": 16.00,"max": 28.00},
-            "bajra":     {"modal": 35.58,"min": 30.00,"max": 40.00},
-            "rice":      {"modal": 34.71,"min": 28.00,"max": 42.00},
+            "bajra":     {"modal": 26.50,"min": 22.00,"max": 30.00},
+            "rice":      {"modal": 25.50,"min": 21.00,"max": 32.00},
         }
         bench = CROP_BENCHMARKS.get(key, {"modal": 30.0, "min": 25.0, "max": 35.0})
 
         for m in cls.MANDI_COORDINATES:
+            # 1. Exact mandi match
             cached = cls._cache.get((key, m["name"]))
+            
+            # 2. Fuzzy / token match in cache
+            if not cached:
+                m_tokens = set(m["name"].lower().replace("apmc", "").replace("mandi", "").split())
+                for (c, market_name), rec in cls._cache.items():
+                    if c == key and isinstance(market_name, str):
+                        target_tokens = set(market_name.lower().replace("apmc", "").replace("mandi", "").split())
+                        if m_tokens and target_tokens and (m_tokens & target_tokens):
+                            cached = rec
+                            break
+
+            # 3. District-level Agmarknet price average
+            if not cached and m.get("district"):
+                d_key = (key, m["district"].lower())
+                prices = cls._district_cache.get(d_key)
+                if prices:
+                    avg_p = round(sum(prices) / len(prices), 2)
+                    cached = {
+                        "price_per_kg": avg_p,
+                        "min_price": round(avg_p * 0.92, 2),
+                        "max_price": round(avg_p * 1.08, 2),
+                    }
+
             if cached:
                 modal = round(float(cached.get("price_per_kg", bench["modal"])), 2)
+                min_p = round(float(cached.get("min_price", modal * 0.92)), 2)
+                max_p = round(float(cached.get("max_price", modal * 1.08)), 2)
             else:
                 modal = bench["modal"]
+                min_p = bench["min"]
+                max_p = bench["max"]
 
             records.append({
                 "source": "Agmarknet APMC Ingestion (Maharashtra)",
@@ -307,8 +369,8 @@ class RealMandiDatasetClient:
                 "mandi": m["name"],
                 "commodity": crop.capitalize(),
                 "variety": "Standard APMC Grade",
-                "min_price": round(modal * 0.92, 2),
-                "max_price": round(modal * 1.08, 2),
+                "min_price": min_p,
+                "max_price": max_p,
                 "modal_price": modal,
                 "arrival_date": "Today",
                 "lat": m["lat"],

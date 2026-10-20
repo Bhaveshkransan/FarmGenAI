@@ -1,7 +1,9 @@
-"""Full end-to-end integration test for FarmGenAI."""
+import os
 import sys
 import json
-sys.path.insert(0, 'c:/PROJECT/FarmGenAI')
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
 
 errors = []
 
@@ -118,5 +120,7 @@ if errors:
     print(f'RESULT: {len(errors)} FAILURES')
     for e in errors:
         print(e)
+    sys.exit(1)
 else:
     print('RESULT: ALL 10 TESTS PASSED - System is fully operational!')
+    sys.exit(0)

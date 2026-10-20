@@ -37,6 +37,13 @@ except Exception:
         get_buyer_pricing_service = None
 
 try:
+    from backend.schemas.buyer_market_context import BuyerMarketContext
+    from backend.services.buyer_market_context_service import buyer_market_context_service
+except Exception:
+    BuyerMarketContext = None
+    buyer_market_context_service = None
+
+try:
     llm_client = LLMClient()
 except Exception:
     llm_client = None
@@ -92,6 +99,7 @@ class BuyerAgent(BaseAgent):
         preferred_crops: list[str] | None = None,
         persona: str | None = None,
         crop: str | None = None,
+        **kwargs
     ):
         # Configure persona-derived attributes if passed
         self.persona = persona if persona in BUYER_PERSONAS else "custom"
@@ -104,8 +112,12 @@ class BuyerAgent(BaseAgent):
                 min_shelf_life = p_config["min_shelf_life"]
         else:
             self.weights = {"price": 0.60, "quantity": 0.25, "freshness": 0.15}
+            if persona in ["boulware", "aggressive", "conceder", "balanced"]:
+                strategy = persona
 
         super().__init__(name, "buyer", strategy=strategy)
+        self.agent_id = kwargs.get("agent_id") or f"buyer_{name}"
+        self.id = self.agent_id
 
         # Handle backward-compatibility where 5th arg might be reservation_price if float
         if isinstance(location, (int, float)) and reservation_price is None:
@@ -312,24 +324,24 @@ class BuyerAgent(BaseAgent):
                     f"the 7 Maharashtra crops: Sugarcane, Soybean, Cotton, Jowar, Onion, Bajra, Rice."
                 )
 
-        price = offer.get("price")
-        if (
-            price is None
-            or not isinstance(price, (int, float))
-            or math.isnan(price)
-            or math.isinf(price)
-            or price <= 0
-        ):
+        price_val = offer.get("price")
+        if price_val is None:
+            return "REJECT", "Invalid price: must be a positive finite number."
+        try:
+            price = float(price_val)
+        except (ValueError, TypeError):
+            return "REJECT", "Invalid price: must be a positive finite number."
+        if math.isnan(price) or math.isinf(price) or price <= 0:
             return "REJECT", "Invalid price: must be a positive finite number."
 
-        qty = offer.get("quantity")
-        if (
-            qty is None
-            or not isinstance(qty, (int, float))
-            or math.isnan(qty)
-            or math.isinf(qty)
-            or qty <= 0
-        ):
+        qty_val = offer.get("quantity")
+        if qty_val is None:
+            return "REJECT", "Invalid quantity: must be a positive finite number."
+        try:
+            qty = float(qty_val)
+        except (ValueError, TypeError):
+            return "REJECT", "Invalid quantity: must be a positive finite number."
+        if math.isnan(qty) or math.isinf(qty) or qty <= 0:
             return "REJECT", "Invalid quantity: must be a positive finite number."
 
         # Spoilage check from offer or context
@@ -337,8 +349,13 @@ class BuyerAgent(BaseAgent):
         if shelf_life is None and context:
             shelf_life = context.get("shelf_life", context.get("spoilage_days"))
 
-        if shelf_life is not None and isinstance(shelf_life, (int, float)) and shelf_life <= 0:
-            return "REJECT", "Crop has already spoiled and cannot be purchased."
+        if shelf_life is not None:
+            try:
+                sl_val = float(shelf_life)
+                if sl_val <= 0 or math.isnan(sl_val):
+                    return "REJECT", "Crop has already spoiled and cannot be purchased."
+            except (ValueError, TypeError):
+                pass
 
         # Budget exhaustion check
         if self.budget <= 0 or price > self.budget:
@@ -399,11 +416,14 @@ class BuyerAgent(BaseAgent):
 
             # Dynamically resolve features from real APMC historical dataset if missing or incomplete
             if not features or any(col not in features for col in self.pricing_service.feature_cols):
+                if context and context.get("market_price") is not None:
+                    return float(context["market_price"])
                 try:
                     features, feature_meta = self.pricing_service.get_market_features(norm_crop, loc)
                 except Exception as e:
                     self.log_action(f"Failed to auto-resolve market features: {e}")
                     features = None
+
 
             if features:
                 try:
@@ -590,14 +610,18 @@ class BuyerAgent(BaseAgent):
 
         counter_p = data.get("counter_price")
         if counter_p is not None:
-            if isinstance(counter_p, (int, float)):
-                counter_p = float(counter_p)
-            else:
-                clean_num = re.sub(r"[^\d.]", "", str(counter_p))
-                try:
+            try:
+                if isinstance(counter_p, (int, float)):
+                    counter_p = float(counter_p)
+                else:
+                    clean_num = re.sub(r"[^\d.]", "", str(counter_p))
                     counter_p = float(clean_num) if clean_num else None
-                except ValueError:
+                if counter_p is not None and (math.isnan(counter_p) or math.isinf(counter_p) or counter_p <= 0):
                     counter_p = None
+                elif counter_p is not None and hasattr(self, "reservation_price") and counter_p > self.reservation_price:
+                    counter_p = float(self.reservation_price)
+            except (ValueError, TypeError):
+                counter_p = None
 
         reason = str(data.get("reason", "Strategic pricing compromise."))
         if hasattr(self, "reservation_price") and str(self.reservation_price) in reason:
@@ -653,6 +677,52 @@ class BuyerAgent(BaseAgent):
         # 2. Hybrid Reasoning (LLM Proposal)
         llm_decision = None
         if llm_client and getattr(llm_client, "enabled", False) and not force_deterministic:
+            market_ctx_text = ""
+            if context and "buyer_market_context" in context:
+                b_m_ctx = context["buyer_market_context"]
+                if hasattr(b_m_ctx, "to_prompt_text"):
+                    market_ctx_text = "\n" + b_m_ctx.to_prompt_text()
+                elif isinstance(b_m_ctx, dict):
+                    market_ctx_text = f"\n- Market Context: {json.dumps(b_m_ctx)}"
+            else:
+                # Build market context dynamically if service available or format individual keys
+                if buyer_market_context_service and target_crop:
+                    try:
+                        resolved_m_ctx = buyer_market_context_service.build_market_context(
+                            crop=target_crop,
+                            location=self.location,
+                            persona=self.persona,
+                            context=context,
+                        )
+                        market_ctx_text = "\n" + resolved_m_ctx.to_prompt_text()
+                    except Exception:
+                        pass
+
+                if not market_ctx_text:
+                    rag_text = ""
+                    if context and "buyer_rag_context" in context:
+                        b_rag = context["buyer_rag_context"]
+                        if hasattr(b_rag, "to_prompt_text"):
+                            rag_text = b_rag.to_prompt_text()
+                        elif isinstance(b_rag, str):
+                            rag_text = b_rag
+                        elif isinstance(b_rag, dict):
+                            rag_text = json.dumps(b_rag)
+
+                    rag_section = f"\n- Relevant Buyer RAG Knowledge Context:\n{rag_text}" if rag_text else ""
+
+                    current_mandi_section = ""
+                    if context and "current_mandi_data" in context and isinstance(context["current_mandi_data"], dict):
+                        m_data = context["current_mandi_data"]
+                        if m_data.get("success", True):
+                            modal_kg = m_data.get("modal_price_kg", 0.0)
+                            apmc = m_data.get("apmc", "APMC Mandi")
+                            freshness = m_data.get("freshness", "CURRENT")
+                            obs_date = m_data.get("observation_date", "")
+                            current_mandi_section = f"\n- Current Daily Mandi Price (Observed): ₹{modal_kg}/kg at {apmc} (Date: {obs_date}, Freshness: {freshness})"
+
+                    market_ctx_text = f"- Predicted Next-Period Modal Price (ML Forecast): ₹{market_price}/kg{current_mandi_section}{rag_section}"
+
             prompt = f"""
             You are a buyer agent ({self.persona}) negotiating the purchase of agricultural produce.
             - Your target price: ₹{self.target_price}/kg
@@ -661,9 +731,11 @@ class BuyerAgent(BaseAgent):
             - Your current budget: ₹{self.budget}
             - Maximum quantity needed: {self.max_quantity}kg
             - Seller offered price: ₹{price}/kg for {req_qty}kg
-            - Regional market benchmark: ₹{market_price}/kg
             - Produce shelf life: {shelf_life if shelf_life is not None else 'Normal'} days
             - Negotiation round: {current_round} of {max_rounds}
+            
+            Market Intelligence & Context:
+            {market_ctx_text}
 
             Decide whether to ACCEPT, REJECT, or COUNTER.
             If COUNTER, provide a realistic counter_price <= ₹{min(self.reservation_price, batna)}.
@@ -695,15 +767,22 @@ class BuyerAgent(BaseAgent):
 
             # Hallucination Override: Never accept a price above reservation price
             if decision == "ACCEPT" and price > self.reservation_price:
-                decision = "COUNTER"
-                counter_price = min(self.reservation_price, self.current_bid + 1.0)
-                reason = "LLM Override: Offer exceeds maximum allowable reservation price."
+                if current_round < max_rounds and self.current_bid < self.reservation_price:
+                    decision = "COUNTER"
+                    counter_price = min(self.reservation_price, self.current_bid + 1.0)
+                    reason = "LLM Override: Offer exceeds maximum allowable reservation price; countering within ZOPA."
+                else:
+                    decision = "REJECT"
+                    counter_price = 0.0
+                    reason = f"LLM Override: Offer ₹{price}/kg strictly exceeds maximum allowable reservation ceiling (₹{self.reservation_price}/kg)."
 
             # Hallucination Override: Invalid counter price validation
             if decision == "COUNTER":
                 if (
-                    not isinstance(counter_price, (int, float))
+                    counter_price is None
+                    or not isinstance(counter_price, (int, float))
                     or math.isnan(counter_price)
+                    or math.isinf(counter_price)
                     or counter_price <= 0
                     or counter_price > self.reservation_price
                     or counter_price >= price
@@ -712,23 +791,39 @@ class BuyerAgent(BaseAgent):
                         offer, market_price, current_round, max_rounds, shelf_life, batna, seller_concession
                     )
                     decision = fb["decision"]
-                    counter_price = fb["counter_price"]
+                    counter_price = min(self.reservation_price, fb["counter_price"])
                     reason = fb["reason"]
 
         # 4. Final Execution & State Update
         if decision == "ACCEPT":
-            # Determine maximum purchasable quantity bounded by max_quantity and remaining budget
-            affordable_qty = math.floor(self.budget / price)
-            purchasable_qty = min(req_qty, self.max_quantity, affordable_qty)
-
-            if purchasable_qty <= 0:
+            # Strict safety check: Never accept above reservation price under ANY circumstance
+            if price > self.reservation_price:
                 return {
                     "type": "REJECT",
                     "price": price,
                     "quantity": req_qty,
-                    "message": self.log_action("REJECTED: Insufficient budget to fulfill transaction."),
+                    "message": self.log_action(
+                        f"REJECTED: Price ₹{price}/kg strictly exceeds reservation ceiling (₹{self.reservation_price}/kg)."
+                    ),
+                    "error": "EXCEEDS_RESERVATION_PRICE"
                 }
 
+            affordable_qty = math.floor(self.budget / price) if price > 0 else 0
+            purchasable_qty = min(req_qty, self.max_quantity, float(affordable_qty))
+
+            # Hard Deterministic Guardrails against Invalid Acceptance
+            if purchasable_qty <= 0 or (price * purchasable_qty > self.budget + 1e-6):
+                return {
+                    "type": "REJECT",
+                    "price": price,
+                    "quantity": req_qty,
+                    "message": self.log_action(
+                        f"REJECTED: Budget limit (₹{self.budget}) exceeded for requested quantity ({req_qty}kg)."
+                    ),
+                    "error": "INSUFFICIENT_BUDGET"
+                }
+
+        if decision == "ACCEPT":
             total_cost = round(purchasable_qty * price, 2)
             self.inventory += purchasable_qty
             self.budget = max(0.0, round(self.budget - total_cost, 2))
@@ -770,7 +865,7 @@ class BuyerAgent(BaseAgent):
                     "quantity": req_qty,
                     "message": self.log_action("REJECTED: Insufficient budget to purchase even 1 unit at counter price."),
                 }
-            counter_qty = min(req_qty, self.max_quantity, affordable_qty)
+            counter_qty = min(req_qty, self.max_quantity, float(affordable_qty))
             if counter_qty <= 0:
                 return {
                     "type": "REJECT",
@@ -811,16 +906,16 @@ class BuyerAgent(BaseAgent):
             batna = self.calculate_batna(market_price)
 
         # 1. Direct Target Satisfaction
-        # Accept if price is at or below target price
-        if price <= self.target_price:
+        # Accept only if price is at or below target price AND strictly within reservation ceiling
+        if price <= self.target_price and price <= self.reservation_price:
             return {
                 "decision": "ACCEPT",
                 "counter_price": None,
                 "reason": "Offered price meets or beats our procurement target.",
             }
 
-        # Accept if within tight 3% margin of target price
-        if price <= round(self.target_price * 1.03, 2):
+        # Accept if within tight 3% margin of target price AND strictly within reservation ceiling
+        if price <= round(self.target_price * 1.03, 2) and price <= self.reservation_price:
             return {
                 "decision": "ACCEPT",
                 "counter_price": None,
@@ -836,18 +931,28 @@ class BuyerAgent(BaseAgent):
                 "reason": "Offered price far exceeds sustainable market pricing and reservation ceiling.",
             }
 
+        # 2b. Stall Detection: Detect immobile seller offers above acceptable threshold
+        if len(self.seller_offer_history) >= 3:
+            recent_delta = abs(self.seller_offer_history[-1] - self.seller_offer_history[-3])
+            if recent_delta < 0.15 and price > self.reservation_price:
+                return {
+                    "decision": "REJECT",
+                    "counter_price": None,
+                    "reason": f"Stall detected: seller price (₹{price}/kg) has remained static across 3 rounds above reservation ceiling.",
+                }
+
         # 3. Spoilage Advantage
         # If shelf-life is critical (<= 2 days), farmer is under decay pressure. Hold firm or discount.
         if shelf_life is not None and shelf_life <= 2:
             discounted_target = max(1.0, round(self.target_price * 0.90, 2))
-            if price <= discounted_target:
+            if price <= discounted_target and price <= self.reservation_price:
                 return {
                     "decision": "ACCEPT",
                     "counter_price": None,
                     "reason": "Accepting discounted produce nearing end of shelf life.",
                 }
             # Counter with lower price due to spoilage risk
-            counter = min(discounted_target, price - 0.5)
+            counter = min(discounted_target, price - 0.5, self.reservation_price)
             return {
                 "decision": "COUNTER",
                 "counter_price": max(1.0, round(counter, 2)),

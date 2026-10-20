@@ -25,6 +25,7 @@ class TestOllamaFailure:
         original_url = client.ollama_url
         client.ollama_url = "http://127.0.0.1:59999"
         client.gemini_key = ""
+        client.groq_key = ""
         result = client.generate("Test prompt.")
         assert result is None
         client.ollama_url = original_url

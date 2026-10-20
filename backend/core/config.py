@@ -9,9 +9,9 @@ class Settings(BaseSettings):
     # ── LLM (Ollama Primary / Gemini Fallback) ──────────────────────
     ENABLE_LLM: bool = True
     OLLAMA_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen3:8b"
+    OLLAMA_MODEL: str = "qwen2:0.5b"
     GEMINI_API_KEY: str = ""
-    DEFAULT_LLM_MODEL: str = "qwen3:8b"
+    DEFAULT_LLM_MODEL: str = "qwen2:0.5b"
 
     # ── Server ───────────────────────────────────────────────────────
     API_HOST: str = "0.0.0.0"
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     WS_PORT: int = 8765
 
     # ── Database & Cache & Search ────────────────────────────────────
-    DATABASE_URL: str = "postgresql+asyncpg://admin:admin_password@localhost:5432/agrinegotiator"
+    DATABASE_URL: str = "postgresql+asyncpg://admin:admin_password@localhost:5433/agrinegotiator"
     REDIS_URL: str = "redis://localhost:6379/0"
     CHROMA_URL: str = "http://localhost:8001"
 
@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     # ── External Integrations (Weather, Maps, Storage) ───────────────
     OPEN_METEO_BASE_URL: str = "https://api.open-meteo.com"
     OSRM_BASE_URL: str = "https://router.project-osrm.org"
+    ENABLE_MINIO: bool = False
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin"
@@ -63,6 +64,7 @@ JWT_ALGORITHM = settings.JWT_ALGORITHM
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 OPEN_METEO_BASE_URL = settings.OPEN_METEO_BASE_URL
 OSRM_BASE_URL = settings.OSRM_BASE_URL
+ENABLE_MINIO = settings.ENABLE_MINIO
 MINIO_ENDPOINT = settings.MINIO_ENDPOINT
 MINIO_ACCESS_KEY = settings.MINIO_ACCESS_KEY
 MINIO_SECRET_KEY = settings.MINIO_SECRET_KEY

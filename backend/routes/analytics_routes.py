@@ -4,9 +4,9 @@ backend/routes/analytics_routes.py
 Dashboard analytics and reporting API endpoints.
 """
 
-from backend.repositories.user_repository import UserRepository
 from fastapi import APIRouter, Depends
-from backend.services.security import get_current_user
+from backend.repositories.user_repository import UserRepository
+from backend.services.security import get_current_user, get_current_user_optional
 from database.db import Database
 
 router = APIRouter(tags=["Analytics"])
@@ -17,7 +17,7 @@ from backend.db.session import AsyncSessionLocal
 from sqlalchemy import select
 
 @router.get("/stats")
-async def platform_stats(current_user: dict = Depends(get_current_user)):
+async def platform_stats(current_user: dict = Depends(get_current_user_optional)):
     """Return aggregated platform statistics for the dashboard."""
     async with AsyncSessionLocal() as session:
         res = await session.execute(select(DBNegotiation))

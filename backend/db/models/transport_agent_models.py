@@ -11,11 +11,36 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.db.session import Base
 
 
+class DBTransportProvider(Base):
+    __tablename__ = "transport_providers"
+
+    provider_id: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    service_area: Mapped[str] = mapped_column(String, nullable=True, default="Maharashtra")
+    rating: Mapped[float] = mapped_column(Float, default=4.5)
+    reliability: Mapped[float] = mapped_column(Float, default=0.95)
+    completion_rate: Mapped[float] = mapped_column(Float, default=0.98)
+    status: Mapped[str] = mapped_column(String, default="ACTIVE", index=True)
+    contact_number: Mapped[str] = mapped_column(String, nullable=True)
+
+
 class DBVehicle(Base):
     __tablename__ = "vehicles"
 
     vehicle_id: Mapped[str] = mapped_column(String, primary_key=True)
     transporter_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+
+    @property
+    def provider_id(self) -> str:
+        return self.transporter_id
+
+    @provider_id.setter
+    def provider_id(self, value: str):
+        self.transporter_id = value
+
+    registration_number: Mapped[str] = mapped_column(String, nullable=True)
+    driver_name: Mapped[str] = mapped_column(String, nullable=True)
+    base_rate_per_km: Mapped[float] = mapped_column(Float, nullable=True)
     vehicle_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
     vehicle_name: Mapped[str] = mapped_column(String, nullable=True)
     capacity_kg: Mapped[float] = mapped_column(Float, nullable=False)
@@ -30,6 +55,8 @@ class DBVehicle(Base):
     status: Mapped[str] = mapped_column(String, default="AVAILABLE", index=True)
     rating: Mapped[float] = mapped_column(Float, default=4.5)
     contact_number: Mapped[str] = mapped_column(String, nullable=True)
+    owner_contact: Mapped[str] = mapped_column(String, nullable=True)
+    image_url: Mapped[str] = mapped_column(String, nullable=True)
 
 
 class DBTransportRequest(Base):
@@ -113,4 +140,36 @@ class DBTransportTrip(Base):
     expected_profit: Mapped[float] = mapped_column(Float, nullable=False)
     status: Mapped[str] = mapped_column(String, default="CONFIRMED")
     details_json: Mapped[dict] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=True)
+
+
+class DBTransportNegotiation(Base):
+    __tablename__ = "transport_negotiations"
+
+    negotiation_id: Mapped[str] = mapped_column(String, primary_key=True)
+    request_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    provider_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    vehicle_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    round_num: Mapped[int] = mapped_column(Integer, default=1)
+    offer: Mapped[float] = mapped_column(Float, nullable=False)
+    counter_offer: Mapped[float] = mapped_column(Float, nullable=True)
+    transport_floor: Mapped[float] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="PENDING")
+    timestamp: Mapped[str] = mapped_column(String, nullable=True)
+
+
+class DBTransportBooking(Base):
+    __tablename__ = "transport_carrier_bookings"
+
+    booking_id: Mapped[str] = mapped_column(String, primary_key=True)
+    request_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    negotiation_id: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String, nullable=True, index=True)
+    provider_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    vehicle_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    agreed_freight: Mapped[float] = mapped_column(Float, nullable=False)
+    transport_floor: Mapped[float] = mapped_column(Float, nullable=True)
+    farmer_net_realization: Mapped[float] = mapped_column(Float, nullable=True)
+    farmer_floor: Mapped[float] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="CONFIRMED")
     created_at: Mapped[str] = mapped_column(String, nullable=True)

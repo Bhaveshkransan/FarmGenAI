@@ -7,15 +7,13 @@ venv/
 .git/
 .gitignore
 .env
-data/
+.pytest_cache/
 frontend/node_modules/
+frontend/dist/
 node_storage/
-# Large generated ML datasets - mount at runtime instead
-backend/dataset/mock_historical_prices.json
-# Scripts not needed in container
-scripts/
-tests/
+data/
 
-backend/venv/
-backend/models/
+# Exclude large raw datasets if mounted at runtime, but PRESERVE backend/models/
 backend/dataset/mock_historical_prices.json
+backend/venv/
+scripts/

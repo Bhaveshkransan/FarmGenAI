@@ -1,7 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ShieldAlert } from 'lucide-react';
 
 /**
  * Enterprise RBAC Route Guard
@@ -21,31 +20,18 @@ export default function ProtectedRoute({ allowedRoles = [] }) {
     );
   }
 
-  // Not logged in -> Redirect to landing page
+  // Not logged in -> Redirect to login page
   if (!user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   // Role validation (case-insensitive)
   const userRole = user.role?.toLowerCase();
   const isAllowed = allowedRoles.length === 0 || allowedRoles.some(r => r.toLowerCase() === userRole);
 
+  // Wrong role → silently redirect to their own dashboard (no 403 error page)
   if (!isAllowed) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
-        <ShieldAlert size={64} className="text-red-500 mb-4" />
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">403 Forbidden</h1>
-        <p className="text-slate-500 text-center max-w-md">
-          You do not have permission to view this module. Your current active role is <span className="font-bold text-slate-700 capitalize">'{user.role}'</span>.
-        </p>
-        <button 
-          onClick={() => window.history.back()}
-          className="mt-6 px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold transition"
-        >
-          Go Back
-        </button>
-      </div>
-    );
+    return <Navigate to="/dashboard" replace />;
   }
 
   // All checks passed, render the nested routes

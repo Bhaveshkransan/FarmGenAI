@@ -5,7 +5,7 @@ import { api } from '@/services/api';
 import { useNotification } from '@/contexts/NotificationContext';
 import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
 
-export default function AgreementPreview({ dealData, onSignAndClose }) {
+export default function AgreementPreview({ dealData, onSignAndClose, isTransport = false }) {
   const [isSigning, setIsSigning] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const { addNotification } = useNotification();
@@ -74,12 +74,14 @@ export default function AgreementPreview({ dealData, onSignAndClose }) {
 
             <div className="bg-white p-2 rounded-lg border border-slate-200 flex justify-between items-center text-[11px]">
               <div>
-                <p className="text-slate-400 text-[9px] uppercase">Final Price</p>
-                <p className="font-bold text-emerald-600 text-sm">{formatCurrency(dealData.price)}/kg</p>
+                <p className="text-slate-400 text-[9px] uppercase">{isTransport ? 'Freight Cost' : 'Final Price'}</p>
+                <p className="font-bold text-emerald-600 text-sm">{formatCurrency(dealData.price)}{!isTransport && '/kg'}</p>
               </div>
               <div className="text-right">
-                <p className="text-slate-400 text-[9px] uppercase">Total Value</p>
-                <p className="font-bold text-slate-800 text-sm">{formatCurrency(dealData.price * (dealData.quantity || 500))}</p>
+                <p className="text-slate-400 text-[9px] uppercase">{isTransport ? 'Total Trip Value' : 'Total Value'}</p>
+                <p className="font-bold text-slate-800 text-sm">
+                  {isTransport ? formatCurrency(dealData.price) : formatCurrency(dealData.price * (dealData.quantity || 500))}
+                </p>
               </div>
             </div>
 
@@ -121,6 +123,7 @@ export default function AgreementPreview({ dealData, onSignAndClose }) {
           if (onSignAndClose) onSignAndClose();
         }}
         dealData={dealData}
+        isTransport={isTransport}
       />
     </>
   );

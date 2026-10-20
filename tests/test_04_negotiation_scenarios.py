@@ -12,6 +12,13 @@ import agents.buyer_agent as _ba_mod
 _fa_mod.llm_client = None
 _ba_mod.llm_client = None
 
+from llm.llm_client import client as global_llm_client
+global_llm_client.enabled = False
+
+from unittest.mock import patch
+_http_patcher = patch("backend.services.external_apis._http_get", return_value=None)
+_http_patcher.start()
+
 from agents.farmer_agent import FarmerAgent
 from agents.buyer_agent import BuyerAgent
 from agents.warehouse_agent import WarehouseAgent
@@ -30,19 +37,20 @@ def run(coro):
 def make_mgr(min_price=20.0, target_price=22.0, max_rounds=6, shelf_life=5,
              quantity=500, buyer_count=1, extra_buyers=None):
     random.seed(42)
-    farmer = FarmerAgent(name="TestFarmer", crop="Tomato", quantity=quantity,
+    farmer = FarmerAgent(name="TestFarmer", crop="Onion", quantity=quantity,
                          min_price=min_price, shelf_life=shelf_life)
     buyers = [
         BuyerAgent(name=f"Buyer_{i+1}",
                    budget=target_price * quantity * 1.5,
                    max_quantity=quantity,
-                   target_price=target_price - i * 0.5)
+                   target_price=target_price - i * 0.5,
+                   crop="Onion")
         for i in range(buyer_count)
     ]
     if extra_buyers:
         buyers.extend(extra_buyers)
     warehouse = WarehouseAgent(name="WH", capacity=5000, storage_cost_per_kg=1.5)
-    processor = ProcessorAgent(name="FP", crop_type="Tomato", processing_capacity=1000,
+    processor = ProcessorAgent(name="FP", crop_type="Onion", processing_capacity=1000,
                                processing_cost_per_kg=2.0,
                                target_price=min_price * 0.7,
                                max_price=min_price * 1.1)

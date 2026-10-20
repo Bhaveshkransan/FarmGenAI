@@ -20,15 +20,19 @@ import { useNavigate } from 'react-router-dom';
 interface TransactionValidationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onDone?: () => void;
   dealData: any;
   buyerUser?: any;
+  isTransport?: boolean;
 }
 
 export default function TransactionValidationModal({
   isOpen,
   onClose,
+  onDone,
   dealData,
-  buyerUser
+  buyerUser,
+  isTransport = false
 }: TransactionValidationModalProps) {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
@@ -45,8 +49,8 @@ export default function TransactionValidationModal({
 
   const agreedPrice = Number(dealData.price || dealData.final_price || 15);
   const quantity = Number(dealData.quantity || 3000);
-  const totalValue = agreedPrice * quantity;
-  const apmcCess = Math.round(totalValue * 0.01); // 1% APMC cess
+  const totalValue = isTransport ? agreedPrice : agreedPrice * quantity;
+  const apmcCess = isTransport ? 0 : Math.round(totalValue * 0.01); // 1% APMC cess
   const netSettlement = totalValue;
 
   const cropName = dealData.crop || 'Produce';
@@ -111,10 +115,9 @@ PARTIES INVOLVED:
 COMMODITY & FINANCIAL TERMS:
 - Commodity: ${cropName} (Grade A)
 - Agreed Volume: ${quantity.toLocaleString()} kg
-- Agreed Unit Settlement Price: Rs. ${agreedPrice.toFixed(2)} / kg
+- ${isTransport ? 'Total Freight Cost' : 'Agreed Unit Settlement Price'}: Rs. ${agreedPrice.toFixed(2)} ${!isTransport ? '/ kg' : ''}
 - Gross Contract Value: Rs. ${totalValue.toLocaleString()}
-- APMC Mandi Cess (1.0%): Rs. ${apmcCess.toLocaleString()}
-- Total Net Settlement: Rs. ${netSettlement.toLocaleString()}
+${!isTransport ? `- APMC Mandi Cess (1.0%): Rs. ${apmcCess.toLocaleString()}\n` : ''}- Total Net Settlement: Rs. ${netSettlement.toLocaleString()}
 - Payment Escrow Mechanism: Direct APMC Settlement / Instant Escrow Release on Delivery Inspection
 
 LOGISTICS & DISPUTE RESOLUTION:
@@ -213,8 +216,8 @@ This contract represents a legally binding electronic agricultural trade agreeme
           {/* FINANCIAL SUMMARY HIGHLIGHTS */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
-              <p className="text-xs text-slate-500 uppercase font-semibold">Agreed Price</p>
-              <p className="text-xl font-black text-emerald-600 mt-1">₹{agreedPrice.toFixed(2)}<span className="text-xs font-normal text-slate-500">/kg</span></p>
+              <p className="text-xs text-slate-500 uppercase font-semibold">{isTransport ? 'Agreed Freight' : 'Agreed Price'}</p>
+              <p className="text-xl font-black text-emerald-600 mt-1">₹{agreedPrice.toFixed(2)}{!isTransport && <span className="text-xs font-normal text-slate-500">/kg</span>}</p>
             </div>
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-center">
               <p className="text-xs text-slate-500 uppercase font-semibold">Contract Volume</p>
@@ -347,7 +350,10 @@ This contract represents a legally binding electronic agricultural trade agreeme
               <ExternalLink size={14} /> View in Ledger
             </button>
             <button
-              onClick={onClose}
+              onClick={() => {
+                onClose();
+                onDone?.();
+              }}
               className="flex-1 sm:flex-initial py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition shadow-md shadow-emerald-600/20"
             >
               Close & Done

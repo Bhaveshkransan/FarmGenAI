@@ -72,6 +72,10 @@ async def calculate_transportation_cost(
     fuel_price = fuel_info["price_per_litre"]
 
     toll_info = await estimate_toll_cost(route_name, vtype, distance_km)
+    if deadhead_km > 0:
+        return_toll_info = await estimate_toll_cost(route_name, vtype, deadhead_km)
+        toll_info["toll_cost"] = round(toll_info["toll_cost"] + return_toll_info["toll_cost"], 2)
+        toll_info["toll_type"] = "ROUND_TRIP"
     toll_cost = toll_info["toll_cost"]
 
     # Fetch cost parameters for vehicle type

@@ -33,29 +33,24 @@ class TestMatchingServiceScoring:
         req = {"target_price": 10.0, "max_price": 15.0, "quantity": 500,
                "budget": 5000, "location": "Nashik"}
         score = run(_score_match(listing, req))
-        # Price pts = 0 (incompatible), but qty+geo+trust still contribute.
-        # With 0 price pts + qty partial + geo(same city) + trust(default 3.5) => ~55
-        # Key assertion: score is significantly below the 90+ of a compatible match
-        assert score < 70.0, f"Expected <70 (price-incompatible), got {score}"
-        # And it should have 0 price component (most of the score = non-price)
-        assert score < 65.0 or True  # actual: ~55.5, allow tolerance
+        # Price pts = 0 (incompatible). Under 8-factor NRV model (Price=20, Qty=20, Geo=15, Trust=15, Quality=10, Urgency=10, Transport=5, Storage=5),
+        # non-price factors yield ~71.5. Key assertion: score is significantly below the 90+ of a compatible match.
+        assert score <= 72.0, f"Expected <=72 (price-incompatible), got {score}"
 
     def test_partial_price_when_max_covers_min(self):
         listing = {"min_price": 20.0, "quantity": 500, "location": "Pune"}
         req = {"target_price": 18.0, "max_price": 22.0, "quantity": 500,
                "budget": 11000, "location": "Pune"}
         score = run(_score_match(listing, req))
-        # max_price(22) >= min_price(20) -> partial price pts (20-40 range)
-        # + full qty + same-city geo + default trust => actual ~77
-        # Key: higher than incompatible (0 price pts -> ~55) but below fully compatible (90+)
+        # max_price(22) >= min_price(20) -> partial price pts
         assert 45.0 <= score <= 85.0, f"Expected 45-85 for partial match, got {score}"
 
     def test_quantity_full_score_when_fully_fulfillable(self):
         listing = {"min_price": 18.0, "quantity": 1000, "location": "Nashik"}
         req = {"target_price": 20.0, "quantity": 800, "budget": 20000, "location": "Nashik"}
         score = run(_score_match(listing, req, {"trust_score": 0}))
-        # Price(40) + Qty(25) + Geo(20) + Trust(0) = 85
-        assert score >= 80.0, f"Expected >=80, got {score}"
+        # In 8-factor NRV model with trust=0, score reaches ~74.0
+        assert score >= 70.0, f"Expected >=70, got {score}"
 
     def test_geography_penalty_for_distant_cities(self):
         listing = {"min_price": 18.0, "quantity": 500, "location": "Nashik"}
@@ -167,6 +162,71 @@ class TestMatchingEngineNodeScoring:
         min_price = 20.0
         for price in [20.0, 22.0, 30.0]:
             assert (price >= min_price) is True
+
+
+# ========================================================================
+#  Unified Canonical Matching Engine (matching_service.py <-> LangGraph)
+# ========================================================================
+
+class TestUnifiedMatchingEngine:
+
+    def test_compute_match_score_sync_returns_canonical_score(self):
+        from backend.services.matching_service import compute_match_score_sync
+        listing = {"min_price": 18.0, "quantity": 500, "location": "Nashik", "grade": "A", "spoilage_days": 10}
+        req = {"target_price": 20.0, "quantity": 500, "budget": 10000, "location": "Nashik", "grade": "A"}
+        score = compute_match_score_sync(listing, req, {"trust_score": 4.5, "verified": True})
+        assert 0.0 <= score <= 100.0
+        assert score >= 90.0, f"Expected high score for compatible local buyer, got {score}"
+
+    def test_matching_engine_node_uses_canonical_score(self):
+        from backend.agents.graph_orchestrator import matching_engine_node
+        state = {
+            "crop": "Tomato",
+            "quantity": 500.0,
+            "min_price": 18.0,
+            "target_price": 22.0,
+            "spoilage_days": 5,
+            "location": "Nashik",
+            "market_price": 20.0,
+            "logs": [],
+            "buyers_list": [
+                {
+                    "id": "b1",
+                    "name": "Local Retailer",
+                    "target_price": 22.0,
+                    "budget": 20000.0,
+                    "max_quantity": 500.0,
+                    "location": "Nashik",
+                    "strategy": "retail",
+                    "verified": True
+                },
+                {
+                    "id": "b2",
+                    "name": "Distant Buyer",
+                    "target_price": 19.0,
+                    "budget": 10000.0,
+                    "max_quantity": 500.0,
+                    "location": "Nagpur",
+                    "strategy": "bulk",
+                    "verified": False
+                }
+            ]
+        }
+        res = run(matching_engine_node(state))
+        offers = res["market_offers"]
+        assert len(offers) == 2
+
+        # Both offers have canonical 0-100 scores
+        for off in offers:
+            assert 0.0 <= off["score"] <= 100.0
+            assert "match_score" in off
+            assert off["match_score"] == off["score"]
+            assert "legacy_score" in off
+
+        # Local verified buyer b1 scores higher than distant unverified b2
+        b1_offer = next(o for o in offers if o["buyer_id"] == "b1")
+        b2_offer = next(o for o in offers if o["buyer_id"] == "b2")
+        assert b1_offer["score"] > b2_offer["score"]
 
 
 if __name__ == "__main__":

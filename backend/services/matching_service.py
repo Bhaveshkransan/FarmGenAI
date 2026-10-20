@@ -4,19 +4,37 @@ backend/services/matching_service.py
 Matching Engine Service — pairs farmer crop listings with buyer requirements.
 Implements FR-5: AI-Powered Matching Engine
 
-Scoring factors:
-  1. Price compatibility   (40%)
-  2. Quantity feasibility  (25%)
-  3. Geographic proximity  (20%)
-  4. Trust score           (15%)
+Scoring factors (8-factor NRV model):
+  1. Base price compatibility   (20%)
+  2. Quantity match             (20%)
+  3. Distance proximity         (15%)
+  4. Trust & Reliability        (15%)
+  5. Quality & Grade match      (10%)
+  6. Urgency / Spoilage match   (10%)
+  7. Transport cost efficiency  (5%)
+  8. Storage cost efficiency    (5%)
 """
 
 from backend.repositories.user_repository import UserRepository
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from database.db import Database
+from shared.crop_catalog import normalize_crop_name
 
 logger = logging.getLogger("MatchingService")
+
+
+def crops_match(crop_a: str, crop_b: str) -> bool:
+    norm_a = normalize_crop_name(crop_a)
+    norm_b = normalize_crop_name(crop_b)
+    if norm_a and norm_b:
+        return norm_a == norm_b
+    if not norm_a and not norm_b:
+        raw_a = (crop_a or "").strip().lower()
+        raw_b = (crop_b or "").strip().lower()
+        return bool(raw_a and raw_b and raw_a == raw_b)
+    return False
+
 
 
 CITY_DISTANCES_KM: Dict[str, Dict[str, float]] = {
@@ -34,64 +52,194 @@ CITY_DISTANCES_KM: Dict[str, Dict[str, float]] = {
 MAX_MATCH_DISTANCE_KM = 600.0
 
 
-async def _get_distance_km(loc_a: str, loc_b: str) -> float:
-    """Estimate distance between two locations."""
+MAHARASHTRA_DISTRICT_COORDS: Dict[str, tuple] = {
+    "Pune": (18.5204, 73.8567),
+    "Mumbai": (19.0760, 72.8777),
+    "Nashik": (19.9975, 73.7898),
+    "Nagpur": (21.1458, 79.0882),
+    "Thane": (19.2183, 72.9781),
+    "Kalyan": (19.2437, 73.1355),
+    "Aurangabad": (19.8762, 75.3433),
+    "Ahmednagar": (19.0948, 74.7480),
+    "Satara": (17.6805, 74.0183),
+    "Solapur": (17.6599, 75.9064),
+    "Kolhapur": (16.7050, 74.2433),
+    "Latur": (18.4088, 76.5604),
+    "Amravati": (20.9374, 77.7796),
+    "Gondia": (21.4600, 80.1900),
+    "Jalgaon": (21.0077, 75.5626),
+    "Dhule": (20.9042, 74.7749),
+    "Nanded": (19.1383, 77.3210),
+    "Sangli": (16.8524, 74.5815),
+    "Wardha": (20.7453, 78.6022),
+    "Yavatmal": (20.3888, 78.1204),
+    "Akola": (20.7002, 77.0082),
+    "Palghar": (19.6967, 72.7655),
+    "Ratnagiri": (16.9902, 73.3120),
+    "Beed": (18.9891, 75.7601),
+    "Jalna": (19.8410, 75.8864),
+    "Bhandara": (21.1667, 79.6500),
+    "Dharashiv": (18.1856, 76.0420),
+    "Osmanabad": (18.1856, 76.0420)
+}
+
+def extract_maharashtra_district(loc: str) -> str:
+    if not loc:
+        return ""
+    loc_lower = str(loc).lower()
+    for d in MAHARASHTRA_DISTRICT_COORDS:
+        if d.lower() in loc_lower:
+            return d
+    return str(loc).strip().title()
+
+def get_distance_km_sync(loc_a: str, loc_b: str) -> float:
+    """Synchronous distance calculation between two city locations with intelligent district extraction and haversine road fallback."""
     if not loc_a or not loc_b:
         return 150.0
     if loc_a == loc_b:
         return 0.0
-    a = loc_a.strip()
-    b = loc_b.strip()
-    dist = CITY_DISTANCES_KM.get(a, {}).get(b)
+    da = extract_maharashtra_district(loc_a)
+    db = extract_maharashtra_district(loc_b)
+    if da and db and da.lower() == db.lower():
+        return 15.0  # Same district cluster / local APMC mandi transit
+    
+    # 1. Lookup in predefined road distance matrix
+    dist = CITY_DISTANCES_KM.get(da, {}).get(db)
     if dist is None:
-        dist = CITY_DISTANCES_KM.get(b, {}).get(a)
-    return dist if dist is not None else 250.0  # default
+        dist = CITY_DISTANCES_KM.get(db, {}).get(da)
+    if dist is not None:
+        return dist
+        
+    # 2. Highway road approximation via coordinates (1.25x road detour multiplier)
+    ca = MAHARASHTRA_DISTRICT_COORDS.get(da)
+    cb = MAHARASHTRA_DISTRICT_COORDS.get(db)
+    if ca and cb:
+        import math
+        lat1, lon1 = math.radians(ca[0]), math.radians(ca[1])
+        lat2, lon2 = math.radians(cb[0]), math.radians(cb[1])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a_val = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c_val = 2 * math.asin(math.sqrt(a_val))
+        return round(6371.0 * c_val * 1.25, 1)
+
+    return 250.0  # default
+
+
+async def _get_distance_km(loc_a: str, loc_b: str) -> float:
+    """Estimate distance between two locations (async wrapper)."""
+    return get_distance_km_sync(loc_a, loc_b)
+
+
+def compute_match_breakdown_sync(listing: Dict, requirement: Dict, buyer_user: Optional[Dict] = None) -> Dict[str, Any]:
+    """
+    Compute full 8-factor NRV match score along with per-factor transparent explainability breakdown.
+    Provides complete mathematical traceability for candidate ranking.
+    """
+    breakdown = {}
+    
+    # 1. Base Price (20 pts)
+    p_score = 0.0
+    min_price = float(listing.get("min_price") or 0)
+    target_price = float(requirement.get("target_price") or 0)
+    max_price = float(requirement.get("max_price") or target_price * 1.2)
+    if target_price >= min_price:
+        p_score = 20.0
+    elif max_price >= min_price:
+        ratio = (max_price - min_price) / max(max_price, 1)
+        p_score = max(0, 10 + ratio * 10)
+    breakdown["price_feasibility"] = round(p_score, 2)
+
+    # 2. Quantity (20 pts)
+    q_score = 0.0
+    avail_qty = float(listing.get("quantity") or 0)
+    req_qty = float(requirement.get("quantity") or 0)
+    if req_qty > 0 and avail_qty > 0:
+        ratio = min(avail_qty, req_qty) / max(avail_qty, req_qty)
+        q_score = ratio * 20.0
+    breakdown["quantity_fulfillment"] = round(q_score, 2)
+
+    # 3. Distance (15 pts)
+    d_score = 0.0
+    listing_loc = listing.get("location") or ""
+    req_loc = requirement.get("location") or ""
+    dist = get_distance_km_sync(listing_loc, req_loc)
+    if dist <= MAX_MATCH_DISTANCE_KM:
+        d_score = max(0, 1.0 - dist / MAX_MATCH_DISTANCE_KM) * 15.0
+    breakdown["distance_proximity"] = round(d_score, 2)
+
+    # 4. Trust (15 pts)
+    raw_trust = (buyer_user or {}).get("trust_score")
+    trust = float(raw_trust if raw_trust is not None else 3.5)
+    t_score = min(trust / 5.0, 1.0) * 15.0
+    breakdown["trust_reliability"] = round(t_score, 2)
+
+    # 5. Quality/Grade (10 pts)
+    g_score = 0.0
+    list_grade = str(listing.get("grade") or listing.get("quality") or "A").upper()
+    req_grade = str(requirement.get("grade") or requirement.get("quality_grade") or "A").upper()
+    if list_grade == req_grade:
+        g_score = 10.0
+    elif list_grade in ["A", "PREMIUM"] and req_grade in ["B", "C", "STANDARD"]:
+        g_score = 8.0
+    else:
+        g_score = 4.0
+    breakdown["quality_grade"] = round(g_score, 2)
+
+    # 6. Urgency / Spoilage (10 pts)
+    raw_spoil = listing.get("spoilage_days")
+    if raw_spoil is None:
+        raw_spoil = listing.get("shelf_life")
+    try:
+        spoilage = int(raw_spoil if raw_spoil is not None else 14)
+    except (ValueError, TypeError):
+        spoilage = 14
+
+    u_score = 6.0
+    urgency = str(requirement.get("urgency") or "NORMAL").upper()
+    if spoilage <= 3 and urgency == "HIGH":
+        u_score = 10.0
+    elif spoilage > 7 and urgency == "LOW":
+        u_score = 10.0
+    breakdown["spoilage_urgency"] = round(u_score, 2)
+
+    # 7. Transport Cost Efficiency (5 pts)
+    est_transport_cost = (dist * 3.0 * req_qty) / 1000.0
+    raw_budget = requirement.get("budget")
+    budget = float(raw_budget if raw_budget is not None else (target_price * req_qty))
+    tr_score = 5.0
+    if budget > 0:
+        transport_ratio = min(est_transport_cost / budget, 1.0)
+        tr_score = (1.0 - transport_ratio) * 5.0
+    breakdown["transport_efficiency"] = round(tr_score, 2)
+
+    # 8. Storage Cost Efficiency (5 pts)
+    st_score = 5.0 if req_qty >= avail_qty else 2.0
+    breakdown["storage_efficiency"] = round(st_score, 2)
+
+    total = round(p_score + q_score + d_score + t_score + g_score + u_score + tr_score + st_score, 2)
+    return {
+        "total_score": total,
+        "factor_breakdown": breakdown,
+        "distance_km": dist
+    }
+
+
+def compute_match_score_sync(listing: Dict, requirement: Dict, buyer_user: Optional[Dict] = None) -> float:
+    """
+    Compute a 0-100 compatibility score using the canonical 8-factor NRV model.
+    Single source of truth for candidate scoring across matching_service and LangGraph.
+    """
+    res = compute_match_breakdown_sync(listing, requirement, buyer_user)
+    return res["total_score"]
 
 
 async def _score_match(listing: Dict, requirement: Dict, buyer_user: Optional[Dict] = None) -> float:
     """
-    Compute a 0-100 compatibility score between a crop listing and buyer requirement.
+    Compute a 0-100 compatibility score using the 8-factor NRV model.
+    Maintains async API compatibility.
     """
-    score = 0.0
-
-    # ── Price compatibility (40 pts) ──────────────────────
-    min_price = float(listing.get("min_price", 0))
-    target_price = float(requirement.get("target_price", 0))
-    max_price = float(requirement.get("max_price") or target_price * 1.2)
-
-    if target_price >= min_price:
-        score += 40.0  # Full compatibility
-    elif max_price >= min_price:
-        # Partial: within budget ceiling
-        ratio = (max_price - min_price) / max(max_price, 1)
-        score += max(0, 20 + ratio * 20)
-    else:
-        score += 0.0  # Price incompatible
-
-    # ── Quantity feasibility (25 pts) ──────────────────────
-    avail_qty = float(listing.get("quantity", 0))
-    req_qty = float(requirement.get("quantity", 0))
-    budget = float(requirement.get("budget", 0))
-    budget_qty = budget / max(target_price, 1)
-
-    fulfillable_qty = min(avail_qty, req_qty, budget_qty)
-    if req_qty > 0:
-        ratio = min(fulfillable_qty / req_qty, 1.0)
-        score += ratio * 25
-
-    # ── Geographic proximity (20 pts) ─────────────────────
-    listing_loc = listing.get("location", "")
-    req_loc = requirement.get("location", "")
-    dist = await _get_distance_km(listing_loc, req_loc)
-    if dist <= MAX_MATCH_DISTANCE_KM:
-        proximity_score = max(0, 1.0 - dist / MAX_MATCH_DISTANCE_KM) * 20
-        score += proximity_score
-
-    # ── Trust score (15 pts) ──────────────────────────────
-    trust = float((buyer_user or {}).get("trust_score", 3.5))
-    score += min(trust / 5.0, 1.0) * 15
-
-    return round(score, 2)
+    return compute_match_score_sync(listing, requirement, buyer_user)
 
 
 async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
@@ -108,11 +256,12 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
 
     results = []
     for req in all_requirements:
-        # Crop must match (case-insensitive)
+        # Crop must match using canonical crop matching
         req_crop = (req.get("crop") or "").strip()
         list_crop = (listing.get("crop") or "").strip()
-        if not req_crop or (list_crop and req_crop.lower() != list_crop.lower()):
+        if not req_crop or not crops_match(req_crop, list_crop):
             continue
+
 
         buyer_user = await UserRepository.get_by_id(req.get("user_id", "")) or {}
         score = await _score_match(listing, req, buyer_user)
@@ -184,8 +333,9 @@ async def match_requirement_to_listings(requirement: Dict) -> List[Dict]:
 
     results = []
     for listing in active:
-        if listing.get("crop", "").lower() != requirement.get("crop", "").lower():
+        if not crops_match(requirement.get("crop", ""), listing.get("crop", "")):
             continue
+
 
         buyer_user = await UserRepository.get_by_id(requirement.get("user_id", "")) or {}
         score = await _score_match(listing, requirement, buyer_user)

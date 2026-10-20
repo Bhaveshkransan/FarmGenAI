@@ -22,6 +22,7 @@ from backend.core.config import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     OPEN_METEO_BASE_URL,
     OSRM_BASE_URL,
+    ENABLE_MINIO,
     MINIO_ENDPOINT,
     MINIO_ACCESS_KEY,
     MINIO_SECRET_KEY,

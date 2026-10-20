@@ -1,0 +1,413 @@
+[
+  {
+    "processor_id": "synth_proc_kolhapur_01",
+    "name": "Chhatrapati Shahu Cooperative Sugar Factory",
+    "location": "Agro Industrial Zone, Kolhapur, Maharashtra",
+    "district": "Kolhapur",
+    "crop_types": [
+      "Sugarcane"
+    ],
+    "processing_type": "Sugar Refining & Molasses",
+    "capacity_kg_per_day": 500000.0,
+    "available_capacity_kg": 258560.0,
+    "cost_per_kg": 0.85,
+    "contact_number": "+91-9764000001",
+    "status": "ACTIVE",
+    "rating": 4.76,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_sangli_02",
+    "name": "Vasantdada Shetkari Sahakari Sakhar Karkhana",
+    "location": "Agro Industrial Zone, Sangli, Maharashtra",
+    "district": "Sangli",
+    "crop_types": [
+      "Sugarcane"
+    ],
+    "processing_type": "Sugar Refining",
+    "capacity_kg_per_day": 450000.0,
+    "available_capacity_kg": 257356.3,
+    "cost_per_kg": 0.85,
+    "contact_number": "+91-9764000002",
+    "status": "ACTIVE",
+    "rating": 4.88,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_pune_03",
+    "name": "Baramati Agro Sugar Division",
+    "location": "Agro Industrial Zone, Pune, Maharashtra",
+    "district": "Pune",
+    "crop_types": [
+      "Sugarcane"
+    ],
+    "processing_type": "Crushing & Ethanol",
+    "capacity_kg_per_day": 400000.0,
+    "available_capacity_kg": 160003.4,
+    "cost_per_kg": 0.9,
+    "contact_number": "+91-9764000003",
+    "status": "ACTIVE",
+    "rating": 4.72,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_solapur_04",
+    "name": "Pandurang Sahakari Sakhar Karkhana Shreepur",
+    "location": "Agro Industrial Zone, Solapur, Maharashtra",
+    "district": "Solapur",
+    "crop_types": [
+      "Sugarcane"
+    ],
+    "processing_type": "Sugar Refining",
+    "capacity_kg_per_day": 350000.0,
+    "available_capacity_kg": 119850.0,
+    "cost_per_kg": 0.8,
+    "contact_number": "+91-9764000004",
+    "status": "ACTIVE",
+    "rating": 4.59,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_ahmednagar_05",
+    "name": "Pravara Sahakari Sakhar Karkhana Loni",
+    "location": "Agro Industrial Zone, Ahmednagar, Maharashtra",
+    "district": "Ahmednagar",
+    "crop_types": [
+      "Sugarcane"
+    ],
+    "processing_type": "Sugar Refining & Distillation",
+    "capacity_kg_per_day": 450000.0,
+    "available_capacity_kg": 265639.0,
+    "cost_per_kg": 0.85,
+    "contact_number": "+91-9764000005",
+    "status": "ACTIVE",
+    "rating": 4.78,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_latur_06",
+    "name": "Kirti Agrovet Solvent Extraction Plant",
+    "location": "Agro Industrial Zone, Latur, Maharashtra",
+    "district": "Latur",
+    "crop_types": [
+      "Soybean"
+    ],
+    "processing_type": "Solvent Extraction & Oil Refining",
+    "capacity_kg_per_day": 150000.0,
+    "available_capacity_kg": 62638.1,
+    "cost_per_kg": 2.5,
+    "contact_number": "+91-9764000006",
+    "status": "ACTIVE",
+    "rating": 4.73,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_nagpur_07",
+    "name": "Surya Agroils Solvent Extraction Unit",
+    "location": "Agro Industrial Zone, Nagpur, Maharashtra",
+    "district": "Nagpur",
+    "crop_types": [
+      "Soybean"
+    ],
+    "processing_type": "Crushing & De-oiled Cake",
+    "capacity_kg_per_day": 120000.0,
+    "available_capacity_kg": 69768.1,
+    "cost_per_kg": 2.4,
+    "contact_number": "+91-9764000007",
+    "status": "ACTIVE",
+    "rating": 4.57,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_nanded_08",
+    "name": "Marathwada Refineries Ltd",
+    "location": "Agro Industrial Zone, Nanded, Maharashtra",
+    "district": "Nanded",
+    "crop_types": [
+      "Soybean"
+    ],
+    "processing_type": "Oil Refining & Meal Processing",
+    "capacity_kg_per_day": 100000.0,
+    "available_capacity_kg": 41300.4,
+    "cost_per_kg": 2.6,
+    "contact_number": "+91-9764000008",
+    "status": "ACTIVE",
+    "rating": 4.84,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_amravati_09",
+    "name": "Vidarbha Oil Mills Industrial Park",
+    "location": "Agro Industrial Zone, Amravati, Maharashtra",
+    "district": "Amravati",
+    "crop_types": [
+      "Soybean"
+    ],
+    "processing_type": "Solvent Extraction",
+    "capacity_kg_per_day": 90000.0,
+    "available_capacity_kg": 48956.0,
+    "cost_per_kg": 2.45,
+    "contact_number": "+91-9764000009",
+    "status": "ACTIVE",
+    "rating": 4.77,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_amravati_10",
+    "name": "Kalyan Ginning & Pressing Works",
+    "location": "Agro Industrial Zone, Amravati, Maharashtra",
+    "district": "Amravati",
+    "crop_types": [
+      "Cotton"
+    ],
+    "processing_type": "Ginning & Bale Pressing",
+    "capacity_kg_per_day": 80000.0,
+    "available_capacity_kg": 43895.0,
+    "cost_per_kg": 3.5,
+    "contact_number": "+91-9764000010",
+    "status": "ACTIVE",
+    "rating": 4.81,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_yavatmal_11",
+    "name": "Vidarbha White Gold Cotton Ginning",
+    "location": "Agro Industrial Zone, Yavatmal, Maharashtra",
+    "district": "Yavatmal",
+    "crop_types": [
+      "Cotton"
+    ],
+    "processing_type": "Ginning & Baling",
+    "capacity_kg_per_day": 85000.0,
+    "available_capacity_kg": 42978.1,
+    "cost_per_kg": 3.4,
+    "contact_number": "+91-9764000011",
+    "status": "ACTIVE",
+    "rating": 4.69,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_jalgaon_12",
+    "name": "Khandesh Cotton Mills & Pressing Unit",
+    "location": "Agro Industrial Zone, Jalgaon, Maharashtra",
+    "district": "Jalgaon",
+    "crop_types": [
+      "Cotton"
+    ],
+    "processing_type": "Ginning & Seed Crushing",
+    "capacity_kg_per_day": 75000.0,
+    "available_capacity_kg": 37035.6,
+    "cost_per_kg": 3.6,
+    "contact_number": "+91-9764000012",
+    "status": "ACTIVE",
+    "rating": 4.63,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_wardha_13",
+    "name": "Hinganghat Cotton Fiber Processing Ltd",
+    "location": "Agro Industrial Zone, Wardha, Maharashtra",
+    "district": "Wardha",
+    "crop_types": [
+      "Cotton"
+    ],
+    "processing_type": "Ginning & Baling",
+    "capacity_kg_per_day": 90000.0,
+    "available_capacity_kg": 36769.4,
+    "cost_per_kg": 3.3,
+    "contact_number": "+91-9764000013",
+    "status": "ACTIVE",
+    "rating": 4.6,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_aurangabad_14",
+    "name": "Chhatrapati Sambhajinagar Ginning Park",
+    "location": "Agro Industrial Zone, Aurangabad, Maharashtra",
+    "district": "Aurangabad",
+    "crop_types": [
+      "Cotton"
+    ],
+    "processing_type": "Ginning & Lint Processing",
+    "capacity_kg_per_day": 70000.0,
+    "available_capacity_kg": 24785.5,
+    "cost_per_kg": 3.55,
+    "contact_number": "+91-9764000014",
+    "status": "ACTIVE",
+    "rating": 4.52,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_gondia_15",
+    "name": "Gondia Central Modern Rice Mill",
+    "location": "Agro Industrial Zone, Gondia, Maharashtra",
+    "district": "Gondia",
+    "crop_types": [
+      "Rice"
+    ],
+    "processing_type": "Paddy De-husking, Polishing & Sorting",
+    "capacity_kg_per_day": 120000.0,
+    "available_capacity_kg": 70116.1,
+    "cost_per_kg": 1.8,
+    "contact_number": "+91-9764000015",
+    "status": "ACTIVE",
+    "rating": 4.67,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_nagpur_16",
+    "name": "Wainganga Agro Foods Rice Mill",
+    "location": "Agro Industrial Zone, Nagpur, Maharashtra",
+    "district": "Nagpur",
+    "crop_types": [
+      "Rice"
+    ],
+    "processing_type": "Milling & Sortex Grading",
+    "capacity_kg_per_day": 95000.0,
+    "available_capacity_kg": 34956.5,
+    "cost_per_kg": 1.9,
+    "contact_number": "+91-9764000016",
+    "status": "ACTIVE",
+    "rating": 4.48,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_pune_17",
+    "name": "Maval Indrayani Fragrant Rice Processors",
+    "location": "Agro Industrial Zone, Pune, Maharashtra",
+    "district": "Pune",
+    "crop_types": [
+      "Rice"
+    ],
+    "processing_type": "Aromatic Rice Polishing & Packing",
+    "capacity_kg_per_day": 60000.0,
+    "available_capacity_kg": 19389.0,
+    "cost_per_kg": 2.1,
+    "contact_number": "+91-9764000017",
+    "status": "ACTIVE",
+    "rating": 4.86,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_solapur_18",
+    "name": "Siddheshwar Modern Roller Flour Mill",
+    "location": "Agro Industrial Zone, Solapur, Maharashtra",
+    "district": "Solapur",
+    "crop_types": [
+      "Jowar",
+      "Bajra"
+    ],
+    "processing_type": "Cleaning, Milling & Fortification",
+    "capacity_kg_per_day": 70000.0,
+    "available_capacity_kg": 23124.0,
+    "cost_per_kg": 1.6,
+    "contact_number": "+91-9764000018",
+    "status": "ACTIVE",
+    "rating": 4.82,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_ahmednagar_19",
+    "name": "Pravara Millet Processing & Packing Unit",
+    "location": "Agro Industrial Zone, Ahmednagar, Maharashtra",
+    "district": "Ahmednagar",
+    "crop_types": [
+      "Bajra",
+      "Jowar"
+    ],
+    "processing_type": "Millet Dehulling & Flour",
+    "capacity_kg_per_day": 50000.0,
+    "available_capacity_kg": 27526.8,
+    "cost_per_kg": 1.7,
+    "contact_number": "+91-9764000019",
+    "status": "ACTIVE",
+    "rating": 4.89,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_pune_20",
+    "name": "Sahyadri Grain Foods Roller Mill",
+    "location": "Agro Industrial Zone, Pune, Maharashtra",
+    "district": "Pune",
+    "crop_types": [
+      "Jowar",
+      "Bajra"
+    ],
+    "processing_type": "Multigrain Flour Processing",
+    "capacity_kg_per_day": 80000.0,
+    "available_capacity_kg": 24905.9,
+    "cost_per_kg": 1.65,
+    "contact_number": "+91-9764000020",
+    "status": "ACTIVE",
+    "rating": 4.59,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_dhule_21",
+    "name": "Khandesh Nutri-Millets Processing Hub",
+    "location": "Agro Industrial Zone, Dhule, Maharashtra",
+    "district": "Dhule",
+    "crop_types": [
+      "Bajra"
+    ],
+    "processing_type": "Millet Cleaning & Flour Processing",
+    "capacity_kg_per_day": 45000.0,
+    "available_capacity_kg": 23845.2,
+    "cost_per_kg": 1.55,
+    "contact_number": "+91-9764000021",
+    "status": "ACTIVE",
+    "rating": 4.47,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_nashik_22",
+    "name": "Jain Agri-Foods Onion Dehydration Plant",
+    "location": "Agro Industrial Zone, Nashik, Maharashtra",
+    "district": "Nashik",
+    "crop_types": [
+      "Onion"
+    ],
+    "processing_type": "Flakes, Granules & Powder Dehydration",
+    "capacity_kg_per_day": 60000.0,
+    "available_capacity_kg": 24781.0,
+    "cost_per_kg": 4.2,
+    "contact_number": "+91-9764000022",
+    "status": "ACTIVE",
+    "rating": 4.49,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_ahmednagar_23",
+    "name": "Pimpalgaon Dehydrated Agro Products",
+    "location": "Agro Industrial Zone, Ahmednagar, Maharashtra",
+    "district": "Ahmednagar",
+    "crop_types": [
+      "Onion"
+    ],
+    "processing_type": "Kibbled Onion & Ring Processing",
+    "capacity_kg_per_day": 45000.0,
+    "available_capacity_kg": 24723.2,
+    "cost_per_kg": 4.1,
+    "contact_number": "+91-9764000023",
+    "status": "ACTIVE",
+    "rating": 4.82,
+    "is_synthetic": true
+  },
+  {
+    "processor_id": "synth_proc_pune_24",
+    "name": "Baramati Vegetable Dehydration & Cold Pack",
+    "location": "Agro Industrial Zone, Pune, Maharashtra",
+    "district": "Pune",
+    "crop_types": [
+      "Onion"
+    ],
+    "processing_type": "Slicing, Drying & Export Packaging",
+    "capacity_kg_per_day": 50000.0,
+    "available_capacity_kg": 27135.7,
+    "cost_per_kg": 4.5,
+    "contact_number": "+91-9764000024",
+    "status": "ACTIVE",
+    "rating": 4.49,
+    "is_synthetic": true
+  }
+]

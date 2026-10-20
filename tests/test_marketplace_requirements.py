@@ -9,10 +9,24 @@ from backend.services.negotiation_service import service
 from database.db import Database
 
 
+from unittest.mock import patch
+
+
 class MarketplaceRequirementsTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        from llm.llm_client import client as global_llm_client
+        cls._orig_llm_enabled = global_llm_client.enabled
+        global_llm_client.enabled = False
+        cls._http_patcher = patch("backend.services.external_apis._http_get", return_value=None)
+        cls._http_patcher.start()
         cls.client = TestClient(app)
+
+    @classmethod
+    def tearDownClass(cls):
+        from llm.llm_client import client as global_llm_client
+        global_llm_client.enabled = cls._orig_llm_enabled
+        cls._http_patcher.stop()
 
     def setUp(self):
         import asyncio
@@ -39,15 +53,13 @@ class MarketplaceRequirementsTests(unittest.TestCase):
             "location": "Latur",
             "quality": "A",
             "language": "English",
+            "sync": True,
         }
         response = self.client.post("/api/v1/negotiations/", json=payload)
         self.assertEqual(response.status_code, 200, response.text)
         result = response.json()
 
-        # With background tasks the endpoint returns RUNNING immediately.
-        # The TestClient completes background tasks before returning, so a
-        # single status poll is enough to retrieve the real result.
-        if result.get("status") == "RUNNING":
+        if "negotiation_id" in result:
             neg_id = result["negotiation_id"]
             status_resp = self.client.get(f"/api/v1/negotiations/{neg_id}")
             if status_resp.status_code == 200:

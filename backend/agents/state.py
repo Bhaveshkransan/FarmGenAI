@@ -10,11 +10,13 @@ import operator
 from typing import TypedDict, Annotated, List, Dict, Any, Optional
 from langchain_core.messages import BaseMessage
 
+from backend.agents.common.core import CommonAgentState
 
-class NegotiationState(TypedDict):
+class NegotiationState(CommonAgentState):
     # Core Listing Information
     negotiation_id: str
     crop: str
+    crop_id: str
     quantity: float
     min_price: float
     location: str
@@ -34,12 +36,6 @@ class NegotiationState(TypedDict):
     latest_farmer_ask: float
     latest_buyer_offer: float
     
-    # Conversational Memory (LangGraph Reducer appends messages)
-    history: Annotated[List[BaseMessage], operator.add]
-    
-    # Real-time WebSocket Logs (Reducer appends logs)
-    logs: Annotated[List[str], operator.add]
-    
     # End-State Decisions
     status: str  # ACTIVE | DEAL | REJECT | ESCALATED_STORAGE | ESCALATED_PROCESSING | ESCALATED_COMPOST
     selected_buyer: Optional[Dict[str, Any]]
@@ -47,6 +43,5 @@ class NegotiationState(TypedDict):
     supply_chain_booking: Optional[Dict[str, Any]]
     
     # Learning & Reflection
-    reflection: Optional[str]
     recommendation: Optional[str]
 

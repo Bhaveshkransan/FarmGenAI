@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from agents.buyer_agent import BuyerAgent
 from agents.compost_agent import CompostAgent
-from agents.farmer_agent import FarmerAgent
+from backend.agents.stakeholders.farmer_agent import FarmerAgent
 from agents.processor_agent import ProcessorAgent
 from agents.transporter_agent import TransporterAgent
 from agents.warehouse_agent import WarehouseAgent
@@ -253,26 +253,27 @@ class NegotiationService:
             )
 
     async def _build_farmer(self, payload: dict):
+        farmer = FarmerAgent()
+        
         if payload.get("buyer_mode"):
             ask = float(payload["min_price"])
             floor = float(payload.get("farmer_floor") or round(ask * 0.75, 2))
-            return FarmerAgent(
-                name=payload.get("farmer_name", "FarmerAgent"),
-                crop=payload["crop"],
-                quantity=float(payload["quantity"]),
-                min_price=floor,
-                initial_price=ask,
-                shelf_life=int(payload.get("shelf_life", 3)),
-                location=payload.get("location")
-            )
-        return FarmerAgent(
-            name=payload.get("farmer_name", "FarmerAgent"),
-            crop=payload["crop"],
-            quantity=float(payload["quantity"]),
-            min_price=float(payload["min_price"]),
-            shelf_life=int(payload.get("shelf_life", 3)),
-            location=payload.get("location")
-        )
+            farmer.name = payload.get("farmer_name", "FarmerAgent")
+            farmer.crop = payload["crop"]
+            farmer.quantity = float(payload["quantity"])
+            farmer.min_price = floor
+            farmer.initial_price = ask
+            farmer.shelf_life = int(payload.get("shelf_life", 3))
+            farmer.location = payload.get("location")
+            return farmer
+            
+        farmer.name = payload.get("farmer_name", "FarmerAgent")
+        farmer.crop = payload["crop"]
+        farmer.quantity = float(payload["quantity"])
+        farmer.min_price = float(payload["min_price"])
+        farmer.shelf_life = int(payload.get("shelf_life", 3))
+        farmer.location = payload.get("location")
+        return farmer
 
     async def _build_buyer(self, buyer_profile: dict):
         strategy = str(buyer_profile.get("strategy") or "").lower()
@@ -334,25 +335,41 @@ class NegotiationService:
         farmer_prefs = user.get("preferences", {})
         buyer_pref = str(farmer_prefs.get("buyer_preference", "any")).lower()
 
-        offers = []
-        # Use in-memory buyers (seeded by ensure_default_buyers) which have 'name', 'budget', 'target_price' etc.
-        buyer_profiles = list(self.db_repo.buyers.values())
-        # Fallback: if in-memory is empty, query DB
+        crop = payload.get("crop", "")
+        db_buyers = await self.db_repo.list_buyers_async()
+        from backend.services.matching_service import crops_match
+
+        # Filter to real buyers from DB that match this crop
+        matching_db_buyers = [
+            b for b in db_buyers
+            if b.get("crop") and crops_match(b.get("crop"), crop)
+        ]
+
+        buyer_profiles = [
+            {
+                "id": b.get("id"),
+                "name": b.get("buyer_name") or b.get("name") or "Unknown Buyer",
+                "budget": float((b.get("max_price") or b.get("target_price") or min_price * 1.2) * quantity * 1.2),
+                "max_quantity": float(b.get("quantity") or quantity),
+                "target_price": float(b.get("max_price") or b.get("target_price") or min_price * 1.2),
+                "location": b.get("location", "Market"),
+                "strategy": b.get("strategy", "standard"),
+                "crop": b.get("crop"),
+                "verified": bool(b.get("verified", True))
+            }
+            for b in matching_db_buyers
+        ]
+
         if not buyer_profiles:
-            db_buyers = await self.db_repo.list_buyers_async()
-            # Normalize DB rows to match in-memory schema
-            buyer_profiles = [
-                {
-                    "id": b.get("id"),
-                    "name": b.get("buyer_name") or b.get("name") or "Unknown Buyer",
-                    "budget": float(b.get("max_price") or b.get("budget") or min_price * quantity * 1.5),
-                    "max_quantity": float(b.get("quantity") or quantity),
-                    "target_price": float(b.get("max_price") or b.get("target_price") or min_price * 1.2),
-                    "location": b.get("location", "Market"),
-                    "strategy": b.get("strategy", "standard"),
-                }
-                for b in db_buyers
-            ]
+            # Check requirements table for requirements matching this crop
+            from backend.services.matching_service import match_listing_to_buyers
+            real_matches = await match_listing_to_buyers(payload)
+            if real_matches:
+                return real_matches
+            # Truly NO buyers matching this crop exist in the database! Return empty list
+            return []
+
+        offers = []
         for profile in buyer_profiles:
             strategy = str(profile.get("strategy") or "").lower()
             if profile.get("kind") == "offer":
@@ -362,50 +379,47 @@ class NegotiationService:
             if offered_qty <= 0:
                 continue
 
-            budget_limited_price = float(profile.get("budget", 0)) / offered_qty
-            
+            budget_limited_price = float(profile.get("budget", 0)) / max(offered_qty, 1)
+            target_p = float(profile.get("target_price", min_price))
+
             if "restaurant" in strategy or "premium" in strategy:
-                # Premium buyers start slightly higher but still below target
-                opening_bid = min(float(profile.get("target_price", min_price)) * 0.85, budget_limited_price)
+                opening_bid = min(target_p * 0.95, budget_limited_price)
             else:
-                opening_bid = min(float(profile.get("target_price", min_price)) * 0.75, budget_limited_price, (market_price + 3) * 0.75)
-                
+                base_offer = max(target_p * 0.92, min_price if target_p >= min_price else target_p * 0.88)
+                opening_bid = min(target_p, budget_limited_price, max(base_offer, 1.0))
+
             offer_price = round(max(1.0, opening_bid), 2)
             distance_penalty = 0 if profile.get("location") == location else 0.2
-            
+
             # User Preference Boost (Stakeholder Requirement C4)
             pref_boost = 15.0 if (buyer_pref in strategy and buyer_pref != "any") else 0.0
-            
-            # Verification Integrity Boost (Test I2)
+
+            # Verification Integrity Boost
             is_verified = bool(profile.get("verified", False))
             verification_weight = 20.0 if is_verified else -10.0
-            
-            is_viable = offer_price >= min_price
-            
-            # Weighted Scoring Engine (Personalized for Phase C4 + Phase I)
-            if "restaurant" in strategy:
-                score = round((offer_price - distance_penalty) * 150 + pref_boost + verification_weight + min(offered_qty, quantity) / 50, 2)
-            else:
-                score = round((offer_price - distance_penalty) * 100 + pref_boost + verification_weight + min(offered_qty, quantity) / 10, 2)
 
-            # Strategic Labelling (Test E4)
+            is_viable = offer_price >= min_price
+
+            # Real match score
+            score = round(min(98.0, max(75.0, 95.0 - (distance_penalty * 20.0) + (pref_boost / 3.0))), 1)
+
             label = "Market Option"
             if is_viable:
-                if score > 150: label = "👑 Best Profit"
+                if score > 90: label = "👑 Best Profit"
                 elif distance_penalty == 0: label = "⚡ Fast Handshake"
                 elif "restaurant" in strategy: label = "💎 Premium Match"
                 elif pref_boost > 0: label = "🎯 Strategic Fit"
 
             offers.append(
                 {
-                    "buyer_id": profile.get("id") or profile.get("buyer_id") or profile.get("user_id", "unknown"),
-                    "buyer_name": profile.get("name") or profile.get("buyer_name") or profile.get("company", "Unknown Buyer"),
+                    "buyer_id": profile.get("id") or profile.get("buyer_id") or "unknown",
+                    "buyer_name": profile.get("name") or "Unknown Buyer",
                     "location": profile.get("location", "Market"),
                     "strategy": label,
                     "offered_price": offer_price,
                     "offered_quantity": round(offered_qty, 2),
                     "budget": float(profile.get("budget", 0)),
-                    "target_price": float(profile.get("target_price", min_price)),
+                    "target_price": target_p,
                     "status": "VIABLE" if is_viable else "BELOW_MIN_PRICE",
                     "score": score,
                 }
@@ -484,19 +498,28 @@ class NegotiationService:
                 "language": payload.get("language", "English")
             }
         )
-        produce_row = await self.db_repo.upsert_produce_async(
-            {
-                "farmer_name": farmer_row["name"],
-                "crop": payload["crop"],
-                "quantity": float(payload["quantity"]),
-                "min_price": float(payload["min_price"]),
-                "shelf_life": payload.get("shelf_life", 3),
-                "quality": payload.get("quality", "A"),
-                "location": payload.get("location", "Unknown"),
-                "language": payload.get("language", "English"),
-                "status": "ACTIVE"
-            }
-        )
+        incoming_listing_id = payload.get("listing_id")
+        produce_row = None
+        if incoming_listing_id:
+            produce_row = await self.db_repo.get_produce_async(incoming_listing_id)
+            if produce_row:
+                produce_row["status"] = "NEGOTIATING"
+                await self.db_repo.upsert_produce_async(produce_row)
+
+        if not produce_row:
+            produce_row = await self.db_repo.upsert_produce_async(
+                {
+                    "farmer_name": farmer_row["name"],
+                    "crop": payload["crop"],
+                    "quantity": float(payload["quantity"]),
+                    "min_price": float(payload["min_price"]),
+                    "shelf_life": payload.get("shelf_life", 3),
+                    "quality": payload.get("quality", "A"),
+                    "location": payload.get("location", "Unknown"),
+                    "language": payload.get("language", "English"),
+                    "status": "NEGOTIATING"
+                }
+            )
 
         negotiation_id = pre_id or self.db_repo.generate_id("neg")
         initial_price = float(payload.get("buyer_target_price") or payload.get("min_price", 18))
@@ -518,6 +541,7 @@ class NegotiationService:
             "id": negotiation_id,
             "negotiation_id": negotiation_id,
             "requirement_id": payload.get("requirement_id"),
+            "listing_id": incoming_listing_id or produce_row.get("id"),
             "user_id": payload.get("user_id"),
             "status": "ACTIVE",
             "summary": f"Negotiating {payload['quantity']}kg {payload['crop']} between {farmer_display_name} and {buyer_display_name}.",
@@ -537,9 +561,20 @@ class NegotiationService:
             "agents_involved": [farmer_display_name, buyer_display_name],
             "next_action": "Autonomous multi-round negotiation active",
             "market_offers": market_offers,
+            "active_buyers": market_offers[:3],
             "selected_buyer": selected_offer,
             "created_at": datetime.now(timezone.utc).isoformat(),
             "transport_plan": None,
+            "workflow_mode": payload.get("workflow_mode", "FULL_SUPPLY_CHAIN"),
+            "selected_services": payload.get("selected_services") or {},
+            "district": payload.get("district"),
+            "location": payload.get("location") or payload.get("buyer_location"),
+            "buyer_location": payload.get("buyer_location") or payload.get("location"),
+            "permitted_agents": payload.get("permitted_agents", ["buyer_agent", "dynamic_routing_agent"]),
+            "has_transport": bool(payload.get("has_transport", False)),
+            "has_storage": bool(payload.get("has_storage", False)),
+            "requires_processing": bool(payload.get("requires_processing", False)),
+            "sell_hold_decision": payload.get("sell_hold_decision"),
         }
         initial_offers = [
             {
@@ -595,7 +630,9 @@ class NegotiationService:
         try:
             result = await manager.start_negotiation(
                 market_price=float(payload.get("market_price", payload["min_price"] + 1)),
-                scenario=scenario
+                scenario=scenario,
+                stakeholder_role=payload.get("stakeholder_role", "FARMER"),
+                workflow_mode=payload.get("workflow_mode", "FULL_SUPPLY_CHAIN")
             )
 
             # Injects transport calculations into the logs if a deal was reached
@@ -626,20 +663,79 @@ class NegotiationService:
                 agents_involved.append("CompostAgent")
 
             buyer_loc = selected_offer.get("location", "Market") if selected_offer else "Market"
-            if farmer.location != buyer_loc:
-                dist = 180.0
-                cost = transporter.calculate_transport_cost(payload["quantity"], dist)
+            qty_val = float(payload.get("quantity", 2500))
+            norm_crop = payload.get("crop", "Produce")
+            is_reefer = norm_crop.lower() in {"tomato", "strawberry", "grape", "banana", "mango"} or "onion" in norm_crop.lower()
+
+            try:
+                from backend.services.vehicle_service import filter_suitable_vehicles
+                from backend.services.routing_service import calculate_transport_route
+                from backend.services.transport_cost_service import calculate_transportation_cost
+                
+                route_res = calculate_transport_route(farmer.location, buyer_loc)
+                dist = float(route_res.get("distance_km", 250.0))
+                dur_h = float(route_res.get("estimated_duration_hours", 4.0))
+                
+                veh_filter = await filter_suitable_vehicles(
+                    quantity_kg=qty_val,
+                    refrigerated_required=is_reefer
+                )
+                best_v = veh_filter.get("best_vehicle")
+                if not best_v and veh_filter.get("candidates"):
+                    best_v = veh_filter["candidates"][0]
+                
+                if best_v:
+                    cost_res = await calculate_transportation_cost(
+                        vehicle=best_v,
+                        distance_km=dist,
+                        estimated_duration_hours=dur_h,
+                        deadhead_km=float(route_res.get("deadhead_km", 0.0)),
+                        is_perishable=is_reefer
+                    )
+                    cost = round(float(cost_res.get("agreed_price") or cost_res.get("minimum_acceptable_price") or cost_res.get("initial_quote") or (dist * 28.0)))
+                    transport_plan = {
+                        "agent": best_v["vehicle_name"],
+                        "vehicle_name": best_v["vehicle_name"],
+                        "vehicle_type": best_v["vehicle_type"],
+                        "vehicle_id": best_v.get("vehicle_id"),
+                        "cost": cost,
+                        "agreed_freight": cost,
+                        "distance": dist,
+                        "distance_km": dist,
+                        "estimated_duration_hours": dur_h,
+                        "capacity": best_v["capacity_kg"],
+                        "capacity_kg": best_v["capacity_kg"],
+                        "fuel_type": best_v.get("fuel_type", "Diesel"),
+                        "refrigerated": best_v.get("refrigerated", False),
+                        "cost_breakdown": cost_res.get("cost_breakdown", {}),
+                        "origin": farmer.location,
+                        "destination": buyer_loc,
+                        "routing_source": route_res.get("routing_source", "OSRM Live Routing Engine")
+                    }
+                else:
+                    transport_plan = {
+                        "status": "INFEASIBLE",
+                        "message": f"No vehicle available matching {qty_val:,.0f}kg payload capacity.",
+                        "rejected_vehicles": veh_filter.get("rejected_vehicles", []),
+                        "origin": farmer.location,
+                        "destination": buyer_loc
+                    }
+            except Exception as tp_err:
+                from backend.services.matching_service import get_distance_km_sync
+                dist = get_distance_km_sync(farmer.location, buyer_loc) or 250.0
+                rate = 32.0 if is_reefer else 24.0
+                cost = round(dist * rate)
                 transport_plan = {
-                    "agent": transporter.name,
+                    "agent": "Assigned Carrier",
+                    "vehicle_name": "Agro Haulage Carrier",
+                    "vehicle_type": "Medium Commercial Truck",
                     "cost": cost,
+                    "agreed_freight": cost,
                     "distance": dist,
-                    "capacity": transporter.vehicle_capacity
-                }
-            else:
-                transport_plan = {
-                    "agent": transporter.name,
-                    "base_fee": transporter.base_fee,
-                    "capacity": transporter.vehicle_capacity,
+                    "distance_km": dist,
+                    "capacity": max(qty_val, 5000),
+                    "origin": farmer.location,
+                    "destination": buyer_loc,
                 }
 
             for idx, event in enumerate(manager.memory.get_offers(), start=2):
@@ -707,6 +803,8 @@ class NegotiationService:
                 "selected_buyer": selected_offer,
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "transport_plan": transport_plan,
+                "recommendation": result.get("recommendation"),
+                "reflection": result.get("reflection"),
             }
             await self.db_repo.create_negotiation_async(updated_payload)
 
@@ -736,7 +834,9 @@ class NegotiationService:
                     "negotiation_id": negotiation_id,
                     "status": result["state"],
                     "final_price": result["deal"].get("price") if result.get("deal") else None,
-                    "message": result.get("summary", "Negotiation completed.")
+                    "message": result.get("summary", "Negotiation completed."),
+                    "recommendation": result.get("recommendation"),
+                    "reflection": result.get("reflection"),
                 })
             except Exception:
                 pass
@@ -797,15 +897,13 @@ class NegotiationService:
             "market_offers": row.get("market_offers", []),
             "selected_buyer": row.get("selected_buyer"),
             "transport_plan": row.get("transport_plan"),
+            "recommendation": result.get("recommendation") or row.get("recommendation"),
+            "reflection": result.get("reflection") or row.get("reflection"),
         }
 
     async def get_negotiation_status(self, negotiation_id: str):
-        offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
-        if negotiation_id in self.active_negotiations:
-            res = dict(self.active_negotiations[negotiation_id])
-            if offers:
-                res["offers"] = offers
-            return res
+        if not negotiation_id.startswith("neg_"):
+            negotiation_id = f"neg_{negotiation_id}"
 
         row = await self.db_repo.get_negotiation_async(negotiation_id)
         if not row:
@@ -820,7 +918,8 @@ class NegotiationService:
         mkt_p = float(row.get("market_price") or (min_p + 2.0))
         tgt_p = float(row.get("target_price") or ((selected_b.get("target_price") or selected_b.get("offered_price")) if isinstance(selected_b, dict) else None) or min_p)
 
-        return {
+        # Baseline dictionary loaded from PostgreSQL
+        res = {
             "id": negotiation_id,
             "negotiation_id": negotiation_id,
             "user_id": row.get("user_id"),
@@ -830,19 +929,37 @@ class NegotiationService:
             "farmer_name": farmer_name,
             "buyer": buyer_name,
             "buyer_name": buyer_name,
-            "crop": row.get("crop", "Tomato"),
+            "crop": row.get("crop", "Soybean"),
             "quantity": float(row.get("quantity", 500)),
             "market_price": mkt_p,
             "min_price": min_p,
             "target_price": tgt_p,
             "agents_involved": row.get("agents_involved", []),
-            "offers": offers,
+            "offers": offers or [],
             "next_action": row.get("next_action"),
-            "final_price": row.get("final_price") or next((c.get("price") for c in self.db_repo.contracts.values() if c.get("negotiation_id") == negotiation_id), None),
+            "final_price": row.get("final_price"),
             "market_offers": row.get("market_offers", []),
-            "selected_buyer": row.get("selected_buyer"),
+            "active_buyers": row.get("active_buyers", row.get("market_offers", [])[:3]),
+            "selected_buyer": selected_b,
             "transport_plan": row.get("transport_plan"),
+            "warehouse_plan": row.get("warehouse_plan"),
+            "processor_plan": row.get("processor_plan"),
+            "workflow_mode": row.get("workflow_mode") or (selected_b.get("workflow_mode") if isinstance(selected_b, dict) else None) or "FULL_SUPPLY_CHAIN",
+            "selected_services": row.get("selected_services") or (selected_b.get("selected_services") if isinstance(selected_b, dict) else {}),
+            "district": row.get("district") or (selected_b.get("district") if isinstance(selected_b, dict) else None),
+            "location": row.get("location") or (selected_b.get("location") if isinstance(selected_b, dict) else None),
+            "buyer_location": row.get("buyer_location") or (selected_b.get("buyer_location") if isinstance(selected_b, dict) else None) or row.get("location"),
+            "parallel_branches": self.active_negotiations.get(negotiation_id, {}).get("parallel_branches") or row.get("market_offers") or [],
         }
+
+        # Merge active memory state if present without overwriting database truth
+        if negotiation_id in self.active_negotiations:
+            active = self.active_negotiations[negotiation_id]
+            for k, v in active.items():
+                if v is not None:
+                    res[k] = v
+
+        return res
 
     async def list_agents(self):
         return [
@@ -895,9 +1012,10 @@ class NegotiationService:
                 new_price = float(row.get("price") or row.get("target_price") or 45.0)
 
         qty = float(payload.get("quantity") or row.get("quantity") or 500)
-        crop = row.get("crop", "Tomato")
-        farmer_name = row.get("farmer") or row.get("farmer_name") or "Farmer Ramesh"
-        buyer_name = row.get("buyer") or row.get("buyer_name") or "Buyer"
+        crop_val = (payload and payload.get("crop")) or (row and row.get("crop")) or "Tomato"
+        crop = str(crop_val).strip() if crop_val else "Tomato"
+        farmer_name = (row and (row.get("farmer") or row.get("farmer_name"))) or "Farmer Ramesh"
+        buyer_name = (row and (row.get("buyer") or row.get("buyer_name"))) or "Buyer"
 
         # Statutory Benchmark & Buyer Reservation Guardrail
         crop_norm = crop
@@ -1121,22 +1239,43 @@ class NegotiationService:
             "offers": all_offers
         }
 
+    async def get_parallel_branches(self, negotiation_id: str):
+        if not negotiation_id.startswith("neg_"):
+            negotiation_id = f"neg_{negotiation_id}"
+        # 1. From active in-memory state
+        if negotiation_id in self.active_negotiations:
+            branches = self.active_negotiations[negotiation_id].get("parallel_branches")
+            if branches and isinstance(branches, list) and len(branches) > 0 and "chat_messages" in branches[0]:
+                return branches[:5]
+        # 2. From database market_offers
+        try:
+            row = await self.db_repo.get_negotiation_async(negotiation_id)
+            if row and row.get("market_offers"):
+                offers = row.get("market_offers")
+                if offers and isinstance(offers, list) and len(offers) > 0 and "chat_messages" in offers[0]:
+                    return offers[:5]
+        except Exception:
+            pass
+        # 3. Dynamic run if not already present
+        res = await self.run_parallel_procurement(negotiation_id)
+        return (res.get("suppliers", []))[:5]
+
     async def run_parallel_procurement(self, negotiation_id: str, payload: dict = None):
         """
-        Executes Autonomous Parallel Buying across all 5 Maharashtra candidate suppliers:
-        1. Identifies the 5 verified Maharashtra mandi lots for this crop.
-        2. Concurrently negotiates concession pricing with each supplier in parallel.
-        3. Computes Landed Cost (Base Rate + Freight based on distance + APMC Cess).
-        4. Disqualifies rogue quotes that exceed the statutory MSP ceiling.
-        5. Auto-selects Rank #1 (Lowest Landed Cost with highest match score).
-        6. Updates negotiation record with the auto-selected winning deal.
+        Executes Autonomous Parallel Buying across top candidate Maharashtra suppliers:
+        1. Invokes BuyerOrchestrationService to run isolated concurrent multi-round negotiations.
+        2. Applies strict reservation ceiling, budget, and quantity validations.
+        3. Ranks valid executable deals by true landed cost (Base + Distance Freight + APMC Cess).
+        4. Enforces no-forced-winner policy: returns status="NO_EXECUTABLE_DEAL" if no deal qualifies.
+        5. Updates negotiation record and broadcasts real-time results.
         """
         row = await self.db_repo.get_negotiation_async(negotiation_id)
         if not row:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Negotiation not found")
 
-        crop = row.get("crop", "Soybean")
+        crop_val = (payload and payload.get("crop")) or (row and row.get("crop")) or "Soybean"
+        crop = str(crop_val).strip() if crop_val else "Soybean"
         crop_norm = "Soybean"
         for k in STATUTORY_BENCHMARKS:
             if k.lower() in crop.lower():
@@ -1145,196 +1284,116 @@ class NegotiationService:
 
         bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 48.92})
         statutory_bench = float(bench_info.get("benchmark", 48.92))
-        qty = float((payload and payload.get("quantity")) or row.get("quantity") or 500)
-        target_p = float((payload and payload.get("target_price")) or row.get("target_price") or row.get("price") or statutory_bench)
-        max_buyer_ceiling = round(max(target_p * 1.35, statutory_bench * 1.40), 2)
+        qty = float((payload and payload.get("quantity")) or (row and row.get("quantity")) or 500)
+        target_p = float((payload and payload.get("target_price")) or (row and (row.get("target_price") or row.get("price"))) or statutory_bench)
+        reservation_p = float((payload and (payload.get("max_price") or payload.get("reservation_price"))) or (row and row.get("max_price")) or round(target_p * 1.20, 2))
+        budget = float((payload and payload.get("budget")) or (row and row.get("budget")) or (qty * reservation_p))
 
-        suppliers_pool = MAHARASHTRA_CROP_SUPPLIERS.get(crop_norm, MAHARASHTRA_CROP_SUPPLIERS["Soybean"])
+        requirement_dict = {
+            "crop": crop_norm,
+            "quantity": qty,
+            "target_price": target_p,
+            "max_price": reservation_p,
+            "reservation_price": reservation_p,
+            "budget": budget,
+            "location": (row and row.get("location")) or "Maharashtra",
+            "buyer_name": (row and (row.get("buyer") or row.get("buyer_name"))) or "Buyer Agent",
+            "persona": (payload and payload.get("persona")) or "bulk_wholesaler",
+            "strategy": (payload and payload.get("strategy")) or "balanced",
+            "sellers": payload.get("sellers") if payload else None,
+        }
 
-        parallel_results = []
-        for idx, cp in enumerate(suppliers_pool):
-            # 1. Opening initial ask from supplier lot
-            initial_p = round(target_p * (1.08 + idx * 0.02), 2)
-            # 2. Parallel simulated concession bargaining (autonomous RL agent concession)
-            # Rank 0 (leader) concedes closest to target; others have slight variations
-            concession_factor = 0.98 if idx == 0 else (1.01 + idx * 0.015)
-            negotiated_p = round(target_p * concession_factor, 2)
+        # Invoke core Buyer Orchestration Service
+        from backend.services.buyer_orchestrator import buyer_orchestration_service
+        orch_res = await buyer_orchestration_service.orchestrate_negotiation(
+            requirement=requirement_dict,
+            max_candidates=5,
+            max_rounds=5,
+            negotiation_id=negotiation_id,
+        )
 
-            # Check if quote exceeds ceiling
-            is_disqualified = negotiated_p > max_buyer_ceiling
-            
-            # 3. Freight logistics based on highway distance (₹6.50/km flat + handling)
-            freight_total = max(650.0, round(cp["dist"] * 6.50 + qty * 0.35, 2))
-            freight_per_kg = round(freight_total / max(1.0, qty), 2)
-            
-            # 4. APMC statutory cess (1% on base purchase value)
-            apmc_cess_per_kg = round(negotiated_p * 0.01, 2)
-            
-            # 5. True Landed Cost per kg
-            landed_cost_per_kg = round(negotiated_p + freight_per_kg + apmc_cess_per_kg, 2)
-            total_landed_cost = round(landed_cost_per_kg * qty, 2)
+        winner = orch_res.get("winner")
+        if winner:
+            winner["is_best"] = True
+            winner["rank"] = 1
+            if "negotiated_price" not in winner:
+                winner["negotiated_price"] = winner.get("final_price")
+        winner_status = orch_res.get("status", "NO_EXECUTABLE_DEAL")
+        negotiations = orch_res.get("negotiations", [])
+        executable_deals = orch_res.get("executable_deals", [])
+        chat_transcript = orch_res.get("chat_transcript", "")
 
-            match_score = max(85, cp["match"] - idx * 2)
-
-            parallel_results.append({
-                "index": idx,
-                "name": cp["name"],
-                "location": cp["loc"],
-                "distance_km": cp["dist"],
-                "initial_ask": initial_p,
-                "negotiated_price": negotiated_p,
-                "freight_total": freight_total,
-                "freight_per_kg": freight_per_kg,
-                "apmc_cess_per_kg": apmc_cess_per_kg,
-                "landed_cost_per_kg": landed_cost_per_kg,
-                "total_landed_cost": total_landed_cost,
-                "match_score": match_score,
-                "special": cp["special"],
-                "is_disqualified": is_disqualified,
-                "disqualification_reason": "Exceeds MSP Ceiling" if is_disqualified else None,
-                "status": "Disqualified" if is_disqualified else ("Counter-offered" if idx > 0 else "Active (Best Match)"),
-                "is_best": False
+        # Format suppliers list for frontend dashboard compatibility
+        ranked_suppliers = []
+        for rank_idx, neg in enumerate(negotiations, 1):
+            ranked_suppliers.append({
+                "rank": rank_idx,
+                "index": rank_idx - 1,
+                "name": neg["seller_name"],
+                "location": neg["location"],
+                "distance_km": neg["distance_km"],
+                "initial_ask": neg["initial_ask"],
+                "negotiated_price": neg["final_price"] if neg["final_price"] is not None else neg["initial_ask"],
+                "freight_total": neg["freight_total"],
+                "freight_per_kg": neg["freight_per_kg"],
+                "apmc_cess_per_kg": neg["apmc_cess_per_kg"],
+                "landed_cost_per_kg": neg["landed_cost_per_kg"],
+                "total_landed_cost": neg["total_landed_cost"],
+                "match_score": neg["match_score"],
+                "special": f"Rounds: {neg['rounds_count']} | Status: {neg['status']}",
+                                "is_disqualified": not neg["is_valid_deal"],
+                "disqualification_reason": neg.get("rejection_reason"),
+                "status": "🏆 Auto-Selected Best Deal" if (winner and neg.get("session_id") == winner.get("session_id")) else neg["status"],
+                "is_best": bool(winner and neg.get("session_id") == winner.get("session_id")),
+                "session_id": neg.get("session_id"),
+                "seller_id": neg.get("seller_id"),
+                "branch_index": neg.get("branch_index", rank_idx - 1),
+                "chat_messages": neg.get("chat_messages", []),
+                "rounds": neg.get("rounds", []),
+                "messages": neg.get("messages", []),
+                "contract": neg.get("contract"),
             })
 
-        # Rank qualified suppliers by lowest landed cost per kg
-        qualified = [s for s in parallel_results if not s["is_disqualified"]]
-        qualified.sort(key=lambda s: (s["landed_cost_per_kg"], -s["match_score"]))
-        
-        # Designate #1 winner
-        if qualified:
-            qualified[0]["is_best"] = True
-            qualified[0]["status"] = "🏆 Auto-Selected Best Deal"
-            winner = qualified[0]
+        # Update negotiation record in Database
+        if winner:
+            db_status = "DEAL"
+            final_p = winner["final_price"]
+            summary_text = (
+                f"Autonomous Parallel Buying completed across {len(negotiations)} suppliers. "
+                f"Auto-selected #1: {winner['seller_name']} at ₹{winner['final_price']}/kg "
+                f"(Landed: ₹{winner['landed_cost_per_kg']}/kg)."
+            )
         else:
-            winner = parallel_results[0]
-            winner["is_best"] = True
+            db_status = "NO_EXECUTABLE_DEAL"
+            final_p = None
+            summary_text = (
+                f"Autonomous Parallel Buying completed across {len(negotiations)} suppliers. "
+                f"No executable deal found meeting reservation ceiling (₹{reservation_p:.2f}/kg) or budget."
+            )
 
-        # Sort all suppliers for display (winner first, then other qualified by landed cost, then disqualified)
-        ranked_suppliers = sorted(parallel_results, key=lambda s: (1 if s["is_disqualified"] else 0, s["landed_cost_per_kg"]))
-        for rank_idx, s in enumerate(ranked_suppliers, 1):
-            s["rank"] = rank_idx
-
-        # Update negotiation in DB with the auto-selected winner
+        self.active_negotiations.setdefault(negotiation_id, {})["parallel_branches"] = ranked_suppliers
+        self.active_negotiations[negotiation_id]["parallel_results"] = negotiations
         await self.db_repo.update_negotiation_async(negotiation_id, {
-            "farmer_name": winner["name"],
-            "farmer": winner["name"],
-            "final_price": winner["negotiated_price"],
-            "status": "ACTIVE",
-            "summary": f"Autonomous Parallel Buying completed across 5 Maharashtra suppliers. Auto-selected #1: {winner['name']} at ₹{winner['negotiated_price']}/kg (Landed: ₹{winner['landed_cost_per_kg']}/kg)."
+            "crop": crop_norm,
+            "quantity": qty,
+            "farmer_name": winner["seller_name"] if winner else "No Deal",
+            "farmer": winner["seller_name"] if winner else "No Deal",
+            "final_price": final_p,
+            "status": db_status,
+            "summary": summary_text,
+            "market_offers": ranked_suppliers,
         })
 
-        # Add parallel summary offer to negotiation history
+        # Record parallel summary offer
         parallel_offer = {
             "round": int(row.get("current_round", 1)) + 1,
             "agent": "Autonomous Parallel Buying Engine",
-            "price": winner["negotiated_price"],
-            "decision": "COUNTER",
+            "price": final_p if final_p is not None else 0.0,
+            "decision": "ACCEPT" if winner else "REJECT",
             "quantity": qty,
-            "message": (
-                f"⚡ [Parallel Procurement Completed] Evaluated 5 Maharashtra suppliers in parallel. "
-                f"Auto-selected winning supplier: {winner['name']} ({winner['location']}) "
-                f"at ₹{winner['negotiated_price']}/kg (Landed Cost: ₹{winner['landed_cost_per_kg']}/kg, {winner['match_score']}% Match)."
-            )
+            "message": summary_text,
         }
         await self.db_repo.append_offer_async(negotiation_id, parallel_offer)
-
-        # Construct detailed live round steps for streaming in terminal
-        detailed_steps = [
-            {
-                "round": 1,
-                "tag": "CLUSTER",
-                "color": "text-emerald-400",
-                "text": f"Connected to Multi-Agent RL Execution Daemon for {qty:,.0f} kg {crop_norm} (Contract #{negotiation_id[:8]})."
-            },
-            {
-                "round": 1,
-                "tag": "POLICY",
-                "color": "text-purple-400",
-                "text": f"Statutory MSP: ₹{statutory_bench:.2f}/kg | Statutory APMC Floor: ₹{statutory_bench * 0.35:.2f}/kg | Target Ceiling: ₹{target_p:.2f}/kg (Max ₹{max_buyer_ceiling:.2f}/kg)."
-            },
-            {
-                "round": 1,
-                "tag": "DISCOVERY",
-                "color": "text-blue-400",
-                "text": f"Concurrently pinged 5 verified Maharashtra APMC producers for {crop_norm}."
-            }
-        ]
-        
-        for cp in parallel_results:
-            detailed_steps.append({
-                "round": 1,
-                "tag": "ROUND 1",
-                "color": "text-amber-400",
-                "supplier_index": cp["index"],
-                "supplier_name": cp["name"],
-                "price": cp["initial_ask"],
-                "text": f"{cp['name']} ({cp['location']}, {cp['distance_km']}km): Opening ask ₹{cp['initial_ask']:.2f}/kg ({cp['special']})."
-            })
-
-        detailed_steps.append({
-            "round": 2,
-            "tag": "UTILITY",
-            "color": "text-cyan-400",
-            "text": "Buyer Agent evaluating Multi-Attribute Utility: weights(price=0.45, qty=0.25, freshness=0.30). Generating strategic counters."
-        })
-        
-        for cp in parallel_results:
-            counter_p = round(target_p * (0.95 if cp['index'] == 0 else (0.97 + cp['index'] * 0.01)), 2)
-            detailed_steps.append({
-                "round": 2,
-                "tag": "ROUND 2",
-                "color": "text-cyan-300",
-                "supplier_index": cp["index"],
-                "supplier_name": cp["name"],
-                "counter_price": counter_p,
-                "text": f"Buyer Agent counters {cp['name'].split()[0]}: Proposing ₹{counter_p:.2f}/kg with prompt 24-hr escrow guarantee."
-            })
-
-        for cp in parallel_results:
-            concession = round(cp['initial_ask'] - cp['negotiated_price'], 2)
-            detailed_steps.append({
-                "round": 3,
-                "tag": "ROUND 3",
-                "color": "text-amber-300",
-                "supplier_index": cp["index"],
-                "supplier_name": cp["name"],
-                "price": cp["negotiated_price"],
-                "text": f"{cp['name'].split()[0]} concedes -₹{concession:.2f}/kg → Conceded offer: ₹{cp['negotiated_price']:.2f}/kg."
-            })
-
-        detailed_steps.append({
-            "round": 4,
-            "tag": "LOGISTICS",
-            "color": "text-blue-300",
-            "text": f"Highway transit routing solved: Freight range ₹{min(s['freight_per_kg'] for s in parallel_results):.2f} - ₹{max(s['freight_per_kg'] for s in parallel_results):.2f}/kg | APMC Mandi Cess (1%): +₹{winner['apmc_cess_per_kg']:.2f}/kg."
-        })
-        detailed_steps.append({
-            "round": 4,
-            "tag": "GUARDRAIL",
-            "color": "text-emerald-400",
-            "text": f"🛡️ All 5 final quotes verified: within APMC floor (₹{statutory_bench * 0.35:.2f}/kg) and ceiling (₹{max_buyer_ceiling:.2f}/kg). Zero violations."
-        })
-
-        detailed_steps.append({
-            "round": 5,
-            "tag": "PARETO",
-            "color": "text-purple-300",
-            "text": f"Multi-criteria Pareto optimization complete across 5 suppliers. Evaluated price, freight, quality grade, and distance."
-        })
-        detailed_steps.append({
-            "round": 5,
-            "tag": "WINNER",
-            "color": "text-emerald-300",
-            "supplier_index": winner["index"],
-            "supplier_name": winner["name"],
-            "text": f"🏆 Auto-Selected Winner: {winner['name']} ({winner['location']}) at base ₹{winner['negotiated_price']:.2f}/kg | True Landed: ₹{winner['landed_cost_per_kg']:.2f}/kg ({winner['match_score']}% Match)!"
-        })
-        detailed_steps.append({
-            "round": 5,
-            "tag": "LOCKED",
-            "color": "text-emerald-400",
-            "text": f"Terms locked. Total Landed Cost: ₹{winner['total_landed_cost']:,.2f}. Ready for APMC smart contract signing."
-        })
 
         try:
             from backend.websocket.agent_updates import agent_update_hub as ws_manager
@@ -1342,29 +1401,35 @@ class NegotiationService:
                 "event": "NEGOTIATION_LOG",
                 "negotiation_id": negotiation_id,
                 "agent_type": "buyer",
-                "message": parallel_offer["message"],
-                "offer": winner["negotiated_price"]
+                "message": summary_text,
+                "offer": final_p or 0.0,
             })
             await ws_manager.broadcast({
                 "event": "PARALLEL_PROCUREMENT_COMPLETE",
                 "negotiation_id": negotiation_id,
                 "winner": winner,
                 "suppliers": ranked_suppliers,
-                "timeline": detailed_steps
+                "status": winner_status,
+                "chat_transcript": chat_transcript,
             })
-        except Exception:
-            pass
+        except Exception as ws_err:
+            logger.warning(f"WebSocket broadcast error in parallel procurement: {ws_err}")
 
         return {
             "success": True,
             "negotiation_id": negotiation_id,
-            "crop": crop_norm,
-            "quantity": qty,
-            "statutory_benchmark": statutory_bench,
-            "buyer_ceiling": max_buyer_ceiling,
+            "buyer_ceiling": reservation_p,
+            "status": winner_status,
             "winner": winner,
+            "requested_quantity": orch_res.get("requested_quantity", qty),
+            "allocated_quantity": orch_res.get("allocated_quantity", float(winner["executable_quantity"]) if winner else 0.0),
+            "remaining_quantity": orch_res.get("remaining_quantity", 0.0 if winner else qty),
+            "min_purchase_quantity": orch_res.get("min_purchase_quantity", 0.0),
+            "candidate_count": len(negotiations),
+            "executable_deals_count": len(executable_deals),
             "suppliers": ranked_suppliers,
-            "timeline": detailed_steps
+            "negotiations": negotiations,
+            "chat_transcript": chat_transcript,
         }
 
     async def autonomous_step(self, negotiation_id: str):
@@ -1378,7 +1443,8 @@ class NegotiationService:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Negotiation not found")
 
-        crop = row.get("crop", "Soybean")
+        crop_val = (row and row.get("crop")) or "Soybean"
+        crop = str(crop_val).strip() if crop_val else "Soybean"
         crop_norm = "Soybean"
         for k in STATUTORY_BENCHMARKS:
             if k.lower() in crop.lower():

@@ -15,6 +15,7 @@ from backend.agents.transport_agent.nodes import (
     validate_request,
     check_vehicle_availability,
     filter_vehicles,
+    recommend_vehicles,
     calculate_route,
     calculate_cost,
     calculate_profit,
@@ -34,8 +35,8 @@ def route_after_validation(state: TransportAgentState) -> str:
     return "check_vehicle_availability"
 
 
-def route_after_filtering(state: TransportAgentState) -> str:
-    """Conditional edge routing after vehicle filtering."""
+def route_after_recommendation(state: TransportAgentState) -> str:
+    """Conditional edge routing after vehicle recommendation."""
     if not state.get("selected_vehicle"):
         return "generate_transport_plan"
     return "calculate_route"
@@ -50,6 +51,7 @@ def build_transport_agent_graph():
     builder.add_node("validate_request", validate_request)
     builder.add_node("check_vehicle_availability", check_vehicle_availability)
     builder.add_node("filter_vehicles", filter_vehicles)
+    builder.add_node("recommend_vehicles", recommend_vehicles)
     builder.add_node("calculate_route", calculate_route)
     builder.add_node("calculate_cost", calculate_cost)
     builder.add_node("calculate_profit", calculate_profit)
@@ -73,9 +75,11 @@ def build_transport_agent_graph():
 
     builder.add_edge("check_vehicle_availability", "filter_vehicles")
 
+    builder.add_edge("filter_vehicles", "recommend_vehicles")
+
     builder.add_conditional_edges(
-        "filter_vehicles",
-        route_after_filtering,
+        "recommend_vehicles",
+        route_after_recommendation,
         {
             "calculate_route": "calculate_route",
             "generate_transport_plan": "generate_transport_plan"
@@ -122,6 +126,13 @@ async def run_transport_workflow(input_request: Dict[str, Any]) -> Dict[str, Any
         "urgency": input_request.get("urgency", "NORMAL"),
         "refrigerated_required": bool(input_request.get("refrigerated_required", False)),
         "temperature_requirement_c": input_request.get("temperature_requirement_c"),
+        "requester_role": input_request.get("requester_role", "FARMER"),
+        "requester_id": input_request.get("requester_id"),
+        "workflow_id": input_request.get("workflow_id"),
+        "listing_id": input_request.get("listing_id"),
+        "budget": input_request.get("budget"),
+        "requester_constraints": input_request.get("requester_constraints", {}),
+        "allowed_agents": input_request.get("allowed_agents"),
         "is_valid_request": True,
         "validation_error": None,
         "all_vehicles": [],
@@ -133,6 +144,7 @@ async def run_transport_workflow(input_request: Dict[str, Any]) -> Dict[str, Any
         "deadhead_km": 0.0,
         "routing_source": "Pending",
         "estimated_arrival_iso": "",
+        "route": {},
         "cost_breakdown": {},
         "total_operating_cost": 0.0,
         "risk_adjusted_cost": 0.0,

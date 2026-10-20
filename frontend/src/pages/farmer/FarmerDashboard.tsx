@@ -4,16 +4,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { api } from '@/services/api';
 import { API_CONFIG } from '@/config/api';
-import { Leaf, TrendingUp, AlertCircle, Clock, Plus, MapPin, Navigation, TrendingDown, Minus, Truck } from 'lucide-react';
+import { Leaf, TrendingUp, AlertCircle, Clock, Plus, MapPin, Navigation, TrendingDown, Minus, Truck, Edit2, Trash2, Tag, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import StatCard from '@/components/ui/StatCard';
 import CreateListingForm from '@/components/forms/CreateListingForm';
+import EditListingModal from '@/components/forms/EditListingModal';
+import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
+import { CANONICAL_CROPS, MAHARASHTRA_DISTRICT_COORDINATES } from '@/constants/crops';
 
 interface MandiResult {
   mandi_name: string;
   distance_km: number;
   modal_price: number;
   transport_cost: number;
+  handling_cost?: number;
+  shrinkage_cost?: number;
   net_realization: number;
   trend: 'Bullish' | 'Stable' | 'Bearish';
   lat: number;
@@ -33,16 +38,38 @@ export default function FarmerDashboard() {
   const wsUrl = `${API_CONFIG.WS_URL}/negotiation`;
   const { isConnected, lastMessage } = useWebSocket(wsUrl);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState<any>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // MandiMitra state
   const [mandiData, setMandiData] = useState<MarketData | null>(null);
   const [mandiLoading, setMandiLoading] = useState(false);
   const [mandiError, setMandiError] = useState<string | null>(null);
   const [selectedCrop, setSelectedCrop] = useState('Soybean');
+  const [selectedDistrict, setSelectedDistrict] = useState('Nashik');
   const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'found' | 'error'>('idle');
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+  const [contractModalDeal, setContractModalDeal] = useState<any>(null);
 
   const [listingsFilterCrop, setListingsFilterCrop] = useState('');
   const [listingsSearch, setListingsSearch] = useState('');
+
+  const handleDeleteListing = async (listingId: string, cropName: string) => {
+    if (!window.confirm(`Are you sure you want to expire/remove the listing for ${cropName}?`)) {
+      return;
+    }
+    setDeletingId(listingId);
+    try {
+      await api.delete(`/listings/${listingId}`);
+      refetchListings();
+    } catch (err) {
+      console.error('Failed to delete listing:', err);
+      alert('Could not delete listing. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const { data: listings, isLoading, isError, refetch: refetchListings } = useQuery({
     queryKey: ['farmer_listings'],
@@ -62,7 +89,7 @@ export default function FarmerDashboard() {
     queryKey: ['farmer_negotiations'],
     queryFn: async () => {
       const res = await api.get('/negotiations/');
-      return res.data?.data || [];
+      return Array.isArray(res.data) ? res.data : (res.data?.data || []);
     }
   });
 
@@ -75,16 +102,25 @@ export default function FarmerDashboard() {
     }
   });
 
+  const { data: dashboardStats, refetch: refetchDashboard } = useQuery({
+    queryKey: ['farmer_dashboard_stats'],
+    queryFn: async () => {
+      const res = await api.get('/dashboards/farmer');
+      return res.data?.data;
+    }
+  });
+
   useEffect(() => {
     if (lastMessage) {
       if (lastMessage.event === 'NEGOTIATION_FINISHED') {
         refetchNegotiations();
         refetchListings();
+        refetchDashboard();
       } else if (lastMessage.event === 'SCENARIO_READY') {
         refetchWorkflows();
       }
     }
-  }, [lastMessage, refetchNegotiations, refetchListings, refetchWorkflows]);
+  }, [lastMessage, refetchNegotiations, refetchListings, refetchWorkflows, refetchDashboard]);
 
   const fetchMandiComparison = (lat: number, lon: number, crop: string) => {
     setMandiLoading(true);
@@ -98,18 +134,25 @@ export default function FarmerDashboard() {
   };
 
   const handleFindMandis = () => {
+    const coords = MAHARASHTRA_DISTRICT_COORDINATES[selectedDistrict] || { lat: 19.9975, lon: 73.7898 };
     setLocationStatus('locating');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocationStatus('found');
-        fetchMandiComparison(pos.coords.latitude, pos.coords.longitude, selectedCrop);
-      },
-      () => {
-        // Fallback to Nashik coords for demo
-        setLocationStatus('found');
-        fetchMandiComparison(19.99, 73.78, selectedCrop);
-      }
-    );
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocationStatus('found');
+          fetchMandiComparison(pos.coords.latitude, pos.coords.longitude, selectedCrop);
+        },
+        () => {
+          // Fallback to selected district coords
+          setLocationStatus('found');
+          fetchMandiComparison(coords.lat, coords.lon, selectedCrop);
+        },
+        { timeout: 3000 }
+      );
+    } else {
+      setLocationStatus('found');
+      fetchMandiComparison(coords.lat, coords.lon, selectedCrop);
+    }
   };
 
   const TrendIcon = ({ trend }: { trend: string }) => {
@@ -133,7 +176,7 @@ export default function FarmerDashboard() {
           </div>
           <div className="text-right">
             <p className="text-slate-500">Trust Score</p>
-            <p className="font-bold text-emerald-600 text-lg">4.8 <span className="text-sm text-slate-400">/ 5.0</span></p>
+            <p className="font-bold text-emerald-600 text-lg">{dashboardStats?.user?.trust_score ? Number(dashboardStats.user.trust_score).toFixed(1) : '4.9'} <span className="text-sm text-slate-400">/ 5.0</span></p>
           </div>
         </div>
       </div>
@@ -148,7 +191,13 @@ export default function FarmerDashboard() {
           trend={mandiData ? `${selectedCrop} ${mandiData.best_option?.trend === 'Bullish' ? '+15%' : '-5%'}` : "Fetch Mandis"} 
           color="blue" 
         />
-        <StatCard icon={<Clock />} title="Avg. Deal Time" value="2.4 hrs" trend="-15 mins" color="purple" />
+        <StatCard 
+          icon={<Clock />} 
+          title="Deals Closed" 
+          value={dashboardStats?.negotiations?.successful ?? (negotiations?.filter((n: any) => n.status === 'DEAL')?.length || 0)} 
+          trend={dashboardStats?.earnings?.total ? `₹${dashboardStats.earnings.total.toLocaleString()} earned` : 'Active'} 
+          color="purple" 
+        />
       </div>
 
       {/* ── MandiMitra Section ── */}
@@ -164,24 +213,48 @@ export default function FarmerDashboard() {
               <p className="text-sm text-slate-500">Government mandis within 500km · Live prices · Net realization after transport</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center flex-wrap gap-2.5">
+            {/* 36 Maharashtra Districts Dropdown */}
             <select
-              value={selectedCrop}
-              onChange={e => setSelectedCrop(e.target.value)}
-              className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none"
+              value={selectedDistrict}
+              onChange={e => {
+                const dist = e.target.value;
+                setSelectedDistrict(dist);
+                const coords = MAHARASHTRA_DISTRICT_COORDINATES[dist] || { lat: 19.9975, lon: 73.7898 };
+                fetchMandiComparison(coords.lat, coords.lon, selectedCrop);
+              }}
+              className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none"
+              title="Select Maharashtra District"
             >
-              {['Sugarcane', 'Soybean', 'Cotton', 'Jowar', 'Onion', 'Bajra', 'Rice'].map(c => (
-                <option key={c}>{c}</option>
+              {Object.keys(MAHARASHTRA_DISTRICT_COORDINATES).map(d => (
+                <option key={d} value={d}>📍 {d}</option>
               ))}
             </select>
+
+            {/* 7 Canonical Crops Selector */}
+            <select
+              value={selectedCrop}
+              onChange={e => {
+                const crop = e.target.value;
+                setSelectedCrop(crop);
+                const coords = MAHARASHTRA_DISTRICT_COORDINATES[selectedDistrict] || { lat: 19.9975, lon: 73.7898 };
+                fetchMandiComparison(coords.lat, coords.lon, crop);
+              }}
+              className="text-xs font-semibold border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:ring-2 focus:ring-emerald-400 outline-none"
+            >
+              {CANONICAL_CROPS.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+
             <button
               id="find-mandis-btn"
               onClick={handleFindMandis}
               disabled={mandiLoading}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-4 py-2 rounded-xl text-sm font-semibold transition shadow-sm"
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer whitespace-nowrap"
             >
-              <Navigation size={15} className={mandiLoading ? 'animate-spin' : ''} />
-              {mandiLoading ? 'Fetching...' : locationStatus === 'idle' ? 'Find My Mandis' : 'Refresh'}
+              <Navigation size={13} className={mandiLoading ? 'animate-spin' : ''} />
+              {mandiLoading ? 'Fetching...' : locationStatus === 'idle' ? 'Find Mandis' : 'Refresh'}
             </button>
           </div>
         </div>
@@ -217,17 +290,30 @@ export default function FarmerDashboard() {
               </div>
             </div>
 
+            {/* Factor Formula Transparency Banner */}
+            <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-200/70 flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-slate-800">Formula Breakdown:</span>
+                <span>Net Realization = Destination Modal Price − Transport Cost (₹2 + ₹0.05/km) − APMC Handling/Hamali (₹0.50/kg) − Transit Shrinkage</span>
+              </div>
+              <span className="text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full text-[11px]">
+                All-Factor APMC Pricing
+              </span>
+            </div>
+
             {/* Mandi Comparison Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-slate-500 border-b border-slate-100">
                   <tr>
-                    <th className="px-5 py-3 font-medium">Mandi</th>
-                    <th className="px-5 py-3 font-medium">Distance</th>
-                    <th className="px-5 py-3 font-medium">Modal Price</th>
-                    <th className="px-5 py-3 font-medium">Transport Cost</th>
-                    <th className="px-5 py-3 font-medium">Net Realization</th>
-                    <th className="px-5 py-3 font-medium">Trend</th>
+                    <th className="px-4 py-3 font-medium">Mandi</th>
+                    <th className="px-4 py-3 font-medium">Distance</th>
+                    <th className="px-4 py-3 font-medium">Modal Price</th>
+                    <th className="px-4 py-3 font-medium">Transport Cost</th>
+                    <th className="px-4 py-3 font-medium">Handling & Cess</th>
+                    <th className="px-4 py-3 font-medium">Shrinkage Loss</th>
+                    <th className="px-4 py-3 font-medium">Net Realization</th>
+                    <th className="px-4 py-3 font-medium">Trend</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -235,19 +321,21 @@ export default function FarmerDashboard() {
                     const isBest = m.mandi_name === mandiData.best_option?.mandi_name;
                     return (
                       <tr key={i} className={`transition ${isBest ? 'bg-emerald-50/60' : 'hover:bg-slate-50/50'}`}>
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-3.5">
                           <div className="flex items-center gap-2">
                             {isBest && <span className="text-xs bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">BEST</span>}
                             <span className="font-medium text-slate-800">{m.mandi_name}</span>
                           </div>
                         </td>
-                        <td className="px-5 py-4 text-slate-600">{m.distance_km} km</td>
-                        <td className="px-5 py-4 font-medium text-slate-800">₹{m.modal_price}/kg</td>
-                        <td className="px-5 py-4 text-red-500">- ₹{m.transport_cost}/kg</td>
-                        <td className={`px-5 py-4 font-bold ${m.net_realization > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          ₹{m.net_realization}/kg
+                        <td className="px-4 py-3.5 text-slate-600">{m.distance_km} km</td>
+                        <td className="px-4 py-3.5 font-medium text-slate-800">₹{Number(m.modal_price).toFixed(2)}/kg</td>
+                        <td className="px-4 py-3.5 text-red-500">- ₹{Number(m.transport_cost).toFixed(2)}/kg</td>
+                        <td className="px-4 py-3.5 text-amber-600">- ₹{Number(m.handling_cost ?? 0.5).toFixed(2)}/kg</td>
+                        <td className="px-4 py-3.5 text-slate-500">- ₹{Number(m.shrinkage_cost ?? 0).toFixed(2)}/kg</td>
+                        <td className={`px-4 py-3.5 font-bold ${m.net_realization > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          ₹{Number(m.net_realization).toFixed(2)}/kg
                         </td>
-                        <td className="px-5 py-4">
+                        <td className="px-4 py-3.5">
                           <span className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full w-fit ${
                             m.trend === 'Bullish' ? 'bg-emerald-100 text-emerald-700' :
                             m.trend === 'Bearish' ? 'bg-red-100 text-red-700' :
@@ -297,14 +385,12 @@ export default function FarmerDashboard() {
               <select 
                 value={listingsFilterCrop} 
                 onChange={e => setListingsFilterCrop(e.target.value)}
-                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 font-medium"
               >
-                <option value="">All Crops</option>
-                <option value="Onion">Onion</option>
-                <option value="Tomato">Tomato</option>
-                <option value="Cotton">Cotton</option>
-                <option value="Soybean">Soybean</option>
-                <option value="Sugarcane">Sugarcane</option>
+                <option value="">All 7 Crops</option>
+                {CANONICAL_CROPS.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
               <button
                 id="new-listing-btn"
@@ -341,46 +427,85 @@ export default function FarmerDashboard() {
                       <td className="px-5 py-4 text-slate-600">{listing.quantity || listing.qty} kg</td>
                       <td className="px-5 py-4 font-medium text-emerald-600">₹{listing.min_price || listing.price}/kg</td>
                       <td className="px-5 py-4">
-                        <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
-                          listing.status === 'NEGOTIATING' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                        <span className={`px-2.5 py-1 text-xs rounded-full font-bold inline-flex items-center gap-1 ${
+                          listing.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
+                          listing.status === 'NEGOTIATING' ? 'bg-blue-100 text-blue-700' :
+                          listing.status === 'SOLD' ? 'bg-purple-100 text-purple-700' :
+                          'bg-slate-100 text-slate-600'
                         }`}>
-                          {listing.status}
+                          {listing.status || 'ACTIVE'}
                         </span>
                       </td>
                       <td className="px-5 py-4">
-                        {listing.status === 'NEGOTIATING' ? (
-                          <button onClick={() => navigate(`/negotiations/${listing.id}`)} className="text-emerald-600 font-medium hover:underline">View Room</button>
-                        ) : (
-                          <button
-                            onClick={async () => {
-                              try {
-                                const payload = {
-                                  user_id: user?.id,
-                                  farmer_name: user?.name || "Unknown Farmer",
-                                  crop: listing.crop,
-                                  quantity: listing.quantity || listing.qty || 100,
-                                  min_price: listing.min_price || listing.price || 10,
-                                  shelf_life: listing.shelf_life || 7,
-                                  location: listing.location || 'Nashik',
-                                  quality: listing.grade || 'A',
-                                  language: 'English'
-                                };
-                                const res = await api.post('/negotiations/', payload);
-                                if (res.data?.negotiation_id) {
-                                  navigate(`/negotiations/${res.data.negotiation_id}`);
-                                } else {
-                                  alert('AI negotiation started but could not get a room ID. Please check your dashboard and try again.');
-                                }
-                              } catch (e) {
-                                console.error(e);
-                                alert('Failed to start AI negotiation');
+                        <div className="flex items-center gap-2">
+                          {listing.status === 'NEGOTIATING' ? (
+                            <button onClick={() => {
+                              const neg = negotiations?.find((n: any) => 
+                                (n.listing_id && (n.listing_id === listing.id || n.listing_id === listing._id)) ||
+                                (n.crop && listing.crop && n.crop.toLowerCase() === listing.crop.toLowerCase())
+                              );
+                              if (neg) {
+                                navigate(`/negotiations/${neg.negotiation_id || neg.id}`);
+                              } else if (negotiations && negotiations.length > 0) {
+                                navigate(`/negotiations/${negotiations[0].negotiation_id || negotiations[0].id}`);
+                              } else {
+                                alert('Negotiation session is initializing. Please wait a moment.');
                               }
+                            }} className="text-emerald-600 font-bold hover:underline text-xs whitespace-nowrap">View Room</button>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const payload = {
+                                    user_id: user?.id,
+                                    farmer_name: user?.name || "Unknown Farmer",
+                                    crop: listing.crop,
+                                    quantity: listing.quantity || listing.qty || 100,
+                                    min_price: listing.min_price || listing.price || 10,
+                                    shelf_life: listing.shelf_life || 7,
+                                    location: listing.location || 'Nashik',
+                                    quality: listing.grade || 'A',
+                                    language: 'English',
+                                    listing_id: listing.id
+                                  };
+                                  const res = await api.post('/negotiations/', payload);
+                                  refetchListings();
+                                  if (res.data?.negotiation_id) {
+                                    navigate(`/negotiations/${res.data.negotiation_id}`);
+                                  } else {
+                                    alert('AI negotiation started but could not get a room ID. Please check your dashboard and try again.');
+                                  }
+                                } catch (e) {
+                                  console.error(e);
+                                  alert('Failed to start AI negotiation');
+                                }
+                              }}
+                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm whitespace-nowrap"
+                            >
+                              AI Match & Negotiate
+                            </button>
+                          )}
+
+                          <button
+                            title="Edit Listing"
+                            onClick={() => {
+                              setEditingListing(listing);
+                              setIsEditOpen(true);
                             }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm"
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
                           >
-                            AI Match & Negotiate
+                            <Edit2 size={14} />
                           </button>
-                        )}
+
+                          <button
+                            title="Expire / Delete Listing"
+                            disabled={deletingId === listing.id}
+                            onClick={() => handleDeleteListing(listing.id, listing.crop)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -420,7 +545,14 @@ export default function FarmerDashboard() {
 
                     return (
                       <tr key={neg.negotiation_id} className="hover:bg-slate-50/50 transition">
-                        <td className="px-5 py-4 font-medium text-slate-800">{neg.crop}</td>
+                        <td className="px-5 py-4 font-medium text-slate-800">
+                          <div className="flex flex-col">
+                            <span className="font-bold">{neg.crop}</span>
+                            {neg.listing_id && (
+                              <span className="text-[10px] text-slate-400 font-mono">Lot #{neg.listing_id.substring(0, 8)}</span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-5 py-4 text-slate-600">{neg.quantity} kg</td>
                         <td className="px-5 py-4 font-medium text-emerald-600">₹{neg.final_price || neg.market_price || neg.min_price || 0}/kg</td>
                         <td className="px-5 py-4">
@@ -449,10 +581,22 @@ export default function FarmerDashboard() {
                             {neg.status}
                           </span>
                         </td>
-                        <td className="px-5 py-4 flex items-center gap-2">
-                          <button onClick={() => navigate(`/negotiations/${neg.negotiation_id}`)} className="text-blue-600 font-medium hover:underline text-xs">
+                        <td className="px-5 py-4 flex items-center flex-wrap gap-2">
+                          <button onClick={() => navigate(`/negotiations/${neg.negotiation_id || neg.id}`)} className="text-blue-600 font-bold hover:underline text-xs">
                             View Room
                           </button>
+                          {neg.status === 'DEAL' && (
+                            <button
+                              onClick={() => {
+                                setContractModalDeal(neg);
+                                setIsContractModalOpen(true);
+                              }}
+                              className="text-emerald-700 font-bold hover:underline text-xs flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200 transition"
+                              title="View & Download Official APMC Contract"
+                            >
+                              <FileText size={11} /> Contract
+                            </button>
+                          )}
                           {tp && (
                             <button onClick={() => navigate('/dashboard/transport')} className="text-emerald-600 font-semibold hover:underline text-xs flex items-center gap-0.5 ml-1">
                               <Truck size={11} /> Fleet
@@ -535,14 +679,32 @@ export default function FarmerDashboard() {
                 </p>
               </div>
             )}
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 mb-1">Recent Activity</p>
-              <p className="text-sm text-slate-700">Your latest listing was indexed and matched against 12 active buyers in your region.</p>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-              <p className="text-xs font-semibold text-slate-500 mb-1">Market Insight</p>
-              <p className="text-sm text-slate-700">Local processors are paying premium for Grade A {selectedCrop} this week.</p>
-            </div>
+            {dashboardStats?.recent_activity && dashboardStats.recent_activity.length > 0 ? (
+              dashboardStats.recent_activity.map((act: any, idx: number) => (
+                <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <p className="text-xs font-semibold text-emerald-600 mb-1">{act.crop} · {act.status}</p>
+                  <p className="text-sm text-slate-700">{act.summary || `Deal finalized for ${act.quantity}kg at ₹${act.final_price}/kg`}</p>
+                </div>
+              ))
+            ) : (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Recent Activity</p>
+                <p className="text-sm text-slate-700">No past closed transactions. Active listings will sync updates here in real-time.</p>
+              </div>
+            )}
+            {mandiData && mandiData.best_option ? (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Market Insight ({selectedCrop})</p>
+                <p className="text-sm text-slate-700">
+                  Optimal dispatch target: {mandiData.best_option.mandi_name} ({mandiData.best_option.distance_km} km) with net realization of ₹{mandiData.best_option.net_realization}/kg.
+                </p>
+              </div>
+            ) : (
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Market Intelligence</p>
+                <p className="text-sm text-slate-700">Select a district and click &apos;Find Mandis&apos; to view real-time APMC price benchmarks and transport deductions.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -552,6 +714,26 @@ export default function FarmerDashboard() {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSuccess={() => refetchListings()}
+      />
+
+      <EditListingModal
+        isOpen={isEditOpen}
+        onClose={() => {
+          setIsEditOpen(false);
+          setEditingListing(null);
+        }}
+        onSuccess={() => refetchListings()}
+        listing={editingListing}
+      />
+
+      <TransactionValidationModal
+        isOpen={isContractModalOpen}
+        onClose={() => {
+          setIsContractModalOpen(false);
+          setContractModalDeal(null);
+        }}
+        dealData={contractModalDeal}
+        buyerUser={user}
       />
     </div>
   );

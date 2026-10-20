@@ -11,8 +11,22 @@ export default function OfferCard({
   transportIncluded,
   warehouseIncluded,
   validity,
-  isFarmer, 
+  isFarmer,
+  isTransport = false,
+  isBuyer = false,
   onAction 
+}: {
+  agent?: string;
+  price: number;
+  quantity: number;
+  quality?: string;
+  deliveryDate?: string;
+  transportIncluded?: boolean;
+  warehouseIncluded?: boolean;
+  validity?: string;
+  isFarmer?: boolean;
+  isBuyer?: boolean;
+  onAction?: (type: string, price: number) => void;
 }) {
   return (
     <div className={`flex flex-col mb-6 ${isFarmer ? 'items-end' : 'items-start'}`}>
@@ -28,11 +42,11 @@ export default function OfferCard({
             <p className={`text-xs font-bold uppercase tracking-wider ${isFarmer ? 'text-emerald-600' : 'text-blue-600'}`}>
               Formal Offer
             </p>
-            <p className="text-2xl font-black text-slate-800">{formatCurrency(price)}<span className="text-sm font-medium text-slate-500">/kg</span></p>
+            <p className="text-2xl font-black text-slate-800">{formatCurrency(price)}{!isTransport && <span className="text-sm font-medium text-slate-500">/kg</span>}</p>
           </div>
           <div className="text-right">
-            <p className="text-xs text-slate-500 font-medium mb-0.5">Total Value</p>
-            <p className="text-lg font-bold text-slate-700">{formatCurrency(price * quantity)}</p>
+            <p className="text-xs text-slate-500 font-medium mb-0.5">{isTransport ? 'Freight Cost' : 'Total Value'}</p>
+            <p className="text-lg font-bold text-slate-700">{formatCurrency(isTransport ? price : price * quantity)}</p>
           </div>
         </div>
 
@@ -74,8 +88,8 @@ export default function OfferCard({
           <span className="font-medium">100% Payment on Delivery</span>
         </div>
 
-        {/* Action Buttons (Only show if it's the opponent's offer) */}
-        {!isFarmer && onAction && (
+        {/* Action Buttons (Only show for Farmer manual review mode, never for Buyer autonomous procurement) */}
+        {!isBuyer && !isFarmer && onAction && (
           <div className="p-3 grid grid-cols-3 gap-2 bg-slate-50">
             <button 
               onClick={() => onAction('reject', price)} 

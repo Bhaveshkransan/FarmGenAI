@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import select, delete, text, JSON
+from sqlalchemy import select, delete, text, JSON, CheckConstraint
 from backend.db.session import Base
 
 class DBUser(Base):
@@ -53,6 +53,8 @@ class DBBuyer(Base):
 class DBProduce(Base):
     __tablename__ = "produce"
     id: Mapped[str] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(nullable=True, index=True)
+    workflow_mode: Mapped[str] = mapped_column(default="FULL_SUPPLY_CHAIN")
     user_id: Mapped[str] = mapped_column(nullable=True, index=True)
     farmer_name: Mapped[str] = mapped_column(nullable=True)
     crop: Mapped[str] = mapped_column(nullable=True)
@@ -76,7 +78,7 @@ class DBProduce(Base):
     storage_info: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
     processing_info: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
     transport_reqs: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
-    selected_services: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
+    selected_services: Mapped[list] = mapped_column(type_=JSON, default=list)
     images: Mapped[list] = mapped_column(type_=JSON, nullable=True)
     description: Mapped[str] = mapped_column(nullable=True)
     language: Mapped[str] = mapped_column(nullable=True)
@@ -84,9 +86,14 @@ class DBProduce(Base):
     created_at: Mapped[str] = mapped_column(nullable=True)
     updated_at: Mapped[str] = mapped_column(nullable=True)
 
+    __table_args__ = (
+        CheckConstraint('quantity >= 0', name='check_produce_qty_positive'),
+    )
+
 class DBNegotiation(Base):
     __tablename__ = "negotiations"
     negotiation_id: Mapped[str] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(nullable=True, index=True)
     crop: Mapped[str] = mapped_column(nullable=True)
     quantity: Mapped[float] = mapped_column(nullable=True)
     farmer_id: Mapped[str] = mapped_column(nullable=True)
@@ -98,6 +105,8 @@ class DBNegotiation(Base):
     summary: Mapped[str] = mapped_column(nullable=True)
     final_price: Mapped[float] = mapped_column(nullable=True)
     transport_plan: Mapped[str] = mapped_column(nullable=True)
+    warehouse_plan: Mapped[str] = mapped_column(nullable=True)
+    processor_plan: Mapped[str] = mapped_column(nullable=True)
     peer_node: Mapped[str] = mapped_column(nullable=True)
     logs: Mapped[list] = mapped_column(type_=JSON, nullable=True)
     market_offers: Mapped[list] = mapped_column(type_=JSON, nullable=True)
@@ -105,10 +114,12 @@ class DBNegotiation(Base):
     signatures: Mapped[dict] = mapped_column(type_=JSON, nullable=True)
     market_price: Mapped[float] = mapped_column(nullable=True)
     min_price: Mapped[float] = mapped_column(nullable=True)
+    listing_id: Mapped[str] = mapped_column(nullable=True)
 
 class DBOffer(Base):
     __tablename__ = "offers"
     id: Mapped[str] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(nullable=True, index=True)
     negotiation_id: Mapped[str] = mapped_column(nullable=True, index=True)
     round_num: Mapped[int] = mapped_column(default=0)
     sender: Mapped[str] = mapped_column(nullable=True)
@@ -119,6 +130,7 @@ class DBOffer(Base):
 class DBContract(Base):
     __tablename__ = "contracts"
     id: Mapped[str] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(nullable=True, index=True)
     negotiation_id: Mapped[str] = mapped_column(nullable=True)
     farmer_id: Mapped[str] = mapped_column(nullable=True)
     buyer_id: Mapped[str] = mapped_column(nullable=True)
@@ -130,6 +142,7 @@ class DBContract(Base):
 class DBHistory(Base):
     __tablename__ = "history"
     id: Mapped[str] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(nullable=True, index=True)
     user_id: Mapped[str] = mapped_column(nullable=True, index=True)
     data: Mapped[str] = mapped_column(nullable=True)
     negotiation_id: Mapped[str] = mapped_column(nullable=True)
@@ -234,6 +247,7 @@ class DBTransporter(Base):
 class DBBooking(Base):
     __tablename__ = "transport_bookings"
     booking_id: Mapped[str] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(nullable=True, index=True)
     negotiation_id: Mapped[str] = mapped_column(nullable=True, index=True)
     crop: Mapped[str] = mapped_column(nullable=True)
     origin_location: Mapped[str] = mapped_column(nullable=True)
@@ -288,5 +302,3 @@ class DBCompost(Base):
     waste_accepted: Mapped[str] = mapped_column(nullable=True)
     capacity_mt: Mapped[float] = mapped_column(nullable=False)
     district: Mapped[str] = mapped_column(nullable=False, index=True)
-
-

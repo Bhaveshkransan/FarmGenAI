@@ -13,7 +13,8 @@ import {
   Truck, 
   Warehouse, 
   ShieldCheck,
-  Bot
+  Bot,
+  Factory
 } from 'lucide-react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -90,7 +91,7 @@ const procurementSchema = z.object({
   req_farmer_match: z.boolean(),
   req_transport: z.boolean(),
   req_warehouse: z.boolean(),
-  req_quality: z.boolean(),
+  req_processor: z.boolean(),
   description: z.string().optional()
 }).refine(data => data.min_batch_size <= data.quantity, {
   message: "Minimum batch size cannot exceed total procurement quantity",
@@ -98,6 +99,14 @@ const procurementSchema = z.object({
 }).refine(data => data.expected_price <= data.max_price, {
   message: "Target price cannot exceed maximum reservation budget",
   path: ["max_price"]
+}).refine(data => {
+  if (data.earliest_delivery && data.delivery_deadline) {
+    return new Date(data.earliest_delivery) <= new Date(data.delivery_deadline);
+  }
+  return true;
+}, {
+  message: "Earliest acceptable inflow date cannot be after the required delivery deadline",
+  path: ["earliest_delivery"]
 });
 
 interface PostRequirementModalProps {
@@ -148,7 +157,7 @@ export default function PostRequirementModal({
       req_farmer_match: true,
       req_transport: true,
       req_warehouse: false,
-      req_quality: true,
+      req_processor: true,
       description: ''
     }
   });
@@ -267,7 +276,7 @@ export default function PostRequirementModal({
       const selected_services = {
         market_intelligence: true,
         negotiation: true,
-        quality_inspection: data.req_full_logistics || data.req_quality,
+        processor: data.req_full_logistics || data.req_processor,
         farmer_matching: data.req_full_logistics || data.req_farmer_match,
         transport: data.req_full_logistics || data.req_transport,
         warehouse: data.req_full_logistics || data.req_warehouse
@@ -335,27 +344,55 @@ export default function PostRequirementModal({
           buyer_strategy: data.purpose || 'Balanced',
           buyer_persona: data.purpose ? `Commercial ${data.purpose}` : 'Balanced Corporate Buyer',
           max_rounds: 5,
-          requirement_id: reqId
+          requirement_id: reqId,
+          selected_services,
+          workflow_mode: data.req_full_logistics 
+            ? 'FULL_SUPPLY_CHAIN' 
+            : (!data.req_farmer_match && data.req_transport) 
+              ? 'TRANSPORT_ONLY' 
+              : 'FULL_SUPPLY_CHAIN',
+          req_transport: Boolean(data.req_full_logistics || data.req_transport),
+          req_warehouse: Boolean(data.req_full_logistics || data.req_warehouse),
+          req_processor: Boolean(data.req_full_logistics || data.req_processor),
+          req_farmer_match: Boolean(data.req_full_logistics || data.req_farmer_match)
         };
 
         const negRes = await api.post('/negotiations/start-negotiation', startNegPayload);
         negId = negRes.data?.negotiation_id || negRes.data?.id;
       } catch (negErr) {
         console.warn('Auto start negotiation error:', negErr);
+        try {
+          const fallbackRes = await api.get('/negotiations');
+          const negs = fallbackRes.data?.data || fallbackRes.data || [];
+          if (Array.isArray(negs) && negs.length > 0) {
+            negId = negs[0].id || negs[0].negotiation_id;
+          }
+        } catch (e) {}
       }
 
-      addNotification('Procurement requirement published! Directing to AI Negotiation Room...', 'success');
+      addNotification('Procurement validated! Launching AI Negotiation Engine...', 'success');
       reset();
       onSuccess?.({ ...reqData, negId });
       onClose();
 
       if (negId) {
-        navigate(`/negotiations/${negId}`);
+        navigate(`/negotiations/${negId}`, { state: { autoStart: true } });
+      } else {
+        navigate('/negotiations', { state: { autoStart: true } });
       }
     } catch (err: any) {
       addNotification(err.response?.data?.detail || 'Failed to submit procurement requirement', 'error');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const onError = (formErrors: any) => {
+    const errorKeys = Object.keys(formErrors);
+    if (errorKeys.length > 0) {
+      const firstKey = errorKeys[0];
+      const msg = formErrors[firstKey]?.message || `Please check ${firstKey}`;
+      addNotification(`Required field missing: ${msg}`, 'error');
     }
   };
 
@@ -386,7 +423,7 @@ export default function PostRequirementModal({
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto flex-1 p-6 sm:p-8 bg-white">
           <FormProvider {...methods}>
-            <form id="procurement-form" onSubmit={handleSubmit(onSubmit)} className="space-y-10">
+            <form id="procurement-form" onSubmit={handleSubmit(onSubmit, onError)} className="space-y-10">
               
               {/* 1. Visual Crop Selection */}
               <div className="space-y-4">
@@ -708,17 +745,21 @@ export default function PostRequirementModal({
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Required Delivery Deadline</label>
                     <input 
                       type="date" 
+                      min={watch('earliest_delivery') || new Date().toISOString().split('T')[0]}
                       {...register('delivery_deadline')} 
                       className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
                     />
+                    {errors.delivery_deadline && <p className="text-red-500 text-xs mt-1">{errors.delivery_deadline.message as string}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Earliest Acceptable Inflow</label>
                     <input 
                       type="date" 
+                      max={watch('delivery_deadline') || undefined}
                       {...register('earliest_delivery')} 
                       className="w-full form-input bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm" 
                     />
+                    {errors.earliest_delivery && <p className="text-red-500 text-xs mt-1">{errors.earliest_delivery.message as string}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold text-slate-700 mb-1.5">Shelf Life Expectation (Days) *</label>
@@ -748,7 +789,7 @@ export default function PostRequirementModal({
                   />
                   <div>
                     <p className="font-bold text-blue-900 text-sm">Full Turnkey Logistics Dispatch</p>
-                    <p className="text-xs text-blue-700">Autonomous multi-agent dispatch: Inbound freight haulage, APMC assaying, and buffer warehousing.</p>
+                    <p className="text-xs text-blue-700">Autonomous multi-agent dispatch: Inbound freight haulage, buffer warehousing, and industrial agro-processing.</p>
                   </div>
                 </label>
                 
@@ -787,11 +828,11 @@ export default function PostRequirementModal({
                     <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
                       <input 
                         type="checkbox" 
-                        {...register('req_quality')} 
+                        {...register('req_processor')} 
                         className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
                       /> 
                       <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                        <ShieldCheck size={14} className="text-purple-600" /> APMC Quality Assaying & Inspection
+                        <Factory size={14} className="text-indigo-600" /> Processor Agent (Agro-Processing & Milling)
                       </span>
                     </label>
                   </div>
@@ -821,10 +862,10 @@ export default function PostRequirementModal({
           >
             {isSubmitting ? (
               <>
-                <Loader2 size={18} className="animate-spin" /> Submitting to Matching Engine...
+                <Loader2 size={18} className="animate-spin" /> Validating & Launching AI Negotiation...
               </>
             ) : (
-              'Submit to AI Procurement Engine'
+              'Submit to AI Validation & Start Negotiation'
             )}
           </button>
         </div>

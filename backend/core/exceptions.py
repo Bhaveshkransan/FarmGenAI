@@ -33,6 +33,22 @@ class ForbiddenException(AppException):
             error_code="FORBIDDEN"
         )
 
+class ConflictException(AppException):
+    def __init__(self, message: str = "Resource conflict"):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_409_CONFLICT,
+            error_code="CONFLICT"
+        )
+
+class VehicleAlreadyBookedException(ConflictException):
+    def __init__(self, message: str = "Vehicle is already booked or unavailable"):
+        super().__init__(message=message)
+
+class VehicleNotFoundException(NotFoundException):
+    def __init__(self, vehicle_id: str):
+        super().__init__(resource=f"Vehicle {vehicle_id}")
+
 async def app_exception_handler(request: Request, exc: AppException):
     return JSONResponse(
         status_code=exc.status_code,

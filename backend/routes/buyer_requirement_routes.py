@@ -95,42 +95,21 @@ class BuyerRequirementUpdate(BaseModel):
     notes: str = None
 
 
-CROP_ALIASES = {
-    "sugarcane": {"sugarcane", "cane", "ganna"},
-    "soybean": {"soybean", "soya", "soyabean"},
-    "cotton": {"cotton", "kapas", "raw cotton"},
-    "jowar": {"jowar", "sorghum", "great millet"},
-    "sorghum": {"jowar", "sorghum", "great millet"},
-    "onion": {"onion", "onions", "pyaz", "kanda"},
-    "bajra": {"bajra", "pearl millet", "millet", "sajje"},
-    "pearl millet": {"bajra", "pearl millet", "millet"},
-    "rice": {"rice", "paddy", "chawal", "dhan"},
-    "paddy": {"rice", "paddy", "chawal", "dhan"},
-    "wheat": {"wheat", "gehun"},
-    "tomato": {"tomato", "tomatoes", "tamatar"},
-    "potato": {"potato", "potatoes", "aloo"},
-}
+from shared.crop_catalog import normalize_crop_name
+from backend.services.matching_service import match_requirement_to_listings
+
 
 def crops_match(req_c: str, prod_c: str) -> bool:
-    r = (req_c or "").lower().strip()
-    p = (prod_c or "").lower().strip()
-    if not r or not p:
-        return False
-    if r == p or r in p or p in r:
-        return True
-    r_words = set(re.findall(r'[a-zA-Z]+', r))
-    p_words = set(re.findall(r'[a-zA-Z]+', p))
-    if r_words & p_words:
-        return True
-    for w in r_words:
-        aliases = CROP_ALIASES.get(w, set())
-        if aliases & p_words or any(al in p for al in aliases):
-            return True
-    for w in p_words:
-        aliases = CROP_ALIASES.get(w, set())
-        if aliases & r_words or any(al in r for al in aliases):
-            return True
+    norm_r = normalize_crop_name(req_c)
+    norm_p = normalize_crop_name(prod_c)
+    if norm_r and norm_p:
+        return norm_r == norm_p
+    if not norm_r and not norm_p:
+        r = (req_c or "").lower().strip()
+        p = (prod_c or "").lower().strip()
+        return bool(r and p and r == p)
     return False
+
 
 @router.get("")
 @router.get("/")
@@ -172,49 +151,25 @@ async def get_requirement_matches(
     requirement_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Find matching produce listings for a specific buyer requirement."""
+    """Find matching produce listings for a specific buyer requirement using centralized matching service."""
     buyers = await Database.list_buyers_async()
-    req = next((r for r in buyers if (r.get("id") == requirement_id or r.get("requirement_id") == requirement_id)), None)
+    req = next((r for r in buyers if (r.get("id") == requirement_id or r.get("requirement_id") == requirement_id) and (r.get("kind") == "requirement" or str(r.get("id", "")).startswith("req_"))), None)
     if not req:
         raise HTTPException(status_code=404, detail="Requirement not found")
     
-    produce_list = await Database.list_produce_async()
-    req_crop = str(req.get("crop") or "").lower().strip()
-    req_max_p = float(req.get("max_price") or 999999)
-    req_target_p = float(req.get("target_price") or req_max_p)
-    
-    matches = []
-    for item in produce_list:
-        p_crop = str(item.get("crop") or "").lower().strip()
-        if not p_crop:
-            continue
-        
-        if req_crop and crops_match(req_crop, p_crop):
-            p_price = float(item.get("min_price") or item.get("expected_price") or 0)
-            score = 70
-            
-            if p_price <= req_target_p:
-                score += 30
-            elif p_price <= req_max_p:
-                score += 15
-            elif p_price <= req_max_p * 1.2:
-                score += 5
-            
-            matches.append({
-                **item,
-                "match_score": min(100, score),
-                "is_perfect_price": p_price <= req_target_p,
-                "is_within_budget": p_price <= req_max_p,
-                "price_diff": round(p_price - req_target_p, 2)
-            })
-            
-    matches.sort(key=lambda x: (-x.get("match_score", 0), x.get("min_price", 99999)))
+    user_id = current_user.get("sub") or current_user.get("id")
+    role = current_user.get("role")
+    if req.get("user_id") and req.get("user_id") != user_id and role != "admin":
+        raise HTTPException(status_code=403, detail="You do not own this requirement")
+
+    matches = await match_requirement_to_listings(req)
     return {
         "success": True, 
         "requirement": req, 
         "data": matches, 
         "count": len(matches)
     }
+
 
 @router.get("/{requirement_id}")
 async def get_requirement(requirement_id: str, current_user: dict = Depends(get_current_user)):
@@ -310,4 +265,58 @@ async def cancel_requirement(
     req["status"] = "CANCELLED"
     await Database.upsert_buyer_async(req)
     return {"success": True, "message": "Requirement cancelled."}
+
+
+@router.post("/{requirement_id}/orchestrate")
+async def orchestrate_requirement_negotiation(
+    requirement_id: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """
+    Triggers autonomous top-5 parallel multi-seller negotiation for an existing buyer requirement.
+    """
+    buyers = await Database.list_buyers_async()
+    req = next((r for r in buyers if (r.get("id") == requirement_id or r.get("requirement_id") == requirement_id) and (r.get("kind") == "requirement" or str(r.get("id", "")).startswith("req_"))), None)
+    if not req:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+
+    from backend.services.buyer_orchestrator import buyer_orchestration_service
+    result = await buyer_orchestration_service.orchestrate_negotiation(req)
+    return {"success": True, **result}
+
+
+@router.post("/orchestrate")
+async def orchestrate_ad_hoc_negotiation(
+    payload: BuyerRequirementCreate,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+):
+    """
+    Executes autonomous top-5 parallel multi-seller negotiation directly for an ad-hoc requirement payload.
+    """
+    data = payload.dict()
+    user_info = current_user or {"sub": "buyer_enterprise", "name": "Buyer Enterprise", "role": "buyer"}
+    loc = data.get("location") or data.get("preferredLocation") or "Maharashtra"
+    max_p = data.get("max_price") or data.get("maxBudget") or 25.0
+    target_p = data.get("target_price") or data.get("maxBudget") or max_p
+    qty = float(data.get("quantity", 500))
+    bgt = data.get("budget") or (qty * float(max_p))
+
+    req_dict = {
+        "crop": data.get("crop", "Soybean"),
+        "quantity": qty,
+        "target_price": float(target_p),
+        "max_price": float(max_p),
+        "reservation_price": float(max_p),
+        "budget": float(bgt),
+        "location": loc,
+        "buyer_name": user_info.get("name") or "Buyer Enterprise",
+        "user_id": user_info.get("sub", "buyer_enterprise"),
+        "persona": data.get("notes") or "bulk_wholesaler",
+        "strategy": "balanced",
+    }
+
+    from backend.services.buyer_orchestrator import buyer_orchestration_service
+    result = await buyer_orchestration_service.orchestrate_negotiation(req_dict)
+    return {"success": True, **result}
+
 

@@ -38,6 +38,8 @@ class AuthResponse(BaseModel):
     business_name: Optional[str] = None
     fssai_license: Optional[str] = None
     gstin: Optional[str] = None
+    token: Optional[str] = None
+    access_token: Optional[str] = None
 
 
 class VerificationRequest(BaseModel):

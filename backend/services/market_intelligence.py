@@ -45,7 +45,7 @@ class MarketIntelligenceService:
                 )
             
             # 3. Format the mathematical intelligence string
-            if live_price <= 0.01:
+            if not live_price or live_price <= 0.01:
                 price_line = f"Live Modal Price for {crop} in {location}: [UNAVAILABLE]"
                 hist_line = f"Historical 30-Day Average: [UNAVAILABLE]"
             else:

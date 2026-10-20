@@ -61,12 +61,14 @@ class TestFarmerLLM:
         from backend.agents.prompts import FARMER_PROMPT
         from backend.core.constants import SUPPORTED_CROPS
         prompt = FARMER_PROMPT.format(
-            crop="Tomato", quantity=500, min_price=20.0, location="Pune",
-            shelf_life=5, market_price=22.0, buyer_offer=18.0, round=1,
+            crop="Onion", quantity=500, min_price=20.0, target_price=25.0,
+            location="Pune", shelf_life=5, storage_urgency="Low",
+            market_price=22.0, buyer_offer=18.0, round=1,
             history="No rounds yet.",
-            rag_context="Market stable. Tomato at Rs.22/kg.",
+            rag_context="Market stable. Onion at Rs.22/kg.",
             trust_context="No trust context.",
-            supported_crops=", ".join(SUPPORTED_CROPS)
+            supported_crops=", ".join(SUPPORTED_CROPS),
+            market_intelligence="APMC prices stable."
         )
         raw = LLM_CLIENT.generate(prompt, max_tokens=150, temperature=0.3)
         assert raw is not None, "LLM returned None"
@@ -75,7 +77,7 @@ class TestFarmerLLM:
         if parsed is None:
             pytest.skip("LLM did not return valid JSON -- model too small")
         assert "decision" in parsed
-        assert parsed["decision"] in ("ACCEPT", "COUNTER", "REJECT")
+        assert str(parsed["decision"]).upper() in ("ACCEPT", "COUNTER", "REJECT")
 
 
 class TestBuyerLLM:

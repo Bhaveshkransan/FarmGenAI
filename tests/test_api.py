@@ -2,8 +2,13 @@ import requests
 import os
 from dotenv import load_dotenv
 
-# load API key from .env
-load_dotenv()
+# load API key from .env safely
+try:
+    dotenv_file = os.path.join(os.path.dirname(__file__), "..", ".env")
+    if os.path.exists(dotenv_file):
+        load_dotenv(dotenv_file)
+except Exception:
+    pass
 
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
