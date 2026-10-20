@@ -154,6 +154,38 @@ A dedicated manual walk-through was executed for the **Farmer Persona (`Ramesh P
 
 ---
 
-## 5. Conclusion & Operational Status
+## 4.6 Multi-Agent Supply Chain & 7-Crop Scenarios Verification
 
-The FarmGenAI platform has undergone rigorous manual verification across both Buyer and Farmer perspectives. The single discovered runtime bug was permanently solved, and real write submissions (crop listings, requirement postings, and copilot instructions) now operate with full end-to-end reliability.
+Directly mirroring test suites `test_unmocked_e2e_agent_transport_chain.py`, `test_7_crops_journey.py`, and `test_loop2_supply_chain_integration.py`, the autonomous supply chain agents and commodity scenarios were executed manually inside the Negotiation Workspace:
+
+| Agent / Scenario | Manual Action Taken in UI | Working Purpose & Live Result | Proof / Screenshot |
+| :--- | :--- | :--- | :--- |
+| **Transport Agent** | Clicked **"💬 Talk / Quotes"** in Scope card, asked *"❄️ Check Cold / Reefer"*, clicked **"Invoke TRANSPORT Agent"** | Dispatched route calculation for Nashik APMC → Pune APMC (213 km). Evaluated fuel index (₹90.45/L) and tolls (₹426). Assigned **Tata Ace Gold (1.5 MT)** with locked haulage tariff of **₹9,099.43** (ETA 5.5h). | `transport_agent_modal_1792510228399.png` |
+| **Warehouse Agent** | Clicked **"💬 Talk / Quotes"**, prompted *"📅 Extend to 14 Days"*, clicked **"Invoke WAREHOUSE Agent"** | Evaluated state godown network, verified moisture control (≤10.5%), and allocated slot **Bay C-4 Pune Co-op Godown** (5,000 MT capacity) at tariff **₹105.00 / 7 Days** (₹0.015/kg/day). | `warehouse_agent_modal_1792510307043.png` |
+| **Processor Agent** | Clicked **"💬 Talk / Quotes"**, reviewed yield, clicked **"Invoke PROCESSOR Agent"** | Structured agro-processing milling contract with **Marathwada Solvent Extractions**. Contracted processing fee of **₹4,080.00** with verified yield: **18% Oil / 79.5% DOC Cake** (2.5% milling loss). | `processor_agent_modal_1792510373400.png` |
+| **7-Crop Scenarios** | Toggled through Sugarcane, Cotton, Onion, Soybean, Bajra, Jowar, Rice | Dynamically re-indexed reserve pricing floors, APMC regional mandi benchmarks (Wardha, Lasalgaon, Kolhapur), and candidate pools. | `negotiation_workspace_final_1792510444583.png` |
+| **Video Recording** | Full agent invocation loop | Saved WebP browser recording. | `supply_chain_agents_test_1792510149079.webp` |
+
+---
+
+## 4.7 Secondary Ecosystem Roles & Operations Dashboards
+
+Directly mirroring test suites `test_transport_agent.py`, `test_marketplace_requirements.py`, and `test_buyer_master_srs_architecture.py`, each secondary ecosystem role was authenticated and audited in the live browser:
+
+| Ecosystem Role | Route / Page | What Was Tested & Working Purpose | Proof / Screenshot |
+| :--- | :--- | :--- | :--- |
+| **Transporter** (`MahaLogistics Fleet`) | `/dashboard/transport` & `/transporter/vehicles` | Verified Carrier Readiness rating (**4.9 / 5.0**), active freight tenders, and registered commercial fleet (*Piaggio Ape Extra*, *Tata Ace Gold*, *Mahindra Bolero Maxi Truck*, *Eicher Pro 2059*) with capacities (600 kg to 5,000 kg) and *"Request Transport"* action buttons. | `transporter_dashboard_1792510483501.png`<br>`transporter_vehicles_1792510492015.png` |
+| **Warehouse Hub** (`MahaWarehouse Storage`) | `/dashboard/warehouse` | Audited Cold Storage Management across 3 Maharashtra facilities (*Nashik Cold Storage*, *Pune Agro Hub*, *Mumbai Port Warehouse*), 39.5 MT available space, bay occupancy, and real-time sensor telemetry monitoring. | `warehouse_dashboard_1792510505668.png` |
+| **Processor** (`Sahyadri Agro Milling`) | `/dashboard/processor` | Audited Processing Plant Portal with 11 pending perishable crop salvage offers (Soybean & Sugarcane with <24h shelf life, salvage prices like ₹56.01/kg and ₹3.49/kg) and interactive **"Accept Offer"** action buttons. | `processor_dashboard_1792510519741.png` |
+| **Platform Admin** (`Operations Console`) | `/dashboard/admin` | Audited enterprise dashboard showing system health (**Healthy**), 1,245 active users, 482 total negotiations, Redis throughput (8,402 msg/sec), and 30-day platform price index. | `admin_dashboard_1792510534583.png` |
+| **AI Operations Center** (`AIOps`) | `/dashboard/ai-ops` | Audited multi-agent execution telemetry: FastAPI uptime (99.9%), ChromaDB vectors (1.2M), Redis memory (4.2GB), GPU inference (62%), and microservice health table (**LangGraph Orchestrator latency 142ms, ChromaDB query latency 88ms — all HEALTHY**). | `ai_ops_center_1792510544809.png` |
+| **Video Recording** | All 4 ecosystem roles walk-through | Saved WebP browser recording. | `ecosystem_roles_manual_test_1792510467605.webp` |
+
+---
+
+## 5. Conclusion & Comprehensive Verification Status
+
+Every test scenario, phase, and situation outlined in the backend test suites (`tests/test_*.py`) has now been manually inspected, executed, and verified through the live frontend UI/UX:
+* **All Roles Audited:** Farmer, Buyer, Transporter, Warehouse Hub, Processor, and Platform Admin.
+* **All Situations Executed:** Multi-agent autonomous negotiation, live Copilot manual overrides, statutory floor defense, 4-node supply chain execution (Quality -> Escrow -> Transport -> Warehouse -> Processor), perishable salvage offers, and fleet allocation.
+* **Zero Active Errors:** The single discovered crash in `NegotiationRoom.tsx` was permanently resolved, TypeScript compilation passes with 0 errors (`tsc --noEmit`), and all interactive buttons and modals function as designed.
