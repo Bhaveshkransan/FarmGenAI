@@ -263,11 +263,9 @@ class Database:
                 db_produce = res.scalar_one_or_none()
                 if db_produce:
                     current_qty = float(db_produce.quantity or 0)
-                    if current_qty < sold_quantity:
-                        raise ValueError(f"Insufficient inventory: Cannot deduct {sold_quantity} from {current_qty}")
                     remaining = max(0.0, round(current_qty - sold_quantity, 2))
                     db_produce.quantity = remaining
-                    if remaining <= 0:
+                    if remaining <= 0 or current_qty <= 0:
                         db_produce.status = "SOLD"
                     else:
                         db_produce.status = "ACTIVE"

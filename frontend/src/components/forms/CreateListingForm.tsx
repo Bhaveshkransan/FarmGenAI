@@ -171,6 +171,11 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
 
       // Automatically launch the AI Negotiation session for this listing and enter room
       let negId: string | null = null;
+      const isFullSupplyChain = Boolean(data.req_full_logistics);
+      const isNeedTransport = Boolean(data.req_full_logistics || data.req_transport);
+      const isNeedWarehouse = Boolean(data.req_full_logistics || data.req_warehouse);
+      const isNeedProcessor = Boolean(data.req_full_logistics || data.req_processor);
+
       try {
         const negPayload = {
           user_id: user?.id,
@@ -183,7 +188,13 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
           location: `${data.village}, ${data.taluka}, ${data.district}` || 'Nashik',
           quality: data.grade || 'A',
           language: 'English',
-          listing_id: listingId
+          listing_id: listingId,
+          selected_services,
+          full_supply_chain: isFullSupplyChain,
+          req_transport: isNeedTransport,
+          req_warehouse: isNeedWarehouse,
+          req_processor: isNeedProcessor,
+          workflow_mode: isFullSupplyChain ? 'FULL_SUPPLY_CHAIN' : (isNeedTransport ? 'TRANSPORT_ONLY' : 'SINGLE_AGENT')
         };
         const negRes = await api.post('/negotiations/', negPayload);
         negId = negRes.data?.negotiation_id || negRes.data?.id;
@@ -201,12 +212,30 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
       addNotification('Produce listing validated! Entering AI Negotiation Room...', 'success');
       reset();
       onSuccess?.();
+
+      const routeState = {
+        autoStart: true,
+        fromListing: true,
+        fullSupplyChain: isFullSupplyChain,
+        full_supply_chain: isFullSupplyChain,
+        selectedServices: selected_services,
+        selected_services: selected_services,
+        needTransport: isNeedTransport,
+        needWarehouse: isNeedWarehouse,
+        needProcessor: isNeedProcessor,
+        crop: data.crop,
+        quantity: data.quantity,
+        min_price: data.min_price,
+        expected_price: data.expected_price,
+        location: `${data.village}, ${data.taluka}, ${data.district}`
+      };
+
       if (actionStr === 'transport') {
         navigate('/dashboard/transport', { state: { prefillData: payload } });
       } else if (actionStr === 'buyer' && negId) {
-        navigate(`/negotiations/${negId}`, { state: { autoStart: true } });
+        navigate(`/negotiations/${negId}`, { state: routeState });
       } else if (actionStr === 'buyer') {
-        navigate('/negotiations', { state: { autoStart: true } });
+        navigate('/negotiations', { state: routeState });
       } else {
         onClose();
       }
