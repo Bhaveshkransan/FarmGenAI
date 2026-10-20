@@ -15,6 +15,7 @@ interface NegotiationResult {
   status: string;
   agreed_price: number | null;
   transcript: TranscriptItem[];
+  route?: any;
   pricing_rules?: {
     floor_price: number;
     market_average: number;

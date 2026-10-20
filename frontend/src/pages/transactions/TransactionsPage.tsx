@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Eye, FileText, CheckCircle2, Truck, ShieldAlert, Clock, Loader2 } from 'lucide-react';
+import { Download, Eye, FileText, CheckCircle2, Truck, ShieldAlert, Clock, Loader2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/services/api';
@@ -8,32 +8,69 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function TransactionsPage() {
   const { user } = useAuth();
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['transactions', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const res = await api.get(`/history/history/${user.id}`);
-      return (res.data?.history || []).filter(
-        (h) => h.negotiation_id && h.crop
-      );
+      const activeUserId = user?.id || localStorage.getItem('user_id') || 'usr_buyer_demo';
+      const res = await api.get(`/history/history/${activeUserId}`);
+      const rawHistory = res.data?.history || [];
+      const mapped = rawHistory
+        .map((h: any, idx: number) => {
+          const det = h.details || {};
+          const createdVal = h.created_at || det.created_at || h.timestamp || det.timestamp || null;
+          return {
+            ...det,
+            ...h,
+            negotiation_id: h.negotiation_id || det.negotiation_id || h.transaction_id || det.transaction_id,
+            transaction_id: h.transaction_id || det.transaction_id,
+            crop: h.crop || det.crop || 'Produce',
+            quantity: h.quantity || det.quantity,
+            final_price: h.final_price || det.final_price || det.price,
+            farmer: h.farmer || h.farmer_name || det.farmer_name || det.seller_name || 'Maharashtra APMC Producer',
+            buyer: h.buyer || h.buyer_name || det.buyer_name || user?.name || 'Buyer Enterprise',
+            status: (h.status || det.status || 'DEAL').toUpperCase(),
+            created_at: createdVal,
+            _orderIndex: idx
+          };
+        })
+        .filter((h: any) => Boolean(h.negotiation_id || h.transaction_id));
+
+      // Always sort latest on top
+      mapped.sort((a: any, b: any) => {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (timeA && timeB && timeA !== timeB) {
+          return timeB - timeA;
+        }
+        // Fallback: reverse insertion index so newly appended history appears at the top
+        return b._orderIndex - a._orderIndex;
+      });
+
+      return mapped;
     },
-    enabled: !!user?.id,
+    enabled: true,
+    refetchInterval: 2500,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const transactions = data || [];
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     switch ((status || '').toUpperCase()) {
       case 'DEAL':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1"/> Deal Closed</span>;
+      case 'SETTLED':
+      case 'COMPLETED':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800"><CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600"/> Deal Closed</span>;
       case 'IN_TRANSIT':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"><Truck className="w-3 h-3 mr-1"/> In Transit</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800"><Truck className="w-3.5 h-3.5 mr-1 text-blue-600"/> In Transit</span>;
       case 'NO_DEAL':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"><ShieldAlert className="w-3 h-3 mr-1"/> No Deal</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800"><ShieldAlert className="w-3.5 h-3.5 mr-1 text-red-600"/> No Deal</span>;
       case 'ESCALATED_STORAGE':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">In Storage</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-800">In Storage</span>;
       default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-800"><Clock className="w-3 h-3 mr-1"/> {status || 'Pending'}</span>;
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800"><Clock className="w-3.5 h-3.5 mr-1 text-slate-600"/> {status || 'Pending'}</span>;
     }
   };
 
@@ -43,12 +80,29 @@ export default function TransactionsPage() {
       {/* Header */}
       <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Transaction History</h1>
-          <p className="text-slate-500 mt-1">View completed agreements and download invoices.</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-900">Transaction History</h1>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Live Sync
+            </span>
+          </div>
+          <p className="text-slate-500 mt-1">View completed agreements and download invoices (latest on top).</p>
         </div>
-        <button className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg font-medium hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center">
-          <Download className="w-4 h-4 mr-2" /> Export CSV
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => refetch()} 
+            disabled={isFetching}
+            className="bg-white text-slate-700 px-3.5 py-2 rounded-lg font-medium hover:bg-slate-50 border border-slate-200 transition-colors flex items-center text-sm shadow-sm cursor-pointer disabled:opacity-60"
+            title="Refresh transactions"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 text-emerald-600 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Updating...' : 'Refresh'}
+          </button>
+          <button className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-lg font-medium hover:bg-emerald-100 border border-emerald-200 transition-colors flex items-center">
+            <Download className="w-4 h-4 mr-2" /> Export CSV
+          </button>
+        </div>
       </div>
 
       {/* Loading */}
@@ -97,9 +151,16 @@ export default function TransactionsPage() {
                     ? `₹${(txn.final_price * txn.quantity).toLocaleString('en-IN')}`
                     : '—';
                   return (
-                    <tr key={txn.negotiation_id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={txn.transaction_id || txn.negotiation_id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-slate-900 font-mono">{txn.negotiation_id?.substring(0, 16)}...</div>
+                        <div className="text-sm font-bold text-slate-900 font-mono">
+                          {txn.transaction_id || (txn.negotiation_id ? `TXN-MH-2026-${String(txn.negotiation_id).replace('neg_', '').toUpperCase()}` : 'TXN-MH-2026-DEAL')}
+                        </div>
+                        {txn.negotiation_id && (
+                          <div className="text-[11px] font-mono text-slate-400">
+                            Ref: {txn.negotiation_id}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-slate-900">{txn.crop || '—'}</div>
@@ -109,20 +170,39 @@ export default function TransactionsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-slate-900">{txn.farmer || txn.farmer_name || 'Unknown Farmer'}</div>
+                        <div className="text-sm font-bold text-slate-800">{txn.farmer || txn.farmer_name || 'Maharashtra APMC Producer'}</div>
+                        <div className="text-xs text-slate-400">Buyer: {txn.buyer || txn.buyer_name || 'AgroCorp'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-emerald-600">{total}</div>
+                        <div className="text-sm font-black text-emerald-600">{total}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getStatusBadge(txn.status)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-3">
-                          <Link to={`/negotiations/${txn.negotiation_id}`} className="text-slate-400 hover:text-emerald-600" title="View Negotiation Room">
+                          <Link 
+                            to={user?.role === 'buyer' ? `/buyer/negotiations/${txn.negotiation_id}` : `/negotiations/${txn.negotiation_id}`} 
+                            className="text-slate-400 hover:text-emerald-600 transition" 
+                            title="View Deal Room"
+                          >
                             <Eye className="w-5 h-5" />
                           </Link>
-                          <button className="text-slate-400 hover:text-blue-600" title="Download Receipt">
+                          <button 
+                            onClick={() => {
+                              const summary = `AGRINEGOTIATOR APMC SMART CONTRACT\nTransaction: ${txn.transaction_id || txn.negotiation_id}\nCrop: ${txn.crop}\nQuantity: ${txn.quantity} kg\nPrice: Rs. ${txn.final_price}/kg\nTotal: ${total}\nFarmer: ${txn.farmer}\nBuyer: ${txn.buyer}\nStatus: COMPLETED`;
+                              const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' });
+                              const url = URL.createObjectURL(blob);
+                              const link = document.createElement('a');
+                              link.href = url;
+                              link.download = `Certificate_${txn.transaction_id || txn.negotiation_id}.txt`;
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="text-slate-400 hover:text-blue-600 transition" 
+                            title="Download Certificate"
+                          >
                             <FileText className="w-5 h-5" />
                           </button>
                         </div>

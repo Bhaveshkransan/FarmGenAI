@@ -3,15 +3,25 @@ import ReactDOM from 'react-dom/client'
 import App from '@/app/App'
 import './index.css'
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface MainErrorBoundaryProps {
+  children?: React.ReactNode;
+}
+
+interface MainErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+  info: any;
+}
+
+class ErrorBoundary extends React.Component<MainErrorBoundaryProps, MainErrorBoundaryState> {
+  constructor(props: MainErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null, info: null };
   }
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
   }
-  componentDidCatch(error, info) {
+  componentDidCatch(error: any, info: any) {
     this.setState({ info });
     console.error("ErrorBoundary caught an error", error, info);
   }
@@ -30,7 +40,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <App />

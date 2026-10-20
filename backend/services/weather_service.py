@@ -42,7 +42,9 @@ CITY_COORDINATES: Dict[str, Dict[str, float]] = {
     "Vashi": {"lat": 19.0771, "lon": 72.9986},
     "Surat": {"lat": 21.1702, "lon": 72.8311},
     "Delhi": {"lat": 28.6139, "lon": 77.2090},
-    "Bengaluru": {"lat": 12.9716, "lon": 77.5946}
+    "Bengaluru": {"lat": 12.9716, "lon": 77.5946},
+    "Wardha": {"lat": 20.7453, "lon": 78.6022},
+    "Indore": {"lat": 22.7196, "lon": 75.8577}
 }
 
 

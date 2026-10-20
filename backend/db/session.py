@@ -137,7 +137,8 @@ async def init_db():
             "ALTER TABLE history ADD COLUMN IF NOT EXISTS compost_strategy VARCHAR;",
             "ALTER TABLE history ADD COLUMN IF NOT EXISTS compost_reward FLOAT;",
             "ALTER TABLE transport_carrier_bookings ADD COLUMN IF NOT EXISTS negotiation_id VARCHAR;",
-            "ALTER TABLE transport_carrier_bookings ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR;"
+            "ALTER TABLE transport_carrier_bookings ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR;",
+            "ALTER TABLE buyer_workflow_states ADD COLUMN IF NOT EXISTS final_plan JSONB;"
         ]
         for stmt in alter_statements:
             try:

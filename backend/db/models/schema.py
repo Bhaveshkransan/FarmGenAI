@@ -300,3 +300,32 @@ class DBCompost(Base):
     waste_accepted: Mapped[str] = mapped_column(nullable=True)
     capacity_mt: Mapped[float] = mapped_column(nullable=False)
     district: Mapped[str] = mapped_column(nullable=False, index=True)
+
+
+class DBBuyerWorkflowState(Base):
+    __tablename__ = "buyer_workflow_states"
+    workflow_id: Mapped[str] = mapped_column(primary_key=True)
+    requirement_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    buyer_id: Mapped[str] = mapped_column(nullable=False, index=True)
+    crop: Mapped[str] = mapped_column(nullable=True)
+    quantity: Mapped[float] = mapped_column(nullable=True)
+    quality: Mapped[str] = mapped_column(nullable=True)
+    pickup_location: Mapped[str] = mapped_column(nullable=True)
+    delivery_location: Mapped[str] = mapped_column(nullable=True)
+    delivery_deadline_hours: Mapped[float] = mapped_column(nullable=True, default=24.0)
+    selected_agents: Mapped[list] = mapped_column(type_=JSON, default=list)
+    current_agent: Mapped[str] = mapped_column(nullable=True)
+    completed_agents: Mapped[list] = mapped_column(type_=JSON, default=list)
+    failed_agents: Mapped[list] = mapped_column(type_=JSON, default=list)
+    pending_agents: Mapped[list] = mapped_column(type_=JSON, default=list)
+    farmer_deal: Mapped[dict] = mapped_column(type_=JSON, default=dict)
+    agent_outcomes: Mapped[dict] = mapped_column(type_=JSON, default=dict)
+    final_plan: Mapped[dict] = mapped_column(type_=JSON, nullable=True, default=dict)
+    conversation_context: Mapped[list] = mapped_column(type_=JSON, default=list)
+    audit_logs: Mapped[list] = mapped_column(type_=JSON, default=list)
+    last_action: Mapped[str] = mapped_column(nullable=True)
+    last_response: Mapped[str] = mapped_column(nullable=True)
+    workflow_status: Mapped[str] = mapped_column(default="INITIALIZED")
+    created_at: Mapped[str] = mapped_column(nullable=True)
+    updated_at: Mapped[str] = mapped_column(nullable=True)
+

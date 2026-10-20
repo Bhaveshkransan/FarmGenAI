@@ -521,6 +521,11 @@ async def list_my_transport_vehicles(current_user: dict = Depends(get_current_us
         )
         vehicles = [v.__dict__ for v in result.scalars().all()]
         
+        # If user has no custom vehicles assigned under their user id, fallback to active registered fleet
+        if not vehicles:
+            result = await session.execute(select(DBVehicle))
+            vehicles = [v.__dict__ for v in result.scalars().all()]
+
         # Clean up SQLAlchemy state
         for v in vehicles:
             v.pop("_sa_instance_state", None)

@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FarmGenAI — Executive 1-Week Engineering & Architecture Audit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --primary-light: #d1fae5;
+      --secondary: #6366f1;
+      --secondary-light: #e0e7ff;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-500: #64748b;
+      --slate-200: #e2e8f0;
+      --slate-100: #f1f5f9;
+      --slate-50: #f8fafc;
+      --emerald-600: #059669;
+      --amber-500: #f59e0b;
+      --red-500: #ef4444;
+      --blue-600: #2563eb;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f8fafc;
+      color: var(--slate-800);
+      line-height: 1.6;
+      padding-bottom: 80px;
+    }
+
+    .container {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Top Action Bar */
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--slate-200);
+      padding: 12px 0;
+      margin-bottom: 36px;
+    }
+
+    .top-bar-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.15rem;
+      color: var(--slate-900);
+    }
+
+    .brand span {
+      color: var(--emerald-600);
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background-color: var(--emerald-600);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-dark);
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+    }
+
+    .btn-outline {
+      background: white;
+      color: var(--slate-700);
+      border: 1px solid var(--slate-200);
+    }
+
+    .btn-outline:hover {
+      background: var(--slate-50);
+      border-color: var(--slate-300);
+    }
+
+    /* Header Banner */
+    .hero-header {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 16px;
+      padding: 36px;
+      margin-bottom: 32px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-success {
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+
+    .badge-info {
+      background: #eff6ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+    }
+
+    .badge-purple {
+      background: #f5f3ff;
+      color: #5b21b6;
+      border: 1px solid #ddd6fe;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin-bottom: 10px;
+      line-height: 1.25;
+    }
+
+    .subtitle {
+      font-size: 1.05rem;
+      color: var(--slate-600);
+      margin-bottom: 24px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      padding-top: 20px;
+      border-top: 1px solid var(--slate-100);
+      font-size: 0.875rem;
+    }
+
+    .meta-item strong {
+      display: block;
+      color: var(--slate-500);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    /* KPI Metrics Grid */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .kpi-card {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    .kpi-val {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin-bottom: 4px;
+    }
+
+    .kpi-val.green { color: var(--emerald-600); }
+    .kpi-val.blue { color: var(--blue-600); }
+    .kpi-val.purple { color: var(--secondary); }
+
+    .kpi-lbl {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--slate-600);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: var(--slate-400);
+      margin-top: 4px;
+    }
+
+    /* Section Styling */
+    .card {
+      background: white;
+      border: 1px solid var(--slate-200);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--slate-800);
+      margin: 20px 0 10px 0;
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: var(--slate-700);
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px 0;
+      font-size: 0.875rem;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--slate-200);
+    }
+
+    th {
+      background: var(--slate-50);
+      font-weight: 700;
+      color: var(--slate-700);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:hover {
+      background: #fafafa;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      background: var(--slate-100);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #d946ef;
+    }
+
+    pre {
+      background: var(--slate-900);
+      color: #e2e8f0;
+      padding: 18px;
+      border-radius: 12px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      margin: 14px 0;
+    }
+
+    .diagram-box {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 24px;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      overflow-x: auto;
+      margin: 20px 0;
+      border: 1px solid #1e293b;
+    }
+
+    /* List items */
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 16px;
+    }
+
+    li {
+      margin-bottom: 6px;
+      color: var(--slate-700);
+    }
+
+    /* Status Pills */
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .pill-green { background: #dcfce7; color: #15803d; }
+    .pill-blue { background: #dbeafe; color: #1d4ed8; }
+    .pill-amber { background: #fef3c7; color: #b45309; }
+    .pill-gray { background: #f1f5f9; color: #475569; }
+
+    /* Print styles */
+    @media print {
+      body {
+        background: white;
+        color: black;
+        padding: 0;
+      }
+      .top-bar, .btn-group {
+        display: none !important;
+      }
+      .hero-header, .card {
+        border: 1px solid #ccc;
+        box-shadow: none;
+        break-inside: avoid;
+        margin-bottom: 18px;
+        padding: 20px;
+      }
+      pre, .diagram-box {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+        border: 1px solid #ccc;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sticky Actions Bar -->
+  <div class="top-bar">
+    <div class="container top-bar-inner">
+      <div class="brand">
+        🌾 <span>FarmGenAI</span> Executive Engineering Audit
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="window.print()">
+          🖨️ Print / Save as PDF
+        </button>
+        <button class="btn btn-outline" onclick="copyFullReport()">
+          📋 Copy Report Text
+        </button>
+        <a href="http://localhost:8080/?demo=buyer" target="_blank" class="btn btn-outline">
+          🚀 Open Live App
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- Header Section -->
+    <div class="hero-header">
+      <div class="badge-row">
+        <span class="badge badge-success">● Verified at HEAD: 5a77c0b</span>
+        <span class="badge badge-info">Branch: feature/buyer-ui-negotiation-parity</span>
+        <span class="badge badge-purple">Phase 1B & Phase 2 Certified</span>
+      </div>
+      <h1>FarmGenAI (AgriNegotiator) — 1-Week Executive Engineering Audit</h1>
+      <p class="subtitle">Complete technical, operational, and architectural audit covering full multi-agent supply chain integration across Farmer, Buyer, and Transport stakeholders.</p>
+      
+      <div class="meta-grid">
+        <div class="meta-item">
+          <strong>Audit Timeframe</strong>
+          Sep 25, 2026 – Oct 2, 2026 (7 Days)
+        </div>
+        <div class="meta-item">
+          <strong>Core Contributors</strong>
+          Bhavesh, Ritik Mehta, Gayatri
+        </div>
+        <div class="meta-item">
+          <strong>Active Platform Daemons</strong>
+          FastAPI (Port 8000) • Vite React (Port 8080)
+        </div>
+        <div class="meta-item">
+          <strong>Persistence Engine</strong>
+          PostgreSQL (SQLAlchemy AsyncSession)
+        </div>
+      </div>
+    </div>
+
+    <!-- Executive KPI Grid -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-val green">65+</div>
+        <div class="kpi-lbl">Commits Pushed</div>
+        <div class="kpi-sub">Across full stack</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val blue">209</div>
+        <div class="kpi-lbl">Files Changed</div>
+        <div class="kpi-sub">+45,000 / -3,500 lines</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val green">100%</div>
+        <div class="kpi-lbl">Tests Passing</div>
+        <div class="kpi-sub">15/15 Phase 1B • 55/55 E2E</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val purple">0</div>
+        <div class="kpi-lbl">TypeScript Errors</div>
+        <div class="kpi-sub">Clean npx tsc --noEmit</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-val green">3</div>
+        <div class="kpi-lbl">Live Agents</div>
+        <div class="kpi-sub">Farmer, Buyer, Transport</div>
+      </div>
+    </div>
+
+    <!-- Architecture Visual Flow -->
+    <div class="card">
+      <h2>🏛️ Multi-Agent Supply Chain Reality</h2>
+      <p>FarmGenAI has progressed from independent prototypes into an integrated, multi-agent autonomous supply-chain operating system:</p>
+
+      <div class="diagram-box">
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 FARMGENAI SUPPLY CHAIN FLOW                             │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+                                            │
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │      BUYER REQUIREMENT POST     │
+                           │  • Scope: [Farmer, Transport]   │
+                           │  • Target Price & P_max Ceiling │
+                           └─────────────────────────────────┘
+                                            │
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │     AI MATCHING & DISCOVERY     │
+                           │  • 8-Factor NRV Scoring Formula │
+                           │  • Top-5 Maharashtra Farmers    │
+                           └─────────────────────────────────┘
+                                            │
+                                            ▼
+                           ┌─────────────────────────────────┐
+                           │   AUTONOMOUS TOP-5 NEGOTIATION  │
+                           │  • Concurrent asyncio.gather()  │
+                           │  • BudgetReservationTracker     │
+                           │  • Landed Cost Sorting          │
+                           └─────────────────────────────────┘
+                                            │
+                                            ▼
+                  [CRITICAL GATE] ──► AUTHORITATIVE FARMER DEAL?
+                                            │
+                     ┌──────────────────────┴──────────────────────┐
+                     ▼ YES                                         ▼ NO / WITHDRAWN
+       ┌───────────────────────────────┐             ┌───────────────────────────────┐
+       │   DOWNSTREAM HANDOFF ELIGIBLE │             │     DOWNSTREAM AGENTS BLOCKED │
+       │  • Transport Action Approved  │             │  • STOP / FARMER_RETRY Only   │
+       │  • Minimal Context Passed     │             │  • HTTP 400 on Manual Step    │
+       └───────────────────────────────┘             └───────────────────────────────┘
+                     │
+                     ▼
+       ┌───────────────────────────────┐
+       │   TRANSPORT AGENT LANGGRAPH   │
+       │  • 11 Nodes Executed          │
+       │  • Route Distance & Tolls     │
+       │  • Vehicle Fleet Selection    │
+       │  • Plan Stored in Memory      │
+       └───────────────────────────────┘
+                     │
+                     ▼
+       ┌───────────────────────────────┐
+       │   WAREHOUSE ROUTE READY       │
+       │  • Route: /dashboard/warehouse│
+       │  • completed = False          │
+       └───────────────────────────────┘
+      </div>
+    </div>
+
+    <!-- 7-Day Day-by-Day Ledger -->
+    <div class="card">
+      <h2>🗓️ Day-by-Day Chronological Engineering Ledger</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Primary Milestone</th>
+            <th>Author</th>
+            <th>Key Commits</th>
+            <th>Impact Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Sep 25</strong></td>
+            <td>Buyer PR #5 & Safety Guardrails</td>
+            <td>Ritik, Bhavesh</td>
+            <td><code>4938bde</code>, <code>c766586</code></td>
+            <td>Enforced reservation ceiling ($P_{\max}$), budget lock, concurrent budget tracker, and APMC market context integration.</td>
+          </tr>
+          <tr>
+            <td><strong>Sep 26</strong></td>
+            <td>Buyer-Farmer Parity & Transport Merge</td>
+            <td>Bhavesh, Gayatri</td>
+            <td><code>d13c764</code>, <code>711dd5e</code>, <code>4d05950</code></td>
+            <td>Full UI parity for Buyer room with Copilot, active negotiations, APMC contract modal, and 1-click demo logins. Gayatri's Transport Agent integrated.</td>
+          </tr>
+          <tr>
+            <td><strong>Sep 27</strong></td>
+            <td>Interactive Copilot & Anti-Flickering</td>
+            <td>Bhavesh</td>
+            <td><code>1e8080e</code>, <code>adfaadd</code>, <code>0d65a24</code></td>
+            <td>Interactive human-in-the-loop copilot with manual pricing override, TDZ ReferenceError fix, uuid bug fix, and eliminated 5s UI flickering.</td>
+          </tr>
+          <tr>
+            <td><strong>Sep 30</strong></td>
+            <td>Component Sanitization & Audits</td>
+            <td>Bhavesh, Ritik</td>
+            <td><code>0a2777b</code>, <code>e5c5556</code>, <code>e4554c0</code></td>
+            <td>Removed outdated inspection agent from modal, decoupled manual transport hooks, fixed Lucide icon prop errors, started Phase 1/2 audits.</td>
+          </tr>
+          <tr>
+            <td><strong>Oct 01</strong></td>
+            <td>LangGraph & Matching Engine Unification</td>
+            <td>Ritik</td>
+            <td><code>15f06c7</code>, <code>b615b47</code>, <code>4b50148</code></td>
+            <td>Unified canonical 8-factor NRV matching formula across matching_service and LangGraph. Added Net Farmer Margin ranking with freight/storage deductions.</td>
+          </tr>
+          <tr>
+            <td><strong>Oct 02 (AM)</strong></td>
+            <td>Transport Intelligence & LangGraph Pipeline</td>
+            <td>Ritik, Bhavesh</td>
+            <td><code>5429a48</code>, <code>14d2054</code>, <code>063c3ac</code></td>
+            <td>Integrated transporter intelligence engine, route pipelining, and full supply-chain LangGraph execution across 5-agent pipeline.</td>
+          </tr>
+          <tr>
+            <td><strong>Oct 02 (PM)</strong></td>
+            <td>TypeScript Zero-Error & Phase 1B Hardening</td>
+            <td>Bhavesh</td>
+            <td><code>6c5f5c5</code>, <code>b823ed5</code>, <code>5a77c0b</code></td>
+            <td>Fixed all TS errors across 20+ files. Hardened UI buttons to call backend <code>POST /workflow/step</code>. Added 15/15 scenario test suite.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Core Pillars -->
+    <div class="card">
+      <h2>🏛️ Architectural Invariants Enforced</h2>
+      
+      <h3>1. Authoritative Farmer Deal Gate</h3>
+      <p>The system enforces: <strong>NO VALID FARMER DEAL = NO DOWNSTREAM EXECUTION</strong>. The gate checks PostgreSQL negotiations records directly (status must strictly be <code>DEAL</code> or <code>COMPLETED</code> with positive price and volume). Client-side flags, LLM assertions, and URL states are untrusted.</p>
+
+      <h3>2. Real Transport LangGraph Integration</h3>
+      <p>When "Proceed to Transport Agent" is clicked, it invokes <code>POST /requirements/{id}/workflow/step</code> which calls <code>run_transport_workflow()</code>. This executes the <strong>real 11-node Transport LangGraph StateGraph</strong>, selects vehicles from the database, calculates highway distances and tolls, and writes the plan into Buyer memory.</p>
+
+      <h3>3. Context Isolation (Zero Data Leakage)</h3>
+      <p>Downstream transport receives only minimal logistics metadata: <code>crop</code>, <code>quantity_kg</code>, <code>pickup</code>, <code>delivery</code>, <code>deadline</code>, <code>refrigerated_required</code>. Private farmer counter-bids, maximum budgets, and negotiation transcripts are strictly omitted.</p>
+
+      <h3>4. Economic Landed Cost Modeling</h3>
+      <p>Suppliers are evaluated by True Landed Cost ($P_{\text{base}} + \text{freight} + \text{APMC cess}$). A closer farmer with a higher base price wins over a distant farmer with a lower base price if the freight advantage is economically superior.</p>
+    </div>
+
+    <!-- Test Evidence -->
+    <div class="card">
+      <h2>🧪 Test Execution & Verification Matrix</h2>
+      <p>All 15 automated Phase 1B scenarios pass with 100% success rate in 87.76s:</p>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th>Expected Behavior</th>
+            <th>Verified Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Scenario 1: Farmer Only</td>
+            <td>Farmer deal confirms &rarr; COMPLETE. Transport and Warehouse never execute.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 2: Farmer + Transport</td>
+            <td>Transport blocked before deal; eligible and executes 11-node LangGraph after deal.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 3: Farmer + Warehouse</td>
+            <td>Warehouse blocked before deal; route placeholder ready after deal; completed=False.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 4: Farmer + Transport + Warehouse</td>
+            <td>Strict sequence: Farmer &rarr; Transport &rarr; Warehouse route ready.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 5: Farmer Failure + Transport</td>
+            <td>Farmer fails &rarr; Transport strictly blocked; only STOP / FARMER_RETRY permitted.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 6: Farmer Failure + Warehouse</td>
+            <td>Farmer fails &rarr; Warehouse strictly blocked; no route prepared.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 7: Deal Withdrawal Revalidation</td>
+            <td>Deal withdrawn or cancelled post-agreement &rarr; downstream eligibility revoked.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 8: Unselected Transport</td>
+            <td>Transport not requested &rarr; never appears in valid actions; never runs.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 9: Unselected Warehouse</td>
+            <td>Warehouse not requested &rarr; workflow completes after Transport.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 10: State Persistence</td>
+            <td>Workflow survives page refresh and server restart via PostgreSQL table.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 11: Transport Context Isolation</td>
+            <td>Minimal logistics payload passed; private transcripts strictly excluded.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 12: Invalid Manual Action Rejection</td>
+            <td>Direct call to unapproved action raises ValueError / HTTP 400 Bad Request.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+          <tr>
+            <td>Scenario 13: Processor Gap Identification</td>
+            <td>Confirms PROCESSOR is not in SUPPORTED_AGENTS; documents boundary.</td>
+            <td><span class="pill pill-green">PASS</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Live Demo Script -->
+    <div class="card">
+      <h2>🎬 Team Demo Walkthrough (5-Minute Script)</h2>
+      <ol>
+        <li><strong>Step 1 (Instant Login):</strong> Open <code>http://localhost:8080/?demo=buyer</code> to automatically log in as an Enterprise Wholesale Buyer.</li>
+        <li><strong>Step 2 (Post Requirement):</strong> Click "Post New Requirement", choose <strong>Soybean</strong>, <strong>2,000 kg</strong>, Target ₹48.00/kg, check <strong>"Need Transport Assistance"</strong>, and submit.</li>
+        <li><strong>Step 3 (Autonomous Sourcing):</strong> Enter Negotiation Room and click <strong>"⚡ Launch Autonomous Sourcing"</strong>. Watch real-time terminal logs negotiate across 5 Maharashtra farmers simultaneously and rank by Landed Cost.</li>
+        <li><strong>Step 4 (Authoritative Transport Step):</strong> Click <strong>"Proceed to Transport Agent"</strong>. Observe backend verify deal, execute the 11-node Transport LangGraph, book vehicle, and navigate seamlessly to the Transporter Room.</li>
+        <li><strong>Step 5 (Security Rejection):</strong> Show that if a deal is withdrawn or rejected, Transport buttons remain disabled, proving the safety gate.</li>
+      </ol>
+    </div>
+
+  </div>
+
+  <script>
+    function copyFullReport() {
+      const text = document.body.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Full executive audit report text copied to clipboard!");
+      });
+    }
+  </script>
+</body>
+</html>

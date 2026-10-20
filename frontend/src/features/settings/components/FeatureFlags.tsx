@@ -21,7 +21,7 @@ export default function FeatureFlags() {
     setFlags(flags.map(f => f.id === id ? { ...f, enabled: !f.enabled } : f));
   };
 
-  const groupedFlags = flags.reduce((acc, flag) => {
+  const groupedFlags = flags.reduce<Record<string, typeof initialFlags>>((acc, flag) => {
     (acc[flag.group] = acc[flag.group] || []).push(flag);
     return acc;
   }, {});

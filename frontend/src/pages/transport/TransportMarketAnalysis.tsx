@@ -1,105 +1,134 @@
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Activity, Fuel, MapPinned, RefreshCw, TrendingUp, Truck } from 'lucide-react';
 import { api } from '@/services/api';
 
-const CANONICAL_CROPS = ['Wheat', 'Rice', 'Soybean', 'Cotton', 'Sugarcane', 'Onion', 'Tomato', 'Produce'];
-const VEHICLE_OPTIONS = ['Cargo Three-Wheeler', 'Mini Truck', 'LCV', 'Medium Truck', 'Refrigerated Truck', 'Heavy Truck', 'Tractor + Trailer'];
-const FUEL_OPTIONS = ['Diesel', 'Petrol', 'CNG', 'Electric'];
+const CROPS = ['Soybean', 'Cotton', 'Jowar', 'Onion', 'Bajra', 'Rice', 'Sugarcane'];
+const VEHICLE_EFFICIENCY: Record<string, number> = {
+  'Cargo Three-Wheeler': 20,
+  'Mini Truck': 14,
+  LCV: 10,
+  'Medium Truck': 8,
+  'Refrigerated Truck': 6,
+  'Heavy Truck': 5,
+  'Tractor + Trailer': 7,
+};
+const VEHICLE_TYPES = Object.keys(VEHICLE_EFFICIENCY);
+const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG'];
 
 export default function TransportMarketAnalysis() {
   const [crop, setCrop] = useState('Soybean');
-  const [mandiLocation, setMandiLocation] = useState('Nagpur');
-  const [origin, setOrigin] = useState('Nagpur');
-  const [destination, setDestination] = useState('Mumbai');
-  const [quantityKg, setQuantityKg] = useState('5000');
+  const [mandiLocation, setMandiLocation] = useState('Nashik');
+  const [origin, setOrigin] = useState('Ahmednagar');
+  const [destination, setDestination] = useState('Pune');
+  const [quantityKg, setQuantityKg] = useState(3000);
   const [vehicleType, setVehicleType] = useState('Medium Truck');
   const [fuelType, setFuelType] = useState('Diesel');
-  const [fuelEfficiency, setFuelEfficiency] = useState('8');
+  const [fuelEfficiency, setFuelEfficiency] = useState(8);
   const [returnTrip, setReturnTrip] = useState(false);
-  const [waitingHours, setWaitingHours] = useState('0');
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [waitingHours, setWaitingHours] = useState(0);
   const [market, setMarket] = useState<any>(null);
   const [routeAnalysis, setRouteAnalysis] = useState<any>(null);
+  const [fuel, setFuel] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [updatedAt, setUpdatedAt] = useState('');
 
-  const fetchAnalysis = async () => {
+  const runAnalysis = async (event?: FormEvent) => {
+    event?.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const [marketRes, routeRes] = await Promise.all([
-        api.get('/market/intelligence', { params: { crop, location: mandiLocation } }),
+      const [marketResult, routeResult, fuelResult] = await Promise.allSettled([
+        api.get('/market-intelligence/price', { params: { crop, location: mandiLocation } }),
         api.get('/transport/route-estimate', {
           params: {
             origin,
             destination,
-            quantity_kg: Number(quantityKg) || 1000,
+            quantity_kg: quantityKg,
             crop,
             vehicle_type: vehicleType,
             fuel_type: fuelType,
-            fuel_efficiency_kmpl: Number(fuelEfficiency) || 8,
+            fuel_efficiency_kmpl: fuelEfficiency,
             return_trip: returnTrip,
-            waiting_hours: Number(waitingHours) || 0,
-          },
+            waiting_hours: waitingHours,
+          }
         }),
+        api.get('/transport/fuel-estimate', {
+          params: {
+            fuel_type: fuelType,
+            location: origin,
+            efficiency_kmpl: fuelEfficiency,
+            capacity_kg: quantityKg,
+            vehicle_type: vehicleType,
+          }
+        })
       ]);
-      setMarket(marketRes.data?.data || null);
-      setRouteAnalysis(routeRes.data || null);
-    } catch {
-      setError('Could not update market analysis. Check route details and retry.');
+
+      if (marketResult.status === 'fulfilled') setMarket(marketResult.value.data?.data || null);
+      else setMarket(null);
+      if (routeResult.status === 'fulfilled') setRouteAnalysis(routeResult.value.data || null);
+      else setRouteAnalysis(null);
+      if (fuelResult.status === 'fulfilled') setFuel(fuelResult.value.data || null);
+      else setFuel(null);
+
+      const failures = [marketResult, routeResult, fuelResult].filter(result => result.status === 'rejected').length;
+      if (failures === 3) setError('Market, route, and fuel services are unavailable. Check that the backend and external data services are reachable.');
+      else if (failures > 0) setError('Some data sources did not respond. Results below show only successful live service responses.');
+      setUpdatedAt(new Date().toLocaleString());
     } finally {
       setLoading(false);
     }
   };
 
-  const priceData = market?.mandi_data;
-  const fuel = market?.fuel;
+  const priceData = market?.price_data;
   const routes = routeAnalysis?.routes || [];
-  const updatedAt = market?.timestamp ? new Date(market.timestamp).toLocaleTimeString() : '';
-  const routeSource = routes[0]?.cost_source || (routeAnalysis ? 'Calculated' : 'Not queried');
-  const sourceLabel = priceData?.source_type === 'live_api' ? 'Live APMC Feed' : priceData?.source_type === 'dataset' ? 'Maharashtra APMC Historical Dataset' : 'Fallback Market Estimate';
+  const sourceLabel = priceData?.source || 'Source unavailable';
+  const routeSource = routes.length ? (routes[0]?.cost_source || 'Transport cost estimate') : 'Unavailable';
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <header className="border-b border-slate-200 pb-5">
-        <p className="text-xs font-bold uppercase text-emerald-700">Freight & commodities</p>
-        <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-slate-900"><TrendingUp size={24} /> Market & Route Analysis</h1>
-        <p className="mt-1 text-sm text-slate-500">Benchmark mandi prices, fuel costs, and per-km route freight in one operational view.</p>
+        <p className="text-xs font-bold uppercase text-emerald-700">Transport operations</p>
+        <h1 className="mt-1 flex items-center gap-2 text-2xl font-bold text-slate-900"><Activity size={22} /> Market & Freight Analysis</h1>
+        <p className="mt-1 text-sm text-slate-500">Compare mandi prices with route-level freight costs using current backend market, fuel, and routing services.</p>
       </header>
 
-      <form onSubmit={event => { event.preventDefault(); fetchAnalysis(); }} className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-xs font-semibold text-slate-700">Crop
-          <select value={crop} onChange={event => setCrop(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal">
-            {CANONICAL_CROPS.map(item => <option key={item} value={item}>{item}</option>)}
+      <form onSubmit={runAnalysis} className="grid grid-cols-1 gap-4 border-b border-slate-200 pb-6 sm:grid-cols-2 lg:grid-cols-5">
+        <label className="text-xs font-semibold text-slate-600">Crop
+          <select value={crop} onChange={event => setCrop(event.target.value)} className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
+            {CROPS.map(item => <option key={item}>{item}</option>)}
           </select>
         </label>
-        <label className="text-xs font-semibold text-slate-700">Mandi location
-          <input value={mandiLocation} onChange={event => setMandiLocation(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal" placeholder="District or APMC market" />
+        <label className="text-xs font-semibold text-slate-600">Mandi / district
+          <input value={mandiLocation} onChange={event => setMandiLocation(event.target.value)} required className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900" />
         </label>
-        <label className="text-xs font-semibold text-slate-700">Pickup
-          <input value={origin} onChange={event => setOrigin(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal" placeholder="Origin city or district" />
+        <label className="text-xs font-semibold text-slate-600">Freight origin
+          <input value={origin} onChange={event => setOrigin(event.target.value)} required className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900" />
         </label>
-        <label className="text-xs font-semibold text-slate-700">Delivery
-          <input value={destination} onChange={event => setDestination(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal" placeholder="Destination market" />
+        <label className="text-xs font-semibold text-slate-600">Freight destination
+          <input value={destination} onChange={event => setDestination(event.target.value)} required className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900" />
         </label>
-        <label className="text-xs font-semibold text-slate-700">Load quantity (kg)
-          <input type="number" min="100" step="100" value={quantityKg} onChange={event => setQuantityKg(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal" />
+        <label className="text-xs font-semibold text-slate-600">Load size (kg)
+          <input type="number" min="1" value={quantityKg} onChange={event => setQuantityKg(Number(event.target.value))} required className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900" />
         </label>
-        <label className="text-xs font-semibold text-slate-700">Vehicle type
-          <select value={vehicleType} onChange={event => setVehicleType(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal">
-            {VEHICLE_OPTIONS.map(item => <option key={item} value={item}>{item}</option>)}
+        <label className="text-xs font-semibold text-slate-600">Vehicle type
+          <select value={vehicleType} onChange={event => {
+            setVehicleType(event.target.value);
+            setFuelEfficiency(VEHICLE_EFFICIENCY[event.target.value]);
+          }} className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
+            {VEHICLE_TYPES.map(item => <option key={item}>{item}</option>)}
           </select>
         </label>
-        <label className="text-xs font-semibold text-slate-700">Fuel type
-          <select value={fuelType} onChange={event => setFuelType(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal">
-            {FUEL_OPTIONS.map(item => <option key={item} value={item}>{item}</option>)}
+        <label className="text-xs font-semibold text-slate-600">Fuel type
+          <select value={fuelType} onChange={event => setFuelType(event.target.value)} className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
+            {FUEL_TYPES.map(item => <option key={item}>{item}</option>)}
           </select>
         </label>
-        <label className="text-xs font-semibold text-slate-700">Mileage (km/L)
-          <input type="number" min="1" step="0.5" value={fuelEfficiency} onChange={event => setFuelEfficiency(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal" />
+        <label className="text-xs font-semibold text-slate-600">Fuel efficiency (km/L)
+          <input type="number" min="1" max="100" step="0.1" value={fuelEfficiency} onChange={event => setFuelEfficiency(Number(event.target.value))} required className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900" />
         </label>
-        <label className="text-xs font-semibold text-slate-700">Waiting hours
-          <input type="number" min="0" step="0.5" value={waitingHours} onChange={event => setWaitingHours(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 p-2 text-sm font-normal" />
+        <label className="text-xs font-semibold text-slate-600">Waiting time (hours)
+          <input type="number" min="0" max="48" step="0.5" value={waitingHours} onChange={event => setWaitingHours(Number(event.target.value))} className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900" />
         </label>
         <label className="flex items-center gap-2 self-end rounded-md border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700">
           <input type="checkbox" checked={returnTrip} onChange={event => setReturnTrip(event.target.checked)} className="h-4 w-4 accent-emerald-700" />
@@ -161,7 +190,7 @@ export default function TransportMarketAnalysis() {
                       <td className="px-4 py-3 text-slate-700">₹{Number(route.estimated_fuel || 0).toLocaleString('en-IN')} fuel<span className="block text-xs text-slate-500">₹{Number(route.estimated_toll || 0).toLocaleString('en-IN')} toll</span></td>
                       <td className="px-4 py-3 font-semibold text-slate-900">₹{Number(route.floor_rate_per_km || 0).toFixed(5)}/km<span className="block text-xs font-normal text-slate-500">₹{Number(route.floor_price || 0).toLocaleString('en-IN')} trip floor</span></td>
                       <td className="px-4 py-3 font-semibold text-slate-900">₹{Number(route.target_rate_per_km || 0).toFixed(5)}/km<span className="block text-xs font-normal text-slate-500">₹{Number(route.target_price || 0).toLocaleString('en-IN')} trip target</span></td>
-                      <td className="px-4 py-3 font-semibold text-emerald-800">₹{Number(route.opening_quote_rate_per_km || 0).toFixed(5)}/km<span className="block text-xs font-normal text-slate-500">₹{Number(route.opening_quote || 0).toLocaleString('en-IN')} trip quote</span><details className="mt-1 text-xs font-normal"><summary className="cursor-pointer text-emerald-700">Cost breakdown</summary><div className="mt-1 space-y-0.5 text-slate-500">{Object.entries(route.cost_breakdown || {}).map(([key, value]) => <p key={key}>{key.replaceAll('_', ' ')}: ₹{Number(value || 0).toLocaleString('en-IN')}</p>)}</div></details></td>
+                      <td className="px-4 py-3 font-semibold text-emerald-800">₹{Number(route.opening_quote_rate_per_km || 0).toFixed(5)}/km<span className="block text-xs font-normal text-slate-500">₹{Number(route.opening_quote || 0).toLocaleString('en-IN')} trip quote</span><details className="mt-1 text-xs font-normal"><summary className="cursor-pointer text-emerald-700">Cost breakdown</summary><div className="mt-1 space-y-0.5 text-slate-500">{Object.entries(route.cost_breakdown || {}).map(([key, value]) => <p key={key}>{key.replace(/_/g, ' ')}: ₹{Number(value || 0).toLocaleString('en-IN')}</p>)}</div></details></td>
                     </tr>
                   ))}
                 </tbody>

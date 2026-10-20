@@ -22,6 +22,7 @@ class Database:
     offers: dict = {}
     contracts: dict = {}
     history: dict = {}
+    buyer_workflows: dict = {}
 
     @staticmethod
     def generate_id(prefix: str) -> str:
@@ -39,6 +40,7 @@ class Database:
         Database.offers.clear()
         Database.contracts.clear()
         Database.history.clear()
+        Database.buyer_workflows.clear()
     @classmethod
     async def upsert_farmer_async(cls, payload: dict) -> dict:
         p = deepcopy(payload)
@@ -607,6 +609,21 @@ class Database:
         record_id = Database.generate_id("hist")
         entry = deepcopy(entry)
         entry["user_id"] = user_id
+        import datetime, time
+        if "created_at" not in entry:
+            entry["created_at"] = datetime.datetime.utcnow().isoformat()
+        if "timestamp" not in entry:
+            entry["timestamp"] = time.time()
+        
+        # Ensure flattened top-level attributes from details if present
+        if "details" in entry and isinstance(entry["details"], dict):
+            det = entry["details"]
+            for k in ("negotiation_id", "crop", "quantity", "final_price", "status", "farmer", "farmer_name", "buyer", "buyer_name", "transaction_id"):
+                if not entry.get(k) and det.get(k):
+                    entry[k] = det[k]
+        if not entry.get("status"):
+            entry["status"] = "DEAL"
+
         try:
             async with AsyncSessionLocal() as session:
                 db_history = DBHistory(
@@ -653,44 +670,90 @@ class Database:
     @classmethod
     async def get_history_async(cls, user_id: str = "all") -> list:
         results = []
+        seen_ids = set()
         try:
             async with AsyncSessionLocal() as session:
                 if user_id == "all":
-                    res = await session.execute(select(DBHistory).order_by(DBHistory.id.desc()).limit(50))
+                    res = await session.execute(select(DBHistory).order_by(DBHistory.id.desc()).limit(100))
                 else:
-                    res = await session.execute(select(DBHistory).where(DBHistory.user_id == user_id).order_by(DBHistory.id.desc()))
+                    res = await session.execute(
+                        select(DBHistory).where(
+                            (DBHistory.user_id == user_id) | (DBHistory.user_id == "all")
+                        ).order_by(DBHistory.id.desc()).limit(100)
+                    )
                 rows = res.scalars().all()
                 for r in rows:
+                    item = None
                     if r.data:
                         try:
-                            results.append(json.loads(r.data))
-                            continue
+                            item = json.loads(r.data)
                         except Exception:
-                            pass
-                    results.append({
-                        "negotiation_id": r.negotiation_id,
-                        "crop": r.crop,
-                        "quantity": r.quantity,
-                        "status": r.status,
-                        "final_price": r.final_price,
-                        "summary": r.summary,
-                        "farmer_strategy": r.farmer_strategy,
-                        "farmer_reward": r.farmer_reward,
-                        "buyer_strategy": r.buyer_strategy,
-                        "buyer_reward": r.buyer_reward,
-                        "warehouse_strategy": r.warehouse_strategy,
-                        "warehouse_reward": r.warehouse_reward,
-                        "transport_strategy": r.transport_strategy,
-                        "transport_reward": r.transport_reward,
-                        "processor_strategy": r.processor_strategy,
-                        "processor_reward": r.processor_reward,
-                        "compost_strategy": r.compost_strategy,
-                        "compost_reward": r.compost_reward
-                    })
+                            item = None
+                    if not item:
+                        item = {
+                            "negotiation_id": r.negotiation_id,
+                            "crop": r.crop,
+                            "quantity": r.quantity,
+                            "status": r.status or "DEAL",
+                            "final_price": r.final_price,
+                            "summary": r.summary,
+                            "farmer_strategy": r.farmer_strategy,
+                            "farmer_reward": r.farmer_reward,
+                            "buyer_strategy": r.buyer_strategy,
+                            "buyer_reward": r.buyer_reward,
+                            "warehouse_strategy": r.warehouse_strategy,
+                            "warehouse_reward": r.warehouse_reward,
+                            "transport_strategy": r.transport_strategy,
+                            "transport_reward": r.transport_reward,
+                            "processor_strategy": r.processor_strategy,
+                            "processor_reward": r.processor_reward,
+                            "compost_strategy": r.compost_strategy,
+                            "compost_reward": r.compost_reward
+                        }
+                    # Populate top-level fields from details if present
+                    det = item.get("details") or {}
+                    if isinstance(det, dict):
+                        for k in ("negotiation_id", "crop", "quantity", "final_price", "status", "farmer", "farmer_name", "buyer", "buyer_name", "transaction_id"):
+                            if not item.get(k) and det.get(k):
+                                item[k] = det[k]
+                    if not item.get("farmer") and item.get("farmer_name"):
+                        item["farmer"] = item["farmer_name"]
+                    if not item.get("farmer_name") and item.get("farmer"):
+                        item["farmer_name"] = item["farmer"]
+                    if not item.get("status"):
+                        item["status"] = "DEAL"
+
+                    # Deduplicate by unique transaction_id or negotiation_id
+                    dedup_key = item.get("transaction_id") or item.get("negotiation_id") or str(len(results))
+                    if dedup_key in seen_ids:
+                        continue
+                    seen_ids.add(dedup_key)
+                    results.append(item)
         except Exception:
             pass
-        if not results and user_id in Database.history:
-            return deepcopy(Database.history[user_id])
+
+        def _get_sort_key(item):
+            ts = item.get("created_at") or item.get("timestamp") or 0
+            if isinstance(ts, (int, float)):
+                return ts
+            try:
+                import datetime
+                return datetime.datetime.fromisoformat(str(ts).replace('Z', '+00:00')).timestamp()
+            except Exception:
+                return 0
+
+        if results:
+            results.sort(key=_get_sort_key, reverse=True)
+            return results
+
+        if user_id in Database.history:
+            mem_items = deepcopy(Database.history[user_id])
+            if mem_items:
+                mem_items.sort(key=_get_sort_key, reverse=True)
+                # If no explicit timestamps exist, reverse to put latest appended on top
+                if all(_get_sort_key(m) == 0 for m in mem_items):
+                    mem_items.reverse()
+            return mem_items
         return results
     @classmethod
     def get_msp_price(cls, crop: str) -> float | None:
@@ -952,4 +1015,162 @@ class Database:
                 "status": r.status,
                 "created_at": r.created_at
             } for r in rows]
+
+    @classmethod
+    async def upsert_buyer_workflow_async(cls, payload: dict) -> dict:
+        p = deepcopy(payload)
+        wf_id = p.get("workflow_id") or p.get("id") or Database.generate_id("wf")
+        p["workflow_id"] = wf_id
+        if "id" not in p:
+            p["id"] = wf_id
+        req_id = p.get("requirement_id") or ""
+        buyer_id = p.get("buyer_id") or "buyer_default"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if not p.get("created_at"):
+            p["created_at"] = now_iso
+        p["updated_at"] = now_iso
+
+        try:
+            async with AsyncSessionLocal() as session:
+                db_wf = await session.get(DBBuyerWorkflowState, wf_id)
+                if not db_wf and req_id:
+                    stmt = select(DBBuyerWorkflowState).where(DBBuyerWorkflowState.requirement_id == req_id).order_by(DBBuyerWorkflowState.updated_at.desc())
+                    res = await session.execute(stmt)
+                    db_wf = res.scalars().first()
+
+                if not db_wf:
+                    db_wf = DBBuyerWorkflowState(workflow_id=wf_id, requirement_id=req_id, buyer_id=buyer_id)
+                    session.add(db_wf)
+                else:
+                    wf_id = db_wf.workflow_id
+                    p["workflow_id"] = wf_id
+
+                db_wf.requirement_id = req_id
+                db_wf.buyer_id = buyer_id
+                db_wf.crop = p.get("crop")
+                db_wf.quantity = float(p.get("quantity") or 0.0)
+                db_wf.quality = p.get("quality")
+                db_wf.pickup_location = p.get("pickup_location")
+                db_wf.delivery_location = p.get("delivery_location")
+                db_wf.delivery_deadline_hours = float(p.get("delivery_deadline_hours") or 24.0)
+                db_wf.selected_agents = p.get("selected_agents", [])
+                db_wf.current_agent = p.get("current_agent")
+                db_wf.completed_agents = p.get("completed_agents", [])
+                db_wf.failed_agents = p.get("failed_agents", [])
+                db_wf.pending_agents = p.get("pending_agents", [])
+                db_wf.farmer_deal = p.get("farmer_deal", {})
+                db_wf.agent_outcomes = p.get("agent_outcomes", {})
+                db_wf.final_plan = p.get("final_plan")
+                db_wf.conversation_context = p.get("conversation_context", [])
+                db_wf.audit_logs = p.get("audit_logs", [])
+                db_wf.last_action = p.get("last_action")
+                db_wf.last_response = p.get("last_response")
+                db_wf.workflow_status = p.get("workflow_status", "INITIALIZED")
+                db_wf.created_at = p.get("created_at")
+                db_wf.updated_at = p.get("updated_at")
+                await session.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger("database_repo").warning(f"Failed to persist buyer workflow state to DB: {e}")
+
+        Database.buyer_workflows[wf_id] = p
+        if req_id:
+            Database.buyer_workflows[req_id] = p
+        return p
+
+    @classmethod
+    async def get_buyer_workflow_async(cls, workflow_id: str = None, requirement_id: str = None) -> dict | None:
+        try:
+            async with AsyncSessionLocal() as session:
+                db_wf = None
+                if workflow_id:
+                    db_wf = await session.get(DBBuyerWorkflowState, workflow_id)
+                if not db_wf and requirement_id:
+                    stmt = select(DBBuyerWorkflowState).where(DBBuyerWorkflowState.requirement_id == requirement_id).order_by(DBBuyerWorkflowState.updated_at.desc())
+                    res = await session.execute(stmt)
+                    db_wf = res.scalars().first()
+
+                if db_wf:
+                    record = {
+                        "workflow_id": db_wf.workflow_id,
+                        "requirement_id": db_wf.requirement_id,
+                        "buyer_id": db_wf.buyer_id,
+                        "crop": db_wf.crop,
+                        "quantity": db_wf.quantity,
+                        "quality": db_wf.quality,
+                        "pickup_location": db_wf.pickup_location,
+                        "delivery_location": db_wf.delivery_location,
+                        "delivery_deadline_hours": db_wf.delivery_deadline_hours,
+                        "selected_agents": db_wf.selected_agents or [],
+                        "current_agent": db_wf.current_agent,
+                        "completed_agents": db_wf.completed_agents or [],
+                        "failed_agents": db_wf.failed_agents or [],
+                        "pending_agents": db_wf.pending_agents or [],
+                        "farmer_deal": db_wf.farmer_deal or {},
+                        "agent_outcomes": db_wf.agent_outcomes or {},
+                        "final_plan": db_wf.final_plan,
+                        "conversation_context": db_wf.conversation_context or [],
+                        "audit_logs": db_wf.audit_logs or [],
+                        "last_action": db_wf.last_action,
+                        "last_response": db_wf.last_response,
+                        "workflow_status": db_wf.workflow_status,
+                        "created_at": db_wf.created_at,
+                        "updated_at": db_wf.updated_at
+                    }
+                    Database.buyer_workflows[db_wf.workflow_id] = record
+                    Database.buyer_workflows[db_wf.requirement_id] = record
+                    return record
+        except Exception as e:
+            import logging
+            logging.getLogger("database_repo").warning(f"Failed to query buyer workflow state from DB: {e}")
+
+        if workflow_id and workflow_id in Database.buyer_workflows:
+            return Database.buyer_workflows[workflow_id]
+        if requirement_id and requirement_id in Database.buyer_workflows:
+            return Database.buyer_workflows[requirement_id]
+        return None
+
+    @classmethod
+    async def list_buyer_workflows_async(cls, buyer_id: str = None) -> list[dict]:
+        try:
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBBuyerWorkflowState)
+                if buyer_id:
+                    stmt = stmt.where(DBBuyerWorkflowState.buyer_id == buyer_id)
+                stmt = stmt.order_by(DBBuyerWorkflowState.updated_at.desc())
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                if rows:
+                    return [{
+                        "workflow_id": r.workflow_id,
+                        "requirement_id": r.requirement_id,
+                        "buyer_id": r.buyer_id,
+                        "crop": r.crop,
+                        "quantity": r.quantity,
+                        "quality": r.quality,
+                        "pickup_location": r.pickup_location,
+                        "delivery_location": r.delivery_location,
+                        "delivery_deadline_hours": r.delivery_deadline_hours,
+                        "selected_agents": r.selected_agents or [],
+                        "current_agent": r.current_agent,
+                        "completed_agents": r.completed_agents or [],
+                        "failed_agents": r.failed_agents or [],
+                        "pending_agents": r.pending_agents or [],
+                        "farmer_deal": r.farmer_deal or {},
+                        "agent_outcomes": r.agent_outcomes or {},
+                        "final_plan": r.final_plan,
+                        "conversation_context": r.conversation_context or [],
+                        "audit_logs": r.audit_logs or [],
+                        "last_action": r.last_action,
+                        "last_response": r.last_response,
+                        "workflow_status": r.workflow_status,
+                        "created_at": r.created_at,
+                        "updated_at": r.updated_at
+                    } for r in rows]
+        except Exception:
+            pass
+        workflows = list(Database.buyer_workflows.values())
+        if buyer_id:
+            workflows = [w for w in workflows if w.get("buyer_id") == buyer_id]
+        return workflows
 

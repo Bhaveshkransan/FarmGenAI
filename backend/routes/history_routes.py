@@ -22,3 +22,17 @@ async def history(
     if user_id != "all" and auth_user_id != user_id and role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden: You cannot access history for other users.")
     return await get_user_history(user_id, db=db)
+
+
+@router.post("/history/{user_id}")
+async def create_user_history_entry(
+    user_id: str,
+    payload: dict,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from backend.services.history_service import add_history
+    await add_history(user_id, payload, db=db)
+    await add_history("all", payload, db=db)
+    return {"success": True, "message": "History entry recorded successfully"}
+

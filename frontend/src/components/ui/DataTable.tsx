@@ -1,6 +1,14 @@
 import React from 'react';
 
-export default function DataTable({ title, columns, data = [], actionButton, isLoading = false }) {
+interface DataTableProps {
+  title?: React.ReactNode;
+  columns: any[];
+  data?: any[];
+  actionButton?: React.ReactNode;
+  isLoading?: boolean;
+}
+
+export default function DataTable({ title, columns, data = [], actionButton, isLoading = false }: DataTableProps) {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col h-full">
       <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">

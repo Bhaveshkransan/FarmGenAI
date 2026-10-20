@@ -452,17 +452,61 @@ export default function TransportAgentStudio() {
                 <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl">
                   <span className="block text-[10px] font-bold uppercase text-blue-600 mb-1">Est. Trip Cost</span>
                   <span className="text-xl font-black text-blue-700">
-                    {state?.distance_km ? `₹${(state.distance_km * parseInt(viewingVehicle.rate.replace(/\\D/g, ''))).toLocaleString('en-IN')}` : 'Evaluate Route First'}
+                    {(() => {
+                      const dist = state?.distance_km || 135;
+                      const rateVal = parseInt(viewingVehicle.rate.replace(/\D/g, '')) || 25;
+                      return `₹${Math.round(dist * rateVal).toLocaleString('en-IN')}`;
+                    })()}
+                  </span>
+                  <span className="text-[10px] text-blue-500 font-medium block mt-0.5">
+                    {state?.distance_km ? `${state.distance_km} km direct route` : `Estimated for ${pickupLocation} → ${deliveryLocation}`}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex flex-col sm:flex-row gap-2.5">
                 <button 
-                  onClick={() => setViewingVehicle(null)}
-                  className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl transition"
+                  type="button"
+                  onClick={() => {
+                    setSelectedVehicleId(viewingVehicle.id);
+                    const isReefer = viewingVehicle.tags?.includes('Cold Chain') || viewingVehicle.type?.includes('Refrigerated');
+                    if (isReefer) setRefrigeratedRequired(true);
+                    const capKg = parseInt(viewingVehicle.capacity.replace(/\D/g, '')) || quantityKg;
+                    if (quantityKg > capKg) setQuantityKg(capKg);
+                    setViewingVehicle(null);
+                    handleEvaluateRoute();
+                  }}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition text-xs shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  Select & Continue
+                  <CheckCircle2 size={16} className="text-emerald-400" />
+                  Select & Evaluate Route
+                </button>
+
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setSelectedVehicleId(viewingVehicle.id);
+                    const isReefer = viewingVehicle.tags?.includes('Cold Chain') || viewingVehicle.type?.includes('Refrigerated');
+                    if (isReefer) setRefrigeratedRequired(true);
+                    const capKg = parseInt(viewingVehicle.capacity.replace(/\D/g, '')) || quantityKg;
+                    const finalQty = Math.min(quantityKg, capKg);
+                    setViewingVehicle(null);
+                    handleEvaluateRoute();
+                    navigate('/dashboard/transport/negotiation', {
+                      state: {
+                        payload: {
+                          ...getPayload(),
+                          quantity_kg: finalQty,
+                          refrigerated_required: isReefer
+                        },
+                        vehicle: viewingVehicle
+                      }
+                    });
+                  }}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Zap size={16} className="text-amber-300" />
+                  Start AI Negotiation &rarr;
                 </button>
               </div>
             </div>

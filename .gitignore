@@ -25,6 +25,8 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+wheels/
+*.whl
 
 # ==============================
 # Virtual Environments
@@ -102,5 +104,6 @@ yarn-error.log*
 *.pid.lock
 *.bak
 *.tmp
+*.zip
 scratch/
 

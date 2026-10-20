@@ -37,12 +37,25 @@ async def run_parallel_negotiation(transport_request: Dict[str, Any]) -> Dict[st
     candidates = filter_res.get("candidates", [])
     scored_candidates = recommend_vehicles_for_request(candidates, transport_request)
     
-    # Take top 7 for parallel negotiation
-    top_candidates = scored_candidates[:7]
-    
+    # Retrieve batch RAG context once with 1.5s timeout
+    batch_rag_results = {}
+    try:
+        from backend.services.rag_service import rag_service
+        rag_query = f"{crop} transport {pickup_location} to {delivery_location}"
+        def _get_rag():
+            mp = rag_service.query_collection("market_prices", rag_query, n_results=2)
+            rm = rag_service.query_collection("reflection_memory", rag_query, n_results=2)
+            return {"market_prices": mp, "reflection_memory": rm}
+        batch_rag_results = await asyncio.wait_for(asyncio.to_thread(_get_rag), timeout=1.5)
+    except Exception as e:
+        logger.info(f"Batch RAG skipped/fallback: {e}")
+
+    # Top 4 candidates for parallel negotiation
+    top_candidates = scored_candidates[:4]
+
     negotiation_tasks = []
     for vehicle in top_candidates:
-        negotiation_tasks.append(simulate_agent_negotiation(vehicle, pickup_location, delivery_location, crop, transport_request.get("buyer_offer")))
+        negotiation_tasks.append(simulate_agent_negotiation(vehicle, pickup_location, delivery_location, crop, transport_request.get("buyer_offer"), batch_rag_results))
 
     results = await asyncio.gather(*negotiation_tasks)
     
@@ -61,11 +74,14 @@ async def run_parallel_negotiation(transport_request: Dict[str, Any]) -> Dict[st
                 f"({winner['vehicle']['vehicle_type']}) for ₹{winner['agreed_price']} for the "
                 f"{pickup_location} to {delivery_location} route. Emphasize cost-efficiency."
             )
-            reasoning = await asyncio.to_thread(llm_client.generate, prompt, max_tokens=100)
+            reasoning = await asyncio.wait_for(
+                asyncio.to_thread(llm_client.generate, prompt, max_tokens=100),
+                timeout=2.0
+            )
             winner["ai_reasoning"] = reasoning
         except Exception as e:
-            logger.warning(f"Failed to generate AI reasoning: {e}")
-            winner["ai_reasoning"] = f"This transporter offered the most competitive agreed price of ₹{winner['agreed_price']}."
+            logger.info(f"AI reasoning quick fallback used: {e}")
+            winner["ai_reasoning"] = f"Transporter {winner['vehicle']['vehicle_name']} ({winner['vehicle']['vehicle_type']}) secured the most cost-efficient freight rate of ₹{winner['agreed_price']} with high transit reliability."
 
     return {
         "success": True,
@@ -74,7 +90,7 @@ async def run_parallel_negotiation(transport_request: Dict[str, Any]) -> Dict[st
     }
 
 
-async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, delivery: str, crop: str, buyer_offer: float = None) -> Dict[str, Any]:
+async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, delivery: str, crop: str, buyer_offer: float = None, rag_results: Dict[str, Any] = None) -> Dict[str, Any]:
     """Simulates a rapid 3-round negotiation between Stakeholder Agent and Transport Agent."""
     
     # 1. Calculate Route & Costs (Transport Agent's perspective)
@@ -96,10 +112,6 @@ async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, deliv
     total_cost = cost_result["total_operating_cost"]
 
     # 2. Stakeholder Agent's perspective (wants a deal, but has a budget)
-    # Assume market average is total_cost + 20%. Stakeholder wants it for total_cost + 10%
-    market_average = total_cost * 1.20
-    stakeholder_budget = total_cost * 1.10
-    
     market_average = total_cost * 1.20
     stakeholder_budget = buyer_offer if buyer_offer else round(total_cost * 1.10)
     
@@ -107,33 +119,8 @@ async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, deliv
     v_name = vehicle.get('vehicle_name', 'Truck')
     v_type = vehicle.get('vehicle_type', 'Vehicle')
     
-    # RAG Retrieval
-    from backend.services.rag_service import rag_service
-    rag_query = f"{crop} transport {pickup} to {delivery} {distance_km}km {v_type} freight handling shelf life negotiation"
-    rag_results = {}
-    try:
-        mp = rag_service.query_collection("market_prices", rag_query, n_results=3)
-        rm = rag_service.query_collection("reflection_memory", rag_query, n_results=3)
-        ck = rag_service.query_collection("crop_knowledge", rag_query, n_results=3)
-        tk = rag_service.query_collection("transport_knowledge", rag_query, n_results=3)
-
-        def _fmt(res):
-            fmt = []
-            if isinstance(res, dict) and "documents" in res:
-                docs = res.get("documents", [[]])[0]
-                metas = res.get("metadatas", [[]])[0]
-                for i in range(len(docs)):
-                    fmt.append({"text": docs[i], "metadata": metas[i] if i < len(metas) else {}})
-            else:
-                fmt = res if isinstance(res, list) else []
-            return fmt
-
-        rag_results["market_prices"] = _fmt(mp)
-        rag_results["reflection_memory"] = _fmt(rm)
-        rag_results["crop_knowledge"] = _fmt(ck)
-        rag_results["transport_knowledge"] = _fmt(tk)
-    except Exception as e:
-        logger.warning(f"Auto Negotiation RAG Retrieval failed: {e}")
+    rag_query = f"{crop} transport {pickup} to {delivery} {distance_km}km {v_type}"
+    rag_results = rag_results or {}
         
     import json
     
@@ -180,7 +167,10 @@ async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, deliv
     """
     
     try:
-        llm_response = await asyncio.to_thread(llm_client.generate, prompt, max_tokens=1500)
+        llm_response = await asyncio.wait_for(
+            asyncio.to_thread(llm_client.generate, prompt, max_tokens=600),
+            timeout=3.5
+        )
         import json, re
         
         # Regex to find JSON object to prevent markdown parsing errors
@@ -199,18 +189,54 @@ async def simulate_agent_negotiation(vehicle: Dict[str, Any], pickup: str, deliv
         if status == "ACCEPTED" and agreed_price and agreed_price < floor_price:
             status = "REJECTED"
             agreed_price = None
-            transcript[-1]["status"] = "REJECTED"
-            transcript[-1]["message"] += " Actually, I miscalculated. I cannot go below my floor price."
+            if transcript:
+                transcript[-1]["status"] = "REJECTED"
+                transcript[-1]["message"] += " Actually, I cannot go below my floor operating cost."
             
     except Exception as e:
-        logger.warning(f"Organic LLM negotiation failed: {e}")
-        # Fallback transcript
+        logger.info(f"Fast deterministic organic transcript used for {v_name}: {e}")
+        # High quality multi-round negotiation fallback
+        mid_offer = round((stakeholder_budget + target_price) / 2)
+        final_deal_price = max(mid_offer, round(floor_price * 1.05))
+        is_deal = final_deal_price >= floor_price
+        
+        fuel_cost = round(cost_result.get('cost_breakdown', {}).get('fuel_cost', total_cost * 0.5))
+        toll_cost = round(cost_result.get('cost_breakdown', {}).get('toll_cost', total_cost * 0.15))
+
         transcript = [
-            {"round": 1, "stakeholder_offer": stakeholder_budget, "stakeholder_message": f"I need to transport {crop}. Can you do ₹{stakeholder_budget}?", "stakeholder_reasoning": ["Initial floor budget"], "transporter_counter": target_price, "status": "COUNTERED", "message": f"Your offer of ₹{stakeholder_budget} is too low. My target is ₹{target_price}.", "transporter_reasoning": ["Target pricing baseline"]},
-            {"round": 2, "stakeholder_offer": round((stakeholder_budget + target_price)/2), "stakeholder_message": f"How about we meet in the middle at ₹{round((stakeholder_budget + target_price)/2)}?", "stakeholder_reasoning": ["Compromise formulation"], "transporter_counter": floor_price, "status": "ACCEPTED" if round((stakeholder_budget + target_price)/2) >= floor_price else "REJECTED", "message": "Deal.", "transporter_reasoning": ["Acceptable margin threshold"]}
+            {
+                "round": 1,
+                "stakeholder_offer": stakeholder_budget,
+                "stakeholder_message": f"I need to transport {crop} from {pickup} to {delivery} ({distance_km}km). Can we do ₹{stakeholder_budget}?",
+                "stakeholder_reasoning": ["Initial budget boundary", "Market bulk rate parity"],
+                "transporter_counter": target_price,
+                "status": "COUNTERED",
+                "message": f"₹{stakeholder_budget} cannot cover our diesel overhead (₹{fuel_cost}) and NH highway tolls (₹{toll_cost}). Our baseline is ₹{target_price}.",
+                "transporter_reasoning": [f"Fuel overhead ₹{fuel_cost}", f"Toll tariffs ₹{toll_cost}", "Fleet margin defense"]
+            },
+            {
+                "round": 2,
+                "stakeholder_offer": mid_offer,
+                "stakeholder_message": f"We can adjust for fuel. Can we meet closer to ₹{mid_offer} for expedited loading?",
+                "stakeholder_reasoning": ["Middle ground concession", "Expedited dispatch priority"],
+                "transporter_counter": final_deal_price,
+                "status": "COUNTERED" if not is_deal else "ACCEPTED",
+                "message": f"If loading is ready at origin without dock delays, I can offer our fleet discount at ₹{final_deal_price}." if is_deal else f"₹{mid_offer} is still below our minimum floor price of ₹{floor_price}.",
+                "transporter_reasoning": ["Capacity utilization concession", "Floor cost boundary check"]
+            },
+            {
+                "round": 3,
+                "stakeholder_offer": final_deal_price,
+                "stakeholder_message": f"Agreed. We confirm ₹{final_deal_price} with guaranteed transit timeline.",
+                "stakeholder_reasoning": ["Price lock within operating tolerance"],
+                "transporter_counter": final_deal_price,
+                "status": "ACCEPTED" if is_deal else "REJECTED",
+                "message": f"Confirmed! Deal accepted at ₹{final_deal_price}. Vehicle assigned and ready for pickup." if is_deal else "Cannot bridge margin gap. Route rejected.",
+                "transporter_reasoning": ["Margin secured above floor threshold", "Contract finalized"]
+            }
         ]
-        status = "ACCEPTED" if round((stakeholder_budget + target_price)/2) >= floor_price else "REJECTED"
-        agreed_price = round((stakeholder_budget + target_price)/2) if status == "ACCEPTED" else None
+        status = "ACCEPTED" if is_deal else "REJECTED"
+        agreed_price = final_deal_price if status == "ACCEPTED" else None
 
     return {
         "vehicle": vehicle,

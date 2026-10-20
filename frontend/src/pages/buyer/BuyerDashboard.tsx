@@ -23,6 +23,7 @@ import {
   ArrowRight,
   TrendingUp,
   TrendingDown,
+  Minus,
   Building2,
   CheckCircle2,
   Trash2,
@@ -33,12 +34,15 @@ import {
   Info,
   ShieldCheck,
   AlertCircle,
-  FileText
+  FileText,
+  Navigation,
+  Edit2
 } from 'lucide-react';
 import StatCard from '@/components/ui/StatCard';
 import PostRequirementModal from '@/components/forms/PostRequirementModal';
 import TransactionValidationModal from '@/components/negotiation/TransactionValidationModal';
 import { matchCrops } from '@/utils/validation';
+import { CANONICAL_CROPS, MAHARASHTRA_DISTRICT_COORDINATES } from '@/constants/crops';
 
 export const CANONICAL_7_CROPS = [
   { id: 'Soybean', name: 'Soybean', emoji: '🫘', type: 'MSP', benchmark: '₹48.92/kg', desc: 'Commercial Oilseed' },
@@ -72,8 +76,15 @@ export default function BuyerDashboard() {
   const [buyerLocation, setBuyerLocation] = useState<string>('Pune');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [hoveredPoint, setHoveredPoint] = useState<any | null>(null);
-  const [activeTab, setActiveTab] = useState<'lots' | 'requirements'>('lots');
   const [isPostReqModalOpen, setIsPostReqModalOpen] = useState<boolean>(false);
+
+  // Active Listings Table Filter States (Parity with Farmer Dashboard)
+  const [listingsSearch, setListingsSearch] = useState<string>('');
+  const [listingsFilterCrop, setListingsFilterCrop] = useState<string>('');
+
+  // MandiMitra Fetching States (Parity with Farmer Dashboard)
+  const [mandiLoading, setMandiLoading] = useState<boolean>(false);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'locating' | 'found' | 'error'>('idle');
 
   // Real-time WebSocket connection matching Farmer Dashboard
   const wsUrl = `${API_CONFIG.WS_URL}/negotiation`;
@@ -82,7 +93,7 @@ export default function BuyerDashboard() {
   // Fallback crop for Mandi Radar & Forecast when "All Crops" is viewed in table
   const radarCrop = selectedCrop || 'Soybean';
 
-  // Negotiation Modal State
+  // Negotiation Modal State (Produce Lot)
   const [selectedListing, setSelectedListing] = useState<any | null>(null);
   const [targetOfferPrice, setTargetOfferPrice] = useState<number>(45);
   const [maxCeilingPrice, setMaxCeilingPrice] = useState<number>(52);
@@ -114,7 +125,7 @@ export default function BuyerDashboard() {
   }, [activeBuyerPersona]);
 
   // 1. Fetch Mandi Comparison Radar Data (MandiMitra for Buyers)
-  const { data: mandiData, isLoading: isLoadingMandi } = useQuery({
+  const { data: mandiData, isLoading: isLoadingMandi, refetch: refetchMandi } = useQuery({
     queryKey: ['mandi_comparison', radarCrop, buyerLocation],
     queryFn: async () => {
       try {
@@ -127,7 +138,7 @@ export default function BuyerDashboard() {
   });
 
   // 2. Fetch 7-Day ML Price Forecast Data
-  const { data: forecastData } = useQuery({
+  const { data: forecastData, refetch: refetchForecast } = useQuery({
     queryKey: ['price_forecast', radarCrop, buyerLocation],
     queryFn: async () => {
       try {
@@ -152,7 +163,7 @@ export default function BuyerDashboard() {
     }
   });
 
-  // 4. Fetch Buyer Requirements
+  // 4. Fetch Buyer Requirements (Active Listings)
   const { data: requirementsData, refetch: refetchRequirements } = useQuery({
     queryKey: ['buyer_requirements'],
     queryFn: async () => {
@@ -192,7 +203,7 @@ export default function BuyerDashboard() {
     }
   }, [lastMessage, refetchNegotiations, refetchListings, refetchRequirements]);
 
-  // Filter listings
+  // Filter listings (Produce lots from farmers)
   const allListings = useMemo(() => {
     return (listingsData || []).filter((item: any) => item && item.crop);
   }, [listingsData]);
@@ -213,6 +224,24 @@ export default function BuyerDashboard() {
     );
   }, [allListings, selectedCrop, searchTerm]);
 
+  // Filter Active Procurement Requirements (Buyer's Own Active Listings)
+  const filteredRequirements = useMemo(() => {
+    let list = requirementsData || [];
+    if (listingsFilterCrop) {
+      list = list.filter((r: any) => matchCrops(r.crop, listingsFilterCrop));
+    }
+    if (listingsSearch) {
+      const term = listingsSearch.toLowerCase().trim();
+      list = list.filter((r: any) =>
+        (r.crop && String(r.crop).toLowerCase().includes(term)) ||
+        (r.location && String(r.location).toLowerCase().includes(term)) ||
+        (r.buyer_name && String(r.buyer_name).toLowerCase().includes(term)) ||
+        (r.strategy && String(r.strategy).toLowerCase().includes(term))
+      );
+    }
+    return list;
+  }, [requirementsData, listingsFilterCrop, listingsSearch]);
+
   // Crop count dictionary for cards
   const cropListingCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -227,6 +256,26 @@ export default function BuyerDashboard() {
     return counts;
   }, [allListings]);
 
+  // MandiMitra Live Fetch Handler matching Farmer Dashboard
+  const handleFindMandis = async () => {
+    setMandiLoading(true);
+    setLocationStatus('locating');
+    try {
+      await Promise.all([
+        refetchMandi(),
+        refetchForecast(),
+        new Promise(resolve => setTimeout(resolve, 600))
+      ]);
+      setLocationStatus('found');
+      addNotification(`Live Mandi feeds & landed costs updated for ${radarCrop} in ${buyerLocation}!`, 'success');
+    } catch (err) {
+      setLocationStatus('error');
+      addNotification('Failed to fetch live Mandi feeds. Please try again.', 'error');
+    } finally {
+      setMandiLoading(false);
+    }
+  };
+
   // Open AI Negotiation Dialog from produce lot
   const handleOpenNegotiate = (item: any) => {
     setSelectedListing(item);
@@ -240,7 +289,7 @@ export default function BuyerDashboard() {
     setMaxCeilingPrice(sensibleCeiling);
   };
 
-  // Launch Autonomous Negotiation
+  // Launch Autonomous Negotiation from Produce Lot
   const handleLaunchNegotiation = async () => {
     if (!selectedListing) return;
     setIsStartingNeg(true);
@@ -279,12 +328,12 @@ export default function BuyerDashboard() {
     }
   };
 
-  // Launch or Re-enter Autonomous Negotiation for a Requirement
+  // Launch or Re-enter Autonomous Negotiation for an Active Requirement Listing
   const handleLaunchNegotiationForRequirement = async (req: any) => {
-    const reqId = req.id || req._id;
+    const reqId = req.id || req.requirement_id || req._id;
     const existingNeg = (negotiationsData || []).find((n: any) => 
-      (n.requirement_id && reqId && n.requirement_id === reqId) ||
-      (matchCrops(n.crop, req.crop) && (n.status === 'ACTIVE' || n.status === 'IN_PROGRESS'))
+      (n.requirement_id && reqId && (n.requirement_id === reqId || n.requirement_id === req.id || n.requirement_id === req.requirement_id)) ||
+      (matchCrops(n.crop, req.crop) && (n.status === 'ACTIVE' || n.status === 'IN_PROGRESS' || n.status === 'ROUND_1' || n.status === 'ROUND_2' || n.status === 'ROUND_3' || n.status === 'NEGOTIATING'))
     );
 
     if (existingNeg) {
@@ -299,16 +348,16 @@ export default function BuyerDashboard() {
       const payload = {
         crop: req.crop,
         quantity: Number(req.quantity) || 1000,
-        min_price: Number(req.target_price || req.expected_price || 40),
+        min_price: Number(req.target_price || req.min_price || req.expected_price || 40),
         shelf_life: Number(req.shelf_life) || 30,
         location: req.location || req.preferredLocation || 'Maharashtra',
         quality: req.quality_grade || req.quality || 'Grade A',
         buyer_mode: true,
         buyer_name: storedUser?.businessName || user?.name || user?.full_name || 'Buyer Enterprise',
-        buyer_budget: Number(req.quantity) * Number(req.max_price || req.maxBudget || 60),
+        buyer_budget: Number(req.quantity || 1000) * Number(req.max_price || req.maxBudget || 60),
         buyer_max_quantity: Number(req.quantity) || 1000,
-        buyer_target_price: Number(req.target_price || req.expected_price || 45),
-        buyer_location: req.location || req.preferredLocation || 'Maharashtra',
+        buyer_target_price: Number(req.target_price || req.min_price || req.expected_price || 45),
+        buyer_location: req.location || req.preferredLocation || buyerLocation || 'Maharashtra',
         buyer_strategy: activeBuyerPersona,
         buyer_persona: activeBuyerPersona,
         max_rounds: 5,
@@ -320,6 +369,7 @@ export default function BuyerDashboard() {
 
       addNotification(`Autonomous Buyer Agent dispatched! Room: ${negId || 'Active'}`, 'success');
       refetchNegotiations?.();
+      refetchRequirements?.();
       if (negId) {
         navigate(`/negotiations/${negId}`, { state: { autoStart: true } });
       }
@@ -372,6 +422,12 @@ export default function BuyerDashboard() {
     return { coords, pathD, areaD, width, height, minPrice, maxPrice };
   }, [chartPoints]);
 
+  const TrendIcon = ({ trend }: { trend?: string }) => {
+    if (trend === 'Bullish') return <TrendingUp size={14} className="text-emerald-500" />;
+    if (trend === 'Bearish') return <TrendingDown size={14} className="text-red-500" />;
+    return <Minus size={14} className="text-slate-400" />;
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-16">
       
@@ -400,12 +456,21 @@ export default function BuyerDashboard() {
           </button>
 
           <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium ${
-              isConnected ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-amber-50 text-amber-800 border-amber-200'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
-              <span>{isConnected ? 'APMC Live Sync' : 'Connecting...'}</span>
-            </div>
+            {/* Interactive APMC Live Sync matching Farmer Dashboard */}
+            <button
+              onClick={handleFindMandis}
+              disabled={mandiLoading}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium cursor-pointer transition hover:shadow-xs ${
+                isConnected ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'
+              }`}
+              title="Click to fetch and sync live APMC mandi data"
+            >
+              <span className={`w-2 h-2 rounded-full ${isConnected ? (mandiLoading ? 'bg-emerald-500 animate-ping' : 'bg-emerald-500 animate-pulse') : 'bg-amber-500'}`}></span>
+              <span className="flex items-center gap-1 font-semibold">
+                <Navigation size={11} className={mandiLoading ? 'animate-spin text-emerald-600' : 'text-emerald-600'} />
+                {mandiLoading ? 'Fetching...' : isConnected ? 'APMC Live Sync' : 'Connecting...'}
+              </span>
+            </button>
             <div className="text-right">
               <p className="text-[10px] text-slate-400 font-medium">Trust Score</p>
               <p className="text-sm font-bold text-emerald-600">4.9/5</p>
@@ -414,20 +479,20 @@ export default function BuyerDashboard() {
         </div>
       </div>
 
-      {/* ── 2. Stat Overview Grid ── */}
+      {/* ── 2. Stat Overview Grid (Parity with Farmer Dashboard) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard 
           icon={<ShoppingCart className="text-emerald-600" />} 
-          title="Verified Produce Lots" 
-          value={allListings.length} 
-          trend="35 active across Maharashtra" 
+          title="Active Listings" 
+          value={requirementsData?.length || 0} 
+          trend="+1 this week" 
           color="emerald" 
         />
         <StatCard 
-          icon={<Compass className="text-blue-600" />} 
-          title="Monitored Mandis" 
-          value="10 APMCs" 
-          trend="Pune, Nashik, Latur, Solapur..." 
+          icon={<TrendingUp className="text-blue-600" />} 
+          title="Market Trend" 
+          value={forecastData ? (forecastData.trend || "Stable") : (mandiData ? "Stable" : "Analyzing...")} 
+          trend={radarCrop ? `${radarCrop} ${forecastData?.trend === 'Bullish' ? '+15%' : '-5%'}` : "Fetch Mandis"} 
           color="blue" 
         />
         <StatCard 
@@ -478,12 +543,13 @@ export default function BuyerDashboard() {
             </div>
             <div className="mt-2">
               <p className="font-bold text-sm truncate">All Crops</p>
-              <p className={`text-[11px] mt-0.5 ${!selectedCrop ? 'text-emerald-200' : 'text-slate-500'}`}>
+              <p className={`text-[11px] mt-0.5 ${!selectedCrop ? 'text-emerald-200' : 'text-slate-400'}`}>
                 {allListings.length} lots total
               </p>
             </div>
           </button>
 
+          {/* 7 Canonical Crops */}
           {CANONICAL_7_CROPS.map((crop) => {
             const isSelected = selectedCrop === crop.id;
             const count = cropListingCounts[crop.id] || 0;
@@ -491,7 +557,7 @@ export default function BuyerDashboard() {
               <button
                 key={crop.id}
                 onClick={() => {
-                  setSelectedCrop(isSelected ? '' : crop.id);
+                  setSelectedCrop(crop.id);
                   setSearchTerm('');
                 }}
                 className={`p-3.5 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
@@ -510,7 +576,7 @@ export default function BuyerDashboard() {
                 </div>
                 <div className="mt-2">
                   <p className="font-bold text-sm truncate">{crop.name}</p>
-                  <p className={`text-[11px] mt-0.5 ${isSelected ? 'text-emerald-200' : 'text-slate-500'}`}>
+                  <p className={`text-[11px] mt-0.5 ${isSelected ? 'text-emerald-200' : 'text-slate-400'}`}>
                     {count} lots available
                   </p>
                 </div>
@@ -527,27 +593,53 @@ export default function BuyerDashboard() {
         <div className="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 flex flex-col justify-between">
           <div>
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Compass className="text-emerald-600" size={20} /> MandiMitra Procurement Radar
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Compares APMC terminal markets across Maharashtra for lowest landed procurement cost.
-                </p>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shadow">
+                  <Compass size={20} className="text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    MandiMitra — Mandi Comparison & Radar
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Government mandis within 500km · Live APMC prices · Landed cost after freight
+                  </p>
+                </div>
               </div>
 
-              {/* Location Selector */}
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-slate-500 font-medium">Buyer Facility:</span>
+              {/* Location, Crop & Fetch Controls (Farmer Parity) */}
+              <div className="flex items-center flex-wrap gap-2 text-xs">
                 <select
                   value={buyerLocation}
                   onChange={(e) => setBuyerLocation(e.target.value)}
-                  className="form-select text-xs py-1.5 px-2.5 rounded-lg border-slate-200 bg-slate-50 font-semibold text-slate-800 focus:ring-emerald-500"
+                  className="form-select text-xs py-1.5 px-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-400 outline-none cursor-pointer"
+                  title="Select Buyer Hub Location"
                 >
                   {MAHARASHTRA_BUYER_HUBS.map((hub) => (
-                    <option key={hub} value={hub}>{hub}, MH</option>
+                    <option key={hub} value={hub}>📍 {hub}, MH</option>
                   ))}
                 </select>
+
+                <select
+                  value={radarCrop}
+                  onChange={(e) => setSelectedCrop(e.target.value)}
+                  className="form-select text-xs py-1.5 px-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-400 outline-none cursor-pointer"
+                  title="Select Commodity Crop"
+                >
+                  {CANONICAL_CROPS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+
+                <button
+                  id="find-mandis-btn"
+                  onClick={handleFindMandis}
+                  disabled={mandiLoading}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer whitespace-nowrap active:scale-95"
+                >
+                  <Navigation size={13} className={mandiLoading ? 'animate-spin' : ''} />
+                  {mandiLoading ? 'Fetching...' : locationStatus === 'idle' ? 'Find Mandis' : 'Refresh'}
+                </button>
               </div>
             </div>
 
@@ -752,51 +844,42 @@ export default function BuyerDashboard() {
                     })}
 
                     {chartGeometry.coords.map((pt: any, idx: number) => (
-                      <g 
-                        key={idx} 
-                        className="cursor-pointer"
-                        onMouseEnter={() => setHoveredPoint(pt)}
-                        onMouseLeave={() => setHoveredPoint(null)}
-                      >
+                      <g key={idx}>
                         <circle
                           cx={pt.x}
                           cy={pt.y}
-                          r={hoveredPoint?.date === pt.date ? 6 : pt.date === 'Today' ? 4.5 : 3.5}
-                          fill={pt.date === 'Today' ? '#047857' : pt.is_projected ? '#10b981' : '#64748b'}
-                          stroke="#ffffff"
-                          strokeWidth="2"
+                          r={hoveredPoint === idx ? 6 : 4}
+                          className="cursor-pointer transition-all fill-emerald-600 stroke-white stroke-2 hover:fill-emerald-800"
+                          onMouseEnter={() => setHoveredPoint(idx)}
+                          onMouseLeave={() => setHoveredPoint(null)}
                         />
-                        {(idx % 2 === 0 || pt.date === 'Today') && (
-                          <text
-                            x={pt.x}
-                            y={chartGeometry.height - 8}
-                            textAnchor="middle"
-                            fontSize="10"
-                            fill={pt.date === 'Today' ? '#047857' : '#94a3b8'}
-                            fontWeight={pt.date === 'Today' ? '700' : '500'}
-                          >
-                            {pt.date}
-                          </text>
-                        )}
+                        <text
+                          x={pt.x}
+                          y={chartGeometry.height - 10}
+                          textAnchor="middle"
+                          className="text-[10px] fill-slate-500 font-medium"
+                        >
+                          {pt.date}
+                        </text>
                       </g>
                     ))}
                   </svg>
 
-                  {hoveredPoint && (
+                  {hoveredPoint !== null && (
                     <div 
-                      className="absolute bg-slate-900 text-white px-2.5 py-1.5 rounded-lg text-xs shadow-lg pointer-events-none transform -translate-x-1/2 -translate-y-full"
+                      className="absolute bg-slate-900 text-white text-[11px] px-2.5 py-1.5 rounded-lg shadow-xl pointer-events-none transform -translate-x-1/2 -translate-y-full transition-all"
                       style={{ 
-                        left: `${(hoveredPoint.x / chartGeometry.width) * 100}%`, 
-                        top: `${(hoveredPoint.y / chartGeometry.height) * 100}%` 
+                        left: `${(chartGeometry.coords[hoveredPoint].x / chartGeometry.width) * 100}%`,
+                        top: `${(chartGeometry.coords[hoveredPoint].y / chartGeometry.height) * 100 - 10}%`
                       }}
                     >
-                      <p className="font-semibold text-[10px] text-slate-300">{hoveredPoint.display_date || hoveredPoint.date}</p>
-                      <p className="font-bold text-emerald-400">price: ₹{hoveredPoint.price}/kg</p>
+                      <p className="font-bold">{chartGeometry.coords[hoveredPoint].date}</p>
+                      <p className="text-emerald-400 font-semibold">₹{chartGeometry.coords[hoveredPoint].price}/kg</p>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="h-44 flex items-center justify-center bg-slate-50 rounded-xl text-slate-400 text-xs">
+                <div className="h-44 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 text-xs">
                   Loading ML forecast projection...
                 </div>
               )}
@@ -806,271 +889,309 @@ export default function BuyerDashboard() {
 
       </div>
 
-      {/* ── 5. Marketplace Produce Lots & Buyer Requirements Section ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* ── 5. Main Grid: Listings, Negotiations & Live Feed (Farmer Parity Layout matching Image 2) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* ── Left Column: Tables with Tabs (8 Cols) ── */}
-        <div className="lg:col-span-8 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col justify-between">
-          <div>
-            {/* Tab Header */}
-            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/60">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => setActiveTab('lots')}
-                  className={`px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-2 ${
-                    activeTab === 'lots' 
-                      ? 'bg-emerald-600 text-white shadow-sm' 
-                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-                  }`}
-                >
-                  <ShoppingCart size={15} /> Produce Lots ({filteredListings.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab('requirements')}
-                  className={`px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer flex items-center gap-2 ${
-                    activeTab === 'requirements' 
-                      ? 'bg-emerald-600 text-white shadow-sm' 
-                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
-                  }`}
-                >
-                  <Target size={15} /> Your Requirements ({requirementsData?.length || 0})
-                </button>
+        {/* Left Column (2 Cols): Active Listings & Active Negotiations */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
 
-                {selectedCrop && (
-                  <button
-                    onClick={() => setSelectedCrop('')}
-                    className="text-[11px] text-emerald-800 hover:text-emerald-950 font-semibold bg-emerald-100/80 border border-emerald-300 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition shadow-xs"
-                    title="Click to view all produce lots"
-                  >
-                    Crop: {selectedCrop} • <span className="underline">View All ({allListings.length})</span>
-                    <X size={12} className="ml-0.5 text-emerald-700" />
-                  </button>
-                )}
+          {/* Card 1: Your Active Listings (Procurement Orders matching Image 2) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center">
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-lg text-slate-800">Your Active Listings</h2>
+                <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-200">
+                  Procurement Orders
+                </span>
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <div className="relative flex-1 sm:w-56">
-                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search farmer, district..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:ring-emerald-500"
-                  />
-                  {searchTerm && (
-                    <button onClick={() => setSearchTerm('')} className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600">
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="text" 
+                  placeholder="Search..." 
+                  value={listingsSearch}
+                  onChange={e => setListingsSearch(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                />
+                <select 
+                  value={listingsFilterCrop} 
+                  onChange={e => setListingsFilterCrop(e.target.value)}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-400 font-medium"
+                >
+                  <option value="">All 7 Crops</option>
+                  {CANONICAL_CROPS.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <button
+                  id="new-listing-btn"
+                  onClick={() => setIsPostReqModalOpen(true)}
+                  className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg flex items-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <Plus size={16} /> New Listing
+                </button>
               </div>
             </div>
 
-            {/* TAB 1: Produce Lots Table */}
-            {activeTab === 'lots' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                      <th className="py-3 px-4">Crop & Variety</th>
-                      <th className="py-3 px-4">Farmer / Location</th>
-                      <th className="py-3 px-4">Volume</th>
-                      <th className="py-3 px-4">Grade</th>
-                      <th className="py-3 px-4">Asking Price</th>
-                      <th className="py-3 px-4 text-center">Action</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Crop</th>
+                    <th className="px-5 py-3 font-medium">Volume</th>
+                    <th className="px-5 py-3 font-medium">Base Price</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredRequirements.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-slate-400">
+                        No active procurement listings found. Click "+ New Listing" to post.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {isLoadingListings ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
-                          Querying Maharashtra produce lots...
-                        </td>
-                      </tr>
-                    ) : filteredListings.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
-                          No active lots found for {selectedCrop || 'your search'} matching your filters.
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredListings.map((item: any) => (
-                        <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <p className="font-bold text-slate-900 text-sm">{item.crop}</p>
-                            <p className="text-[11px] text-slate-500">{item.variety || 'Certified Lot'}</p>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <p className="font-medium text-slate-800">{item.farmer_name || 'Maharashtra Farmer'}</p>
-                            <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                              <MapPin size={10} /> {item.location}
-                            </p>
-                          </td>
-                          <td className="py-3.5 px-4 font-semibold text-slate-700">
-                            {Number(item.quantity).toLocaleString()} kg
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                              item.grade?.includes('A') ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
-                            }`}>
-                              {item.grade || 'Grade A'}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-bold text-slate-900 text-sm">
-                              ₹{item.min_price || item.expected_price}/kg
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <button
-                              onClick={() => handleOpenNegotiate(item)}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-sm transition-all flex items-center gap-1.5 mx-auto cursor-pointer"
-                            >
-                              <Zap size={13} className="text-amber-300" />
-                              Negotiate with AI
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  ) : (
+                    filteredRequirements.map((req: any) => {
+                      const reqId = req.id || req.requirement_id || req._id;
+                      const matchingNeg = (negotiationsData || []).find((n: any) => 
+                        (n.requirement_id && (n.requirement_id === reqId || n.requirement_id === req.id || n.requirement_id === req.requirement_id)) ||
+                        (matchCrops(n.crop, req.crop) && (n.status === 'ACTIVE' || n.status === 'IN_PROGRESS' || n.status === 'ROUND_1' || n.status === 'ROUND_2' || n.status === 'ROUND_3' || n.status === 'NEGOTIATING'))
+                      );
+                      const isNegotiating = Boolean(matchingNeg);
+                      const status = isNegotiating ? 'NEGOTIATING' : (req.status || 'ACTIVE');
 
-            {/* TAB 2: Your Active Requirements */}
-            {activeTab === 'requirements' && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-                      <th className="py-3 px-4">Required Commodity</th>
-                      <th className="py-3 px-4">Target Quantity</th>
-                      <th className="py-3 px-4">Target / Max Price</th>
-                      <th className="py-3 px-4">Delivery Facility</th>
-                      <th className="py-3 px-4">Logistics</th>
-                      <th className="py-3 px-4 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {!requirementsData || requirementsData.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
-                          No active procurement requirements posted yet.<br />
-                          Click "+ Post Procurement Requirement" above to define your volume & quality needs.
-                        </td>
-                      </tr>
-                    ) : (
-                      requirementsData.map((req: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <p className="font-bold text-slate-900 text-sm">{req.crop}</p>
-                            <p className="text-[11px] text-slate-500">{req.quality_grade || 'Grade A'}</p>
+                      return (
+                        <tr key={reqId} className="hover:bg-slate-50/50 transition">
+                          <td className="px-5 py-4 font-medium text-slate-800">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900">{req.crop}</span>
+                              <span className="text-[11px] text-slate-400">{req.quality_grade || req.strategy || req.location || 'Grade A'}</span>
+                            </div>
                           </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-800">
-                            {Number(req.quantity).toLocaleString()} {req.unit || 'kg'}
+                          <td className="px-5 py-4 text-slate-600">
+                            {Number(req.quantity || 1000).toLocaleString()} kg
                           </td>
-                          <td className="py-3.5 px-4">
-                            <span className="font-bold text-emerald-700">₹{req.target_price || req.maxBudget}/kg</span>
-                            <span className="text-slate-400 text-[10px]"> (Max ₹{req.max_price || req.maxBudget}/kg)</span>
+                          <td className="px-5 py-4 font-medium text-emerald-600">
+                            ₹{req.target_price || req.min_price || req.maxBudget || 45}/kg
                           </td>
-                          <td className="py-3.5 px-4 text-slate-600">
-                            {req.location || req.preferredLocation || 'Maharashtra'}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              req.transportRequired || req.transport_required ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
+                          <td className="px-5 py-4">
+                            <span className={`px-2.5 py-1 text-xs rounded-full font-bold inline-flex items-center gap-1 ${
+                              status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-800' :
+                              status === 'NEGOTIATING' ? 'bg-blue-100 text-blue-700' :
+                              status === 'DEAL' ? 'bg-purple-100 text-purple-700' :
+                              'bg-slate-100 text-slate-600'
                             }`}>
-                              {req.transportRequired || req.transport_required ? 'Freight Required' : 'Self-Arranged'}
+                              {status}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                          <td className="px-5 py-4">
+                            <div className="flex items-center gap-2">
+                              {status === 'NEGOTIATING' ? (
+                                <button
+                                  onClick={() => {
+                                    const negId = matchingNeg?.negotiation_id || matchingNeg?.id;
+                                    if (negId) {
+                                      navigate(`/negotiations/${negId}`);
+                                    } else {
+                                      navigate('/negotiations');
+                                    }
+                                  }}
+                                  className="text-emerald-600 font-bold hover:underline text-xs whitespace-nowrap cursor-pointer"
+                                >
+                                  View Room
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleLaunchNegotiationForRequirement(req)}
+                                  disabled={isStartingNeg}
+                                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm whitespace-nowrap cursor-pointer active:scale-95 disabled:opacity-50"
+                                >
+                                  AI Match & Negotiate
+                                </button>
+                              )}
+
                               <button
-                                onClick={() => handleLaunchNegotiationForRequirement(req)}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition flex items-center gap-1.5 cursor-pointer"
-                                title="Launch or Enter AI Negotiation Room"
-                              >
-                                <Zap size={13} className="fill-amber-300 text-amber-300" />
-                                <span>Negotiate with AI</span>
-                              </button>
-                              <button
+                                title="Edit Requirement"
                                 onClick={() => {
                                   setSelectedCrop(req.crop);
-                                  setActiveTab('lots');
+                                  setIsPostReqModalOpen(true);
                                 }}
-                                className="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-semibold text-xs transition cursor-pointer"
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                               >
-                                Lots →
+                                <Edit2 size={14} />
                               </button>
+
                               <button
-                                onClick={() => handleDeleteRequirement(req.id || req._id, req.crop)}
+                                title="Expire / Delete Listing"
+                                onClick={() => handleDeleteRequirement(reqId, req.crop)}
                                 className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition cursor-pointer"
-                                title="Remove requirement"
                               >
-                                <Trash2 size={13} />
+                                <Trash2 size={14} />
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
+          {/* Card 2: Your Active Negotiations (matching Image 2) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center">
+              <h2 className="font-bold text-lg text-slate-800">Your Active Negotiations</h2>
+              <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
+                {negotiationsData?.length || 0} Total Active
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="px-5 py-3 font-medium">Crop</th>
+                    <th className="px-5 py-3 font-medium">Volume</th>
+                    <th className="px-5 py-3 font-medium">Latest Price</th>
+                    <th className="px-5 py-3 font-medium">Logistics / Carrier</th>
+                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {!negotiationsData || negotiationsData.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-400">
+                        No active negotiations found. Click "AI Match & Negotiate" on any listing above to start.
+                      </td>
+                    </tr>
+                  ) : (
+                    negotiationsData.map((neg: any) => {
+                      const tp = typeof neg.transport_plan === 'string' && neg.transport_plan.startsWith('{')
+                        ? JSON.parse(neg.transport_plan)
+                        : neg.transport_plan;
+                      const negId = neg.negotiation_id || neg.id;
+
+                      return (
+                        <tr key={negId} className="hover:bg-slate-50/50 transition">
+                          <td className="px-5 py-4 font-medium text-slate-800">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-900">{neg.crop || 'Soybean'}</span>
+                              {(neg.listing_id || neg.requirement_id) && (
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  Lot #{(neg.listing_id || neg.requirement_id).substring(0, 8)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-5 py-4 text-slate-600">
+                            {Number(neg.quantity || 1000).toLocaleString()} kg
+                          </td>
+                          <td className="px-5 py-4 font-medium text-emerald-600">
+                            ₹{neg.final_price || neg.current_offer || neg.market_price || neg.min_price || neg.target_price || 0}/kg
+                          </td>
+                          <td className="px-5 py-4">
+                            {tp ? (
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-slate-800 text-xs flex items-center gap-1">
+                                  <Truck size={12} className="text-emerald-600" />
+                                  {tp.vehicle_name || tp.agent || 'Assigned Carrier'}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-medium">
+                                  ₹{(tp.cost || tp.agreed_price || 0).toLocaleString()} • {tp.distance || '0'} km
+                                </span>
+                              </div>
+                            ) : neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? (
+                              <span className="text-[11px] text-slate-400 italic">Dispatch Scheduled</span>
+                            ) : (
+                              <span className="text-[11px] text-slate-400">Coordinating...</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-4">
+                            <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+                              neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-700' :
+                              neg.status === 'NO_DEAL' || neg.status === 'FAILED' ? 'bg-red-100 text-red-700' :
+                              'bg-blue-100 text-blue-700'
+                            }`}>
+                              {neg.status || 'ACTIVE'}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4 flex items-center flex-wrap gap-2">
+                            <button
+                              onClick={() => navigate(`/negotiations/${negId}`)}
+                              className="text-blue-600 font-bold hover:underline text-xs cursor-pointer"
+                            >
+                              View Room
+                            </button>
+                            {(neg.status === 'DEAL' || neg.status === 'ACCEPTED') && (
+                              <button
+                                onClick={() => {
+                                  setContractModalDeal(neg);
+                                  setIsContractModalOpen(true);
+                                }}
+                                className="text-emerald-700 font-bold hover:underline text-xs flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200 transition cursor-pointer"
+                              >
+                                <FileText size={11} /> Contract
+                              </button>
+                            )}
+                            {tp && (
+                              <button
+                                onClick={() => navigate('/dashboard/transport')}
+                                className="text-emerald-600 font-semibold hover:underline text-xs flex items-center gap-0.5 ml-1 cursor-pointer"
+                              >
+                                <Truck size={11} /> Fleet
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-          
-          <div className="p-4 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 flex justify-between items-center">
-            <span>Showing {activeTab === 'lots' ? filteredListings.length : (requirementsData?.length || 0)} items in Maharashtra</span>
-            <span className="font-medium text-emerald-700">Autonomous multi-agent matching ready</span>
-          </div>
+
         </div>
 
-        {/* ── Right Column: Live Market Feeds & Strategic Insights (4 Cols) ── */}
-        <div className="lg:col-span-4 space-y-6">
-
-          {/* Live Market Updates Sidebar */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5">
-            <h2 className="font-bold text-base text-slate-900 mb-3 flex items-center justify-between">
+        {/* Right Column (1 Col): Live Market Updates & Multi-Agent Engine (matching Image 2) */}
+        <div className="flex flex-col gap-6">
+          {/* Live Market Updates Card matching Image 2 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+            <h2 className="font-bold text-base text-slate-800 mb-3 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <AlertCircle size={18} className="text-emerald-600" /> Live Market Feeds
+                <AlertCircle size={18} className="text-emerald-600" /> Live Market Updates
               </span>
               <span className="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-100">
                 APMC Realtime
               </span>
             </h2>
-            <div className="space-y-3 text-xs">
-              <div className="p-3.5 bg-emerald-50/70 border border-emerald-100 rounded-xl">
-                <p className="font-bold text-emerald-900 flex items-center gap-1.5">
-                  <TrendingUp size={13} className="text-emerald-600" /> MandiMitra Alert
-                </p>
-                <p className="text-slate-600 mt-1 leading-relaxed">
-                  Pune APMC: Soybean modal rate settled at ₹33.29/kg with 180 MT inbound arrivals.
+            <div className="space-y-4 text-xs">
+              <div>
+                <p className="font-semibold text-slate-500">Recent Activity</p>
+                <p className="text-slate-800 mt-0.5 leading-relaxed font-medium">
+                  Your latest requirement was indexed and matched against active farmer produce lots across Maharashtra.
                 </p>
               </div>
-              <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-xl">
-                <p className="font-bold text-blue-900 flex items-center gap-1.5">
-                  <Bot size={13} className="text-blue-600" /> Buyer Agent Matching
-                </p>
-                <p className="text-slate-600 mt-1 leading-relaxed">
-                  Matching against 6 criteria: Crop, Quantity, Quality Grade, Location, Price & Freight.
+              <div className="pt-3 border-t border-slate-100">
+                <p className="font-semibold text-slate-500">Market Insight</p>
+                <p className="text-slate-800 mt-0.5 leading-relaxed font-medium">
+                  Local processors and solvent extractors are paying premium for Grade A low-moisture Soybean this week.
                 </p>
               </div>
-              <div className="p-3.5 bg-slate-50 border border-slate-200/70 rounded-xl">
-                <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Building2 size={13} className="text-slate-600" /> Processing Industry Insight
-                </p>
-                <p className="text-slate-600 mt-1 leading-relaxed">
-                  Crushing units in Solapur & Latur are paying premium for Grade A low-moisture oilseeds.
+              <div className="pt-3 border-t border-slate-100">
+                <p className="font-semibold text-slate-500">Logistics Optimization</p>
+                <p className="text-slate-800 mt-0.5 leading-relaxed font-medium">
+                  Average freight across Western Maharashtra stabilized at ₹1.85/kg with 15 verified carrier fleets standby.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Quick Negotiation Stats Card */}
+          {/* Autonomous Multi-Agent Card */}
           <div className="bg-gradient-to-br from-emerald-900 to-slate-900 rounded-2xl p-5 text-white shadow-sm">
             <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
               <Activity size={14} className="text-emerald-400" /> Multi-Agent Engine
@@ -1088,137 +1209,115 @@ export default function BuyerDashboard() {
               </span>
             </div>
           </div>
-
         </div>
 
       </div>
 
-      {/* ── 6. Your Active Negotiations Table (Identical Full-Width Section to Farmer Dashboard) ── */}
+      {/* ── 6. Marketplace Produce Lots (Farmer Lots for Direct Discovery & Negotiation) ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-slate-50/60">
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/60">
           <div>
             <h2 className="font-bold text-lg text-slate-900 flex items-center gap-2">
-              <Activity size={20} className="text-emerald-600" /> Your Active Negotiations
+              <ShoppingCart className="text-emerald-600" size={20} /> Verified Produce Lots (Supplier Discovery)
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Live status, negotiated price points, carrier dispatch, and official APMC smart contracts.
+              Direct farmgate produce lots across Maharashtra with certified moisture, quality grades, and instant AI negotiation.
             </p>
           </div>
-          <span className="text-xs bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full font-bold">
-            {negotiationsData?.length || 0} Total Active
-          </span>
+          <div className="flex items-center gap-3">
+            <div className="relative w-56">
+              <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search farmer, district..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:ring-emerald-500"
+              />
+            </div>
+            {selectedCrop && (
+              <button
+                onClick={() => setSelectedCrop('')}
+                className="text-[11px] text-emerald-800 hover:text-emerald-950 font-semibold bg-emerald-100/80 border border-emerald-300 px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition shadow-xs"
+              >
+                Clear Crop Filter
+                <X size={12} className="ml-0.5 text-emerald-700" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
-              <tr>
-                <th className="px-5 py-3.5 font-medium text-xs">Crop</th>
-                <th className="px-5 py-3.5 font-medium text-xs">Volume</th>
-                <th className="px-5 py-3.5 font-medium text-xs">Latest Price</th>
-                <th className="px-5 py-3.5 font-medium text-xs">Logistics / Carrier</th>
-                <th className="px-5 py-3.5 font-medium text-xs">Status</th>
-                <th className="px-5 py-3.5 font-medium text-xs">Action</th>
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                <th className="py-3 px-4">Crop & Variety</th>
+                <th className="py-3 px-4">Farmer / Location</th>
+                <th className="py-3 px-4">Volume</th>
+                <th className="py-3 px-4">Grade</th>
+                <th className="py-3 px-4">Asking Price</th>
+                <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {!negotiationsData || negotiationsData.length === 0 ? (
+              {isLoadingListings ? (
                 <tr>
-                  <td colSpan={6} className="p-10 text-center text-slate-400 text-xs">
-                    No active negotiations found. Click "Negotiate with AI" on any produce lot above to launch.
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    Querying Maharashtra produce lots...
+                  </td>
+                </tr>
+              ) : filteredListings.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    No active lots found matching your filter.
                   </td>
                 </tr>
               ) : (
-                negotiationsData.map((neg: any) => {
-                  const tp = typeof neg.transport_plan === 'string' && neg.transport_plan.startsWith('{')
-                    ? JSON.parse(neg.transport_plan)
-                    : neg.transport_plan;
-
-                  const negId = neg.negotiation_id || neg.id;
-
-                  return (
-                    <tr key={negId} className="hover:bg-slate-50/60 transition">
-                      <td className="px-5 py-4 font-medium text-slate-800">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-900">{neg.crop || 'Soybean'}</span>
-                          {(neg.listing_id || neg.requirement_id) && (
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              Lot #{(neg.listing_id || neg.requirement_id).substring(0, 8)}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-slate-600 font-medium">
-                        {Number(neg.quantity || 1000).toLocaleString()} kg
-                      </td>
-                      <td className="px-5 py-4 font-bold text-emerald-600">
-                        ₹{neg.final_price || neg.current_offer || neg.market_price || neg.min_price || neg.target_price || 0}/kg
-                      </td>
-                      <td className="px-5 py-4">
-                        {tp ? (
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-slate-800 text-xs flex items-center gap-1">
-                              <Truck size={12} className="text-emerald-600" />
-                              {tp.vehicle_name || tp.agent || 'Assigned Carrier'}
-                            </span>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              ₹{(tp.cost || tp.agreed_price || 0).toLocaleString()} • {tp.distance || '0'} km
-                            </span>
-                          </div>
-                        ) : neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? (
-                          <span className="text-[11px] text-slate-400 italic">Dispatch Scheduled</span>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">Coordinating...</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`px-2.5 py-1 text-xs rounded-full font-bold ${
-                          neg.status === 'DEAL' || neg.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-700' :
-                          neg.status === 'NO_DEAL' || neg.status === 'FAILED' ? 'bg-red-100 text-red-700' :
-                          neg.status === 'NO_EXECUTABLE_DEAL' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
-                          'bg-blue-100 text-blue-700'
-                        }`}>
-                          {neg.status || 'ACTIVE'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 flex items-center flex-wrap gap-2">
-                        <button 
-                          onClick={() => navigate(`/negotiations/${negId}`)} 
-                          className="text-blue-600 font-bold hover:underline text-xs cursor-pointer"
-                        >
-                          View Room
-                        </button>
-                        {(neg.status === 'DEAL' || neg.status === 'ACCEPTED') && (
-                          <button
-                            onClick={() => {
-                              setContractModalDeal(neg);
-                              setIsContractModalOpen(true);
-                            }}
-                            className="text-emerald-700 font-bold hover:underline text-xs flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-md border border-emerald-200 transition cursor-pointer"
-                            title="View & Download Official APMC Contract"
-                          >
-                            <FileText size={11} /> Contract
-                          </button>
-                        )}
-                        {tp && (
-                          <button 
-                            onClick={() => navigate('/dashboard/transport')} 
-                            className="text-emerald-600 font-semibold hover:underline text-xs flex items-center gap-0.5 ml-1 cursor-pointer"
-                          >
-                            <Truck size={11} /> Fleet
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
+                filteredListings.map((item: any) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3.5 px-4">
+                      <p className="font-bold text-slate-900 text-sm">{item.crop}</p>
+                      <p className="text-[11px] text-slate-500">{item.variety || 'Certified Lot'}</p>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <p className="font-medium text-slate-800">{item.farmer_name || 'Maharashtra Farmer'}</p>
+                      <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} /> {item.location}
+                      </p>
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-700">
+                      {Number(item.quantity).toLocaleString()} kg
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                        item.grade?.includes('A') ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'
+                      }`}>
+                        {item.grade || 'Grade A'}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-bold text-slate-900 text-sm">
+                        ₹{item.min_price || item.expected_price}/kg
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <button
+                        onClick={() => handleOpenNegotiate(item)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs shadow-sm transition-all flex items-center gap-1.5 mx-auto cursor-pointer active:scale-95"
+                      >
+                        <Zap size={13} className="text-amber-300" />
+                        Negotiate with AI
+                      </button>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* ── 6. Autonomous Buyer Agent Negotiation Launch Modal (from Lot) ── */}
+      {/* ── 7. Autonomous Buyer Agent Negotiation Launch Modal (from Lot) ── */}
       {selectedListing && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -1240,7 +1339,7 @@ export default function BuyerDashboard() {
               </div>
               <button 
                 onClick={() => setSelectedListing(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
               >
                 <X size={18} />
               </button>
@@ -1321,14 +1420,14 @@ export default function BuyerDashboard() {
             <div className="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
               <button
                 onClick={() => setSelectedListing(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleLaunchNegotiation}
                 disabled={isStartingNeg}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md transition flex items-center gap-2 disabled:opacity-50"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2 rounded-xl text-xs shadow-md transition flex items-center gap-2 disabled:opacity-50 cursor-pointer active:scale-95"
               >
                 {isStartingNeg ? (
                   <>Launching Agent...</>
@@ -1345,7 +1444,7 @@ export default function BuyerDashboard() {
         </div>
       )}
 
-      {/* ── 7. Multi-Step Post Procurement Requirement Modal ── */}
+      {/* ── 8. Multi-Step Post Procurement Requirement Modal ── */}
       <PostRequirementModal
         isOpen={isPostReqModalOpen}
         onClose={() => setIsPostReqModalOpen(false)}
@@ -1359,7 +1458,7 @@ export default function BuyerDashboard() {
         }}
       />
 
-      {/* ── 8. APMC Validated Smart Contract Modal matching Farmer Dashboard ── */}
+      {/* ── 9. APMC Validated Smart Contract Modal matching Farmer Dashboard ── */}
       <TransactionValidationModal
         isOpen={isContractModalOpen}
         onClose={() => setIsContractModalOpen(false)}

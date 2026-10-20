@@ -1,0 +1,714 @@
+WARNING:root:⚠️ PostgreSQL not reachable or credentials invalid. Falling back to local SQLite: agrinegotiator.db
+WARNING:RAGService:External ChromaDB HTTP client failed: Could not connect to a Chroma server. Are you sure it is running?. Falling back to local PersistentClient.
+WARNING:pypdf._reader:incorrect startxref pointer(1)
+WARNING:pypdf._reader:parsing for Object Streams
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+WARNING:huggingface_hub.utils._http:Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+DEBUG: Hub Global Instance Created: 2729100277376
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 6326.81it/s]
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Latur High Moisture Producer (Latur) | Ask: ₹52.00/kg | Dist: 110.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Latur High Moisture Producer (Latur): Seller Ask ₹52.00 | Buyer Bid ₹40.58 -> COUNTER
+⚡ [ROUND 2] Branch #1 | Latur High Moisture Producer (Latur): Seller Ask ₹51.20 | Buyer Bid ₹51.20 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Latur High Moisture Producer (Latur)
+   Final Agreed Price: ₹51.20/kg | Freight: ₹0.49/kg | Landed Cost: ₹52.20/kg
+   Total Value: ₹256,000.00 | Savings vs Ceiling: ₹19,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Unyielding Producer 1 (Nashik) | Ask: ₹999.00/kg | Dist: 110.0 km | Special: Commercial Lot
+   [2] Unyielding Producer 2 (Nashik) | Ask: ₹999.00/kg | Dist: 120.0 km | Special: Commercial Lot
+   [3] Unyielding Producer 3 (Nashik) | Ask: ₹999.00/kg | Dist: 130.0 km | Special: Commercial Lot
+   [4] Unyielding Producer 4 (Nashik) | Ask: ₹999.00/kg | Dist: 140.0 km | Special: Commercial Lot
+   [5] Unyielding Producer 5 (Nashik) | Ask: ₹999.00/kg | Dist: 150.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Unyielding Producer 1 (Nashik): Seller Ask ₹999.00 | Buyer Bid ₹999.00 -> REJECT
+⚡ [ROUND 1] Branch #2 | Unyielding Producer 2 (Nashik): Seller Ask ₹999.00 | Buyer Bid ₹999.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Unyielding Producer 3 (Nashik): Seller Ask ₹999.00 | Buyer Bid ₹999.00 -> REJECT
+⚡ [ROUND 1] Branch #4 | Unyielding Producer 4 (Nashik): Seller Ask ₹999.00 | Buyer Bid ₹999.00 -> REJECT
+⚡ [ROUND 1] Branch #5 | Unyielding Producer 5 (Nashik): Seller Ask ₹999.00 | Buyer Bid ₹999.00 -> REJECT
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 10,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-3 Candidate Suppliers across Maharashtra mandis:
+   [1] Farmer A (5,000kg) (Pune) | Ask: ₹48.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Farmer B (3,000kg) (Pune) | Ask: ₹49.00/kg | Dist: 60.0 km | Special: Commercial Lot
+   [3] Farmer C (2,000kg) (Pune) | Ask: ₹50.00/kg | Dist: 70.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Farmer A (5,000kg) (Pune): Seller Ask ₹48.00 | Buyer Bid ₹48.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Farmer B (3,000kg) (Pune): Seller Ask ₹49.00 | Buyer Bid ₹49.00 -> ACCEPT
+⚡ [ROUND 1] Branch #3 | Farmer C (2,000kg) (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Farmer A (5,000kg) (Pune)
+   Final Agreed Price: ₹48.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹48.89/kg
+   Total Value: ₹480,000.00 | Savings vs Ceiling: ₹70,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 100kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 499kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 500kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 500kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 500kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹1.30/kg | Landed Cost: ₹51.80/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 501kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 501kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 501kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹1.30/kg | Landed Cost: ₹51.80/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 2500kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 2500kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 2500kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.48/kg | Landed Cost: ₹50.98/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 5000kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 5000kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 5000kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 10000kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 10000kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 10000kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Sugarcane | Qty: 10,000 kg | Target: ₹3.40/kg | Ceiling: ₹3.80/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Kolhapur Panchganga Cane Growers Co-op (Kolhapur, Maharashtra) | Ask: ₹3.54/kg | Dist: 210.0 km | Special: High Sucrose 12.5% Brix
+   [2] Sangli Krishna Valley Sugar Belt FPO (Sangli, Maharashtra) | Ask: ₹3.60/kg | Dist: 190.0 km | Special: Fresh Harvest Lot
+   [3] Baramati Cane Producers Society (Pune, Maharashtra) | Ask: ₹3.67/kg | Dist: 75.0 km | Special: Express Gate Transit
+   [4] Satara Cane & Bio-Agro Producers Group (Satara, Maharashtra) | Ask: ₹3.74/kg | Dist: 115.0 km | Special: FRP Direct Compliant
+   [5] Ahmednagar Sugar Cane Cooperative (Ahmednagar, Maharashtra) | Ask: ₹3.81/kg | Dist: 150.0 km | Special: Bulk Crusher Ready
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Kolhapur Panchganga Cane Growers Co-op (Kolhapur, Maharashtra): Seller Ask ₹3.54 | Buyer Bid ₹3.22 -> COUNTER
+⚡ [ROUND 1] Branch #3 | Baramati Cane Producers Society (Pune, Maharashtra): Seller Ask ₹3.67 | Buyer Bid ₹3.22 -> REJECT
+⚡ [ROUND 1] Branch #5 | Ahmednagar Sugar Cane Cooperative (Ahmednagar, Maharashtra): Seller Ask ₹3.81 | Buyer Bid ₹3.22 -> REJECT
+⚡ [ROUND 1] Branch #2 | Sangli Krishna Valley Sugar Belt FPO (Sangli, Maharashtra): Seller Ask ₹3.60 | Buyer Bid ₹3.22 -> REJECT
+⚡ [ROUND 1] Branch #4 | Satara Cane & Bio-Agro Producers Group (Satara, Maharashtra): Seller Ask ₹3.74 | Buyer Bid ₹3.22 -> REJECT
+⚡ [ROUND 2] Branch #1 | Kolhapur Panchganga Cane Growers Co-op (Kolhapur, Maharashtra): Seller Ask ₹3.49 | Buyer Bid ₹3.49 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Kolhapur Panchganga Cane Growers Co-op (Kolhapur, Maharashtra)
+   Final Agreed Price: ₹3.49/kg | Freight: ₹0.49/kg | Landed Cost: ₹4.01/kg
+   Total Value: ₹34,900.00 | Savings vs Ceiling: ₹3,100.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹52.00/kg | Ceiling: ₹56.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra) | Ask: ₹54.08/kg | Dist: 220.0 km | Special: 18.5% Oil Content
+   [2] Nanded Krishi Vikas Agro Consortium (Nanded, Maharashtra) | Ask: ₹55.12/kg | Dist: 280.0 km | Special: Moisture < 10%
+   [3] Barshi Soybean Producers Union (Solapur, Maharashtra) | Ask: ₹56.16/kg | Dist: 180.0 km | Special: Certified Commercial Lot
+   [4] Hingoli Green Oilseeds Cluster (Hingoli, Maharashtra) | Ask: ₹57.20/kg | Dist: 310.0 km | Special: Bulk Hopper Delivery
+   [5] Amravati Krishi Sahakari Sanstha (Amravati, Maharashtra) | Ask: ₹58.24/kg | Dist: 390.0 km | Special: Solvent Grade Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra): Seller Ask ₹54.08 | Buyer Bid ₹42.20 -> COUNTER
+⚡ [ROUND 1] Branch #3 | Barshi Soybean Producers Union (Solapur, Maharashtra): Seller Ask ₹56.16 | Buyer Bid ₹42.20 -> REJECT
+⚡ [ROUND 1] Branch #5 | Amravati Krishi Sahakari Sanstha (Amravati, Maharashtra): Seller Ask ₹58.24 | Buyer Bid ₹42.20 -> REJECT
+⚡ [ROUND 1] Branch #2 | Nanded Krishi Vikas Agro Consortium (Nanded, Maharashtra): Seller Ask ₹55.12 | Buyer Bid ₹42.20 -> REJECT
+⚡ [ROUND 1] Branch #4 | Hingoli Green Oilseeds Cluster (Hingoli, Maharashtra): Seller Ask ₹57.20 | Buyer Bid ₹42.20 -> REJECT
+⚡ [ROUND 2] Branch #1 | Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra): Seller Ask ₹53.28 | Buyer Bid ₹53.28 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra)
+   Final Agreed Price: ₹53.28/kg | Freight: ₹0.64/kg | Landed Cost: ₹54.45/kg
+   Total Value: ₹266,400.00 | Savings vs Ceiling: ₹13,600.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Cotton | Qty: 5,000 kg | Target: ₹75.00/kg | Ceiling: ₹82.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Vidarbha White Gold Farmers Producer Co. (Wardha, Maharashtra) | Ask: ₹78.00/kg | Dist: 310.0 km | Special: 29mm Staple Length
+   [2] Akola Cotton Growers Association (Akola, Maharashtra) | Ask: ₹79.50/kg | Dist: 280.0 km | Special: Micronaire 4.0
+   [3] Yavatmal Kapas Utpadak Sahakari Sangh (Yavatmal, Maharashtra) | Ask: ₹81.00/kg | Dist: 340.0 km | Special: Moisture < 8%
+   [4] Jalgaon Cotton Ginning Farmer Pool (Jalgaon, Maharashtra) | Ask: ₹82.50/kg | Dist: 240.0 km | Special: Direct Ginning Pass
+   [5] Chhatrapati Sambhajinagar Agri Consortium (Aurangabad, Maharashtra) | Ask: ₹84.00/kg | Dist: 195.0 km | Special: Clean Lint Baleable
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Vidarbha White Gold Farmers Producer Co. (Wardha, Maharashtra): Seller Ask ₹78.00 | Buyer Bid ₹60.83 -> COUNTER
+⚡ [ROUND 1] Branch #3 | Yavatmal Kapas Utpadak Sahakari Sangh (Yavatmal, Maharashtra): Seller Ask ₹81.00 | Buyer Bid ₹60.83 -> REJECT
+⚡ [ROUND 1] Branch #5 | Chhatrapati Sambhajinagar Agri Consortium (Aurangabad, Maharashtra): Seller Ask ₹84.00 | Buyer Bid ₹60.83 -> REJECT
+⚡ [ROUND 1] Branch #2 | Akola Cotton Growers Association (Akola, Maharashtra): Seller Ask ₹79.50 | Buyer Bid ₹60.83 -> REJECT
+⚡ [ROUND 1] Branch #4 | Jalgaon Cotton Ginning Farmer Pool (Jalgaon, Maharashtra): Seller Ask ₹82.50 | Buyer Bid ₹60.83 -> REJECT
+⚡ [ROUND 2] Branch #1 | Vidarbha White Gold Farmers Producer Co. (Wardha, Maharashtra): Seller Ask ₹76.85 | Buyer Bid ₹76.85 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Vidarbha White Gold Farmers Producer Co. (Wardha, Maharashtra)
+   Final Agreed Price: ₹76.85/kg | Freight: ₹0.75/kg | Landed Cost: ₹78.37/kg
+   Total Value: ₹384,250.00 | Savings vs Ceiling: ₹25,750.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Jowar | Qty: 2,000 kg | Target: ₹34.00/kg | Ceiling: ₹38.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Solapur Maldandi Jowar Growers Society (Solapur, Maharashtra) | Ask: ₹35.36/kg | Dist: 205.0 km | Special: Maldandi M-35-1 Pure
+   [2] Dharashiv Millets & Sorghum Producer Co. (Osmanabad, Maharashtra) | Ask: ₹36.04/kg | Dist: 240.0 km | Special: Nutri-Cereal Certified
+   [3] Ahmednagar Dryland Jowar Collective (Ahmednagar, Maharashtra) | Ask: ₹36.72/kg | Dist: 140.0 km | Special: Machine Cleaned White
+   [4] Beed Marathwada Agri Farmers Union (Beed, Maharashtra) | Ask: ₹37.40/kg | Dist: 220.0 km | Special: Sun-Dried Commercial
+   [5] Sangli Nutri-Cereal FPO (Sangli, Maharashtra) | Ask: ₹38.08/kg | Dist: 195.0 km | Special: Flour Milling Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Solapur Maldandi Jowar Growers Society (Solapur, Maharashtra): Seller Ask ₹35.36 | Buyer Bid ₹27.70 -> COUNTER
+⚡ [ROUND 1] Branch #3 | Ahmednagar Dryland Jowar Collective (Ahmednagar, Maharashtra): Seller Ask ₹36.72 | Buyer Bid ₹27.70 -> REJECT
+⚡ [ROUND 1] Branch #5 | Sangli Nutri-Cereal FPO (Sangli, Maharashtra): Seller Ask ₹38.08 | Buyer Bid ₹27.70 -> REJECT
+⚡ [ROUND 1] Branch #2 | Dharashiv Millets & Sorghum Producer Co. (Osmanabad, Maharashtra): Seller Ask ₹36.04 | Buyer Bid ₹27.70 -> REJECT
+⚡ [ROUND 1] Branch #4 | Beed Marathwada Agri Farmers Union (Beed, Maharashtra): Seller Ask ₹37.40 | Buyer Bid ₹27.70 -> REJECT
+⚡ [ROUND 2] Branch #1 | Solapur Maldandi Jowar Growers Society (Solapur, Maharashtra): Seller Ask ₹34.84 | Buyer Bid ₹34.84 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Solapur Maldandi Jowar Growers Society (Solapur, Maharashtra)
+   Final Agreed Price: ₹34.84/kg | Freight: ₹1.02/kg | Landed Cost: ₹36.21/kg
+   Total Value: ₹69,680.00 | Savings vs Ceiling: ₹6,320.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Onion | Qty: 5,000 kg | Target: ₹22.00/kg | Ceiling: ₹26.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Lasalgaon Kanda Apex FPO (Nashik, Maharashtra) | Ask: ₹23.32/kg | Dist: 105.0 km | Special: APMC Red Onion Direct
+   [2] Pimpalgaon Baswant Onion Farmers Co-op (Nashik, Maharashtra) | Ask: ₹23.76/kg | Dist: 120.0 km | Special: Sorted Mesh Lots
+   [3] Dindori Red Onion Consortium (Nashik, Maharashtra) | Ask: ₹24.20/kg | Dist: 135.0 km | Special: Cleaned Lot Standard
+   [4] Junnar Agri Producer Company (Pune, Maharashtra) | Ask: ₹24.64/kg | Dist: 65.0 km | Special: Rapid Dispatch
+   [5] Pune Progressive Producer (Pune) | Ask: ₹17.25/kg | Dist: 210.0 km | Special: Grade A Listing
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Lasalgaon Kanda Apex FPO (Nashik, Maharashtra): Seller Ask ₹23.32 | Buyer Bid ₹18.10 -> COUNTER
+⚡ [ROUND 1] Branch #3 | Dindori Red Onion Consortium (Nashik, Maharashtra): Seller Ask ₹24.20 | Buyer Bid ₹18.10 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pune Progressive Producer (Pune): Seller Ask ₹17.25 | Buyer Bid ₹17.25 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pimpalgaon Baswant Onion Farmers Co-op (Nashik, Maharashtra): Seller Ask ₹23.76 | Buyer Bid ₹18.10 -> REJECT
+⚡ [ROUND 1] Branch #4 | Junnar Agri Producer Company (Pune, Maharashtra): Seller Ask ₹24.64 | Buyer Bid ₹18.10 -> REJECT
+⚡ [ROUND 2] Branch #1 | Lasalgaon Kanda Apex FPO (Nashik, Maharashtra): Seller Ask ₹22.90 | Buyer Bid ₹18.60 -> COUNTER
+⚡ [ROUND 3] Branch #1 | Lasalgaon Kanda Apex FPO (Nashik, Maharashtra): Seller Ask ₹22.47 | Buyer Bid ₹22.47 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Lasalgaon Kanda Apex FPO (Nashik, Maharashtra)
+   Final Agreed Price: ₹22.47/kg | Freight: ₹0.49/kg | Landed Cost: ₹23.18/kg
+   Total Value: ₹112,350.00 | Savings vs Ceiling: ₹17,650.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Bajra | Qty: 3,000 kg | Target: ₹25.00/kg | Ceiling: ₹28.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Dhule Pearl Millet Farmers Federation (Dhule, Maharashtra) | Ask: ₹26.00/kg | Dist: 260.0 km | Special: ICTP-8203 Bold Grain
+   [2] Nashik Nutri-Cereal Consortium (Malegaon, Nashik, Maharashtra) | Ask: ₹26.50/kg | Dist: 160.0 km | Special: Graded Uniform Kernel
+   [3] Sangamner Bajra Utpadak Sangh (Ahmednagar, Maharashtra) | Ask: ₹27.00/kg | Dist: 130.0 km | Special: Cleaned Seed Grade
+   [4] Jalgaon Bajra Producer Company (Jalgaon, Maharashtra) | Ask: ₹27.50/kg | Dist: 230.0 km | Special: Low Moisture < 11%
+   [5] Solapur Bajra & Millets Cooperative (Solapur, Maharashtra) | Ask: ₹28.00/kg | Dist: 210.0 km | Special: Direct Mandi Inflow
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Dhule Pearl Millet Farmers Federation (Dhule, Maharashtra): Seller Ask ₹26.00 | Buyer Bid ₹20.50 -> COUNTER
+⚡ [ROUND 1] Branch #3 | Sangamner Bajra Utpadak Sangh (Ahmednagar, Maharashtra): Seller Ask ₹27.00 | Buyer Bid ₹20.50 -> REJECT
+⚡ [ROUND 1] Branch #5 | Solapur Bajra & Millets Cooperative (Solapur, Maharashtra): Seller Ask ₹28.00 | Buyer Bid ₹20.50 -> REJECT
+⚡ [ROUND 1] Branch #2 | Nashik Nutri-Cereal Consortium (Malegaon, Nashik, Maharashtra): Seller Ask ₹26.50 | Buyer Bid ₹20.50 -> REJECT
+⚡ [ROUND 1] Branch #4 | Jalgaon Bajra Producer Company (Jalgaon, Maharashtra): Seller Ask ₹27.50 | Buyer Bid ₹20.50 -> REJECT
+⚡ [ROUND 2] Branch #1 | Dhule Pearl Millet Farmers Federation (Dhule, Maharashtra): Seller Ask ₹25.62 | Buyer Bid ₹25.62 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Dhule Pearl Millet Farmers Federation (Dhule, Maharashtra)
+   Final Agreed Price: ₹25.62/kg | Freight: ₹0.91/kg | Landed Cost: ₹26.79/kg
+   Total Value: ₹76,860.00 | Savings vs Ceiling: ₹7,140.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Rice | Qty: 4,000 kg | Target: ₹42.00/kg | Ceiling: ₹48.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Indrayani Fragrant Rice Producers FPO (Maval, Pune, Maharashtra) | Ask: ₹43.68/kg | Dist: 45.0 km | Special: Indrayani Aromatic Grade
+   [2] Gondia Paddy Farmers Cooperative (Gondia, Maharashtra) | Ask: ₹44.52/kg | Dist: 480.0 km | Special: Long Grain Paddy
+   [3] Bhandara Kolam Rice Producer Group (Bhandara, Maharashtra) | Ask: ₹45.36/kg | Dist: 450.0 km | Special: Milling Ready <12% Moist
+   [4] Raigad Wada Kolam Farmers Union (Raigad, Maharashtra) | Ask: ₹46.20/kg | Dist: 110.0 km | Special: GI Tagged Wada Kolam
+   [5] Kolhapur Basmati & Brown Rice Cluster (Kolhapur, Maharashtra) | Ask: ₹47.04/kg | Dist: 225.0 km | Special: Premium Head Rice
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Indrayani Fragrant Rice Producers FPO (Maval, Pune, Maharashtra): Seller Ask ₹43.68 | Buyer Bid ₹34.10 -> COUNTER
+⚡ [ROUND 1] Branch #3 | Bhandara Kolam Rice Producer Group (Bhandara, Maharashtra): Seller Ask ₹45.36 | Buyer Bid ₹34.10 -> REJECT
+⚡ [ROUND 1] Branch #5 | Kolhapur Basmati & Brown Rice Cluster (Kolhapur, Maharashtra): Seller Ask ₹47.04 | Buyer Bid ₹34.10 -> REJECT
+⚡ [ROUND 1] Branch #2 | Gondia Paddy Farmers Cooperative (Gondia, Maharashtra): Seller Ask ₹44.52 | Buyer Bid ₹34.10 -> REJECT
+⚡ [ROUND 1] Branch #4 | Raigad Wada Kolam Farmers Union (Raigad, Maharashtra): Seller Ask ₹46.20 | Buyer Bid ₹34.10 -> REJECT
+⚡ [ROUND 2] Branch #1 | Indrayani Fragrant Rice Producers FPO (Maval, Pune, Maharashtra): Seller Ask ₹43.04 | Buyer Bid ₹43.04 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Indrayani Fragrant Rice Producers FPO (Maval, Pune, Maharashtra)
+   Final Agreed Price: ₹43.04/kg | Freight: ₹0.42/kg | Landed Cost: ₹43.89/kg
+   Total Value: ₹172,160.00 | Savings vs Ceiling: ₹19,840.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 120 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 120kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 120kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 120kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹5.42/kg | Landed Cost: ₹55.92/kg
+   Total Value: ₹6,000.00 | Savings vs Ceiling: ₹600.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 120 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Overpriced Producer 120kg (Pune) | Ask: ₹99.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Overpriced Producer 120kg (Pune): Seller Ask ₹99.00 | Buyer Bid ₹40.86 -> COUNTER
+⚡ [ROUND 2] Branch #1 | Overpriced Producer 120kg (Pune): Seller Ask ₹98.20 | Buyer Bid ₹98.20 -> REJECT
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 500 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 500kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 500kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 500kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹1.30/kg | Landed Cost: ₹51.80/kg
+   Total Value: ₹25,000.00 | Savings vs Ceiling: ₹2,500.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 500 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Overpriced Producer 500kg (Pune) | Ask: ₹99.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Overpriced Producer 500kg (Pune): Seller Ask ₹99.00 | Buyer Bid ₹40.86 -> COUNTER
+⚡ [ROUND 2] Branch #1 | Overpriced Producer 500kg (Pune): Seller Ask ₹98.20 | Buyer Bid ₹98.20 -> REJECT
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 1,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 1000kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 1000kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 1000kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.68/kg | Landed Cost: ₹51.18/kg
+   Total Value: ₹50,000.00 | Savings vs Ceiling: ₹5,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 1,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Overpriced Producer 1000kg (Pune) | Ask: ₹99.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Overpriced Producer 1000kg (Pune): Seller Ask ₹99.00 | Buyer Bid ₹40.86 -> COUNTER
+⚡ [ROUND 2] Branch #1 | Overpriced Producer 1000kg (Pune): Seller Ask ₹98.20 | Buyer Bid ₹98.20 -> REJECT
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 5000kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 5000kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 5000kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Overpriced Producer 5000kg (Pune) | Ask: ₹99.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Overpriced Producer 5000kg (Pune): Seller Ask ₹99.00 | Buyer Bid ₹40.86 -> COUNTER
+⚡ [ROUND 2] Branch #1 | Overpriced Producer 5000kg (Pune): Seller Ask ₹98.20 | Buyer Bid ₹98.20 -> REJECT
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 10,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Producer 10000kg (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Producer 10000kg (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Producer 10000kg (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.38/kg | Landed Cost: ₹50.88/kg
+   Total Value: ₹500,000.00 | Savings vs Ceiling: ₹50,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 10,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Overpriced Producer 10000kg (Pune) | Ask: ₹99.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Overpriced Producer 10000kg (Pune): Seller Ask ₹99.00 | Buyer Bid ₹40.86 -> COUNTER
+⚡ [ROUND 2] Branch #1 | Overpriced Producer 10000kg (Pune): Seller Ask ₹98.20 | Buyer Bid ₹98.20 -> REJECT
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra) | Ask: ₹52.00/kg | Dist: 220.0 km | Special: 18.5% Oil Content
+   [2] Nanded Krishi Vikas Agro Consortium (Nanded, Maharashtra) | Ask: ₹53.00/kg | Dist: 280.0 km | Special: Moisture < 10%
+   [3] Barshi Soybean Producers Union (Solapur, Maharashtra) | Ask: ₹54.00/kg | Dist: 180.0 km | Special: Certified Commercial Lot
+   [4] Hingoli Green Oilseeds Cluster (Hingoli, Maharashtra) | Ask: ₹55.00/kg | Dist: 310.0 km | Special: Bulk Hopper Delivery
+   [5] Amravati Krishi Sahakari Sanstha (Amravati, Maharashtra) | Ask: ₹56.00/kg | Dist: 390.0 km | Special: Solvent Grade Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> COUNTER
+⚡ [ROUND 2] Branch #1 | Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra): Seller Ask ₹51.24 | Buyer Bid ₹51.24 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Nanded Krishi Vikas Agro Consortium (Nanded, Maharashtra): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #3 | Barshi Soybean Producers Union (Solapur, Maharashtra): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Hingoli Green Oilseeds Cluster (Hingoli, Maharashtra): Seller Ask ₹55.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Amravati Krishi Sahakari Sanstha (Amravati, Maharashtra): Seller Ask ₹56.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Latur Solvent & Oilseeds Farmers FPO (Latur, Maharashtra)
+   Final Agreed Price: ₹51.24/kg | Freight: ₹0.64/kg | Landed Cost: ₹52.39/kg
+   Total Value: ₹256,200.00 | Savings vs Ceiling: ₹18,800.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-2 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-3 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-4 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Pool Farmer 1 (Pune) | Ask: ₹50.00/kg | Dist: 50.0 km | Special: Commercial Lot
+   [2] Pool Farmer 2 (Pune) | Ask: ₹51.00/kg | Dist: 51.0 km | Special: Commercial Lot
+   [3] Pool Farmer 3 (Pune) | Ask: ₹52.00/kg | Dist: 52.0 km | Special: Commercial Lot
+   [4] Pool Farmer 4 (Pune) | Ask: ₹53.00/kg | Dist: 53.0 km | Special: Commercial Lot
+   [5] Pool Farmer 5 (Pune) | Ask: ₹54.00/kg | Dist: 54.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Pool Farmer 1 (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Pool Farmer 2 (Pune): Seller Ask ₹51.00 | Buyer Bid ₹51.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Pool Farmer 3 (Pune): Seller Ask ₹52.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #4 | Pool Farmer 4 (Pune): Seller Ask ₹53.00 | Buyer Bid ₹40.86 -> REJECT
+⚡ [ROUND 1] Branch #5 | Pool Farmer 5 (Pune): Seller Ask ₹54.00 | Buyer Bid ₹40.86 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Pool Farmer 1 (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.41/kg | Landed Cost: ₹50.91/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-5 Candidate Suppliers across Maharashtra mandis:
+   [1] Candidate C (Highest Quality / Match Score) (Pune) | Ask: ₹50.00/kg | Dist: 100.0 km | Special: Commercial Lot
+   [2] Candidate B (Worse Price, Better Distance) (Pune) | Ask: ₹48.00/kg | Dist: 40.0 km | Special: Commercial Lot
+   [3] Candidate E (Best Landed Economics) (Pune) | Ask: ₹44.00/kg | Dist: 60.0 km | Special: Commercial Lot
+   [4] Candidate A (Better Price, Worse Distance) (Pune) | Ask: ₹45.00/kg | Dist: 350.0 km | Special: Commercial Lot
+   [5] Candidate D (Lowest Distance Proximity) (Pune) | Ask: ₹52.00/kg | Dist: 20.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Candidate C (Highest Quality / Match Score) (Pune): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+⚡ [ROUND 1] Branch #2 | Candidate B (Worse Price, Better Distance) (Pune): Seller Ask ₹48.00 | Buyer Bid ₹48.00 -> REJECT
+⚡ [ROUND 1] Branch #3 | Candidate E (Best Landed Economics) (Pune): Seller Ask ₹44.00 | Buyer Bid ₹44.00 -> REJECT
+⚡ [ROUND 1] Branch #4 | Candidate A (Better Price, Worse Distance) (Pune): Seller Ask ₹45.00 | Buyer Bid ₹45.00 -> REJECT
+⚡ [ROUND 1] Branch #5 | Candidate D (Lowest Distance Proximity) (Pune): Seller Ask ₹52.00 | Buyer Bid ₹52.00 -> REJECT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Candidate C (Highest Quality / Match Score) (Pune)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.48/kg | Landed Cost: ₹50.98/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Sangamner Soybean Producer (Ahmednagar) | Ask: ₹50.00/kg | Dist: 120.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Sangamner Soybean Producer (Ahmednagar): Seller Ask ₹50.00 | Buyer Bid ₹50.00 -> ACCEPT
+------------------------------------------------------------------------------
+🏆 [DEAL FINALIZED] Winning Supplier: Sangamner Soybean Producer (Ahmednagar)
+   Final Agreed Price: ₹50.00/kg | Freight: ₹0.51/kg | Landed Cost: ₹51.01/kg
+   Total Value: ₹250,000.00 | Savings vs Ceiling: ₹25,000.00
+==============================================================================
+
+WARNING:TransportAgentNodes:LLM negotiation failed: 
+
+==============================================================================
+🌾 [LIVE BUYER PROCUREMENT] Crop: Soybean | Qty: 5,000 kg | Target: ₹50.00/kg | Ceiling: ₹55.00/kg
+🎯 Sourcing Top-1 Candidate Suppliers across Maharashtra mandis:
+   [1] Unyielding Farmer for Processor Test (Pune) | Ask: ₹999.00/kg | Dist: 50.0 km | Special: Commercial Lot
+------------------------------------------------------------------------------
+⚡ [ROUND 1] Branch #1 | Unyielding Farmer for Processor Test (Pune): Seller Ask ₹999.00 | Buyer Bid ₹999.00 -> REJECT
+❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹55.00/kg.
+==============================================================================
+

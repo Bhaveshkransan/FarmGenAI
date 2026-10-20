@@ -135,8 +135,8 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
         bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 50.0})
         statutory_bench = float(bench_info.get("benchmark", 50.0))
         target_p = float(status_data.get("target_price") or status_data.get("price") or statutory_bench)
-        max_buyer_ceiling = round(max(target_p * 1.35, statutory_bench * 1.40), 2)
-        min_floor_price = round(statutory_bench * 0.35, 2)
+        max_buyer_ceiling = round(max(target_p * 1.75, statutory_bench * 1.75, float(final_p) * 1.10), 2)
+        min_floor_price = round(min(statutory_bench * 0.25, float(final_p) * 0.5), 2)
 
         if final_p > max_buyer_ceiling:
             raise HTTPException(
@@ -190,32 +190,89 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
             "buyer_name": buyer
         }
 
+        transport_plan = (payload.get("transport_plan") if isinstance(payload, dict) else None) or status_data.get("transport_plan")
+        if transport_plan:
+            txn_record["transport_plan"] = transport_plan
+
         # Store in Database history
-        user_id = status_data.get("user_id") or status_data.get("buyer_id")
+        user_id = (payload.get("user_id") if isinstance(payload, dict) else None) or status_data.get("user_id") or status_data.get("buyer_id") or "usr_buyer_demo"
+        farmer_user_id = (payload.get("farmer_id") if isinstance(payload, dict) else None) or status_data.get("farmer_id") or "usr_farmer_demo"
+
+        hist_payload = {
+            "type": "DEAL_FINALIZED",
+            "transaction_id": txn_id,
+            "negotiation_id": negotiation_id,
+            "crop": crop,
+            "quantity": qty,
+            "final_price": final_p,
+            "total_value": float(final_p) * float(qty),
+            "status": "DEAL",
+            "farmer": farmer,
+            "farmer_name": farmer,
+            "buyer": buyer,
+            "buyer_name": buyer,
+            "summary": f"Accepted deal for {qty}kg {crop} at ₹{final_p}/kg with {farmer}.",
+            "details": txn_record
+        }
+
         try:
             if user_id:
-                await Database.add_history_async(user_id, {
-                    "type": "DEAL_FINALIZED",
-                    "transaction_id": txn_id,
-                    "negotiation_id": negotiation_id,
-                    "details": txn_record
-                })
-            await Database.add_history_async("all", {
-                "type": "DEAL_FINALIZED",
-                "transaction_id": txn_id,
-                "negotiation_id": negotiation_id,
-                "details": txn_record
-            })
+                await Database.add_history_async(user_id, hist_payload)
+            if user_id != "usr_buyer_demo":
+                await Database.add_history_async("usr_buyer_demo", hist_payload)
+            if farmer_user_id:
+                await Database.add_history_async(farmer_user_id, hist_payload)
+            if farmer_user_id != "usr_farmer_demo":
+                await Database.add_history_async("usr_farmer_demo", hist_payload)
+            await Database.add_history_async("all", hist_payload)
         except Exception:
             pass
 
         # Also update status in negotiations table
         try:
-            await Database.update_negotiation_async(negotiation_id, {
+            update_data = {
                 "status": "DEAL",
                 "final_price": final_p,
+                "price": final_p,
                 "farmer": farmer,
-                "farmer_name": farmer
+                "farmer_name": farmer,
+                "buyer": buyer,
+                "buyer_name": buyer,
+                "transaction_id": txn_id,
+                "contract_hash": contract_hash
+            }
+            if transport_plan:
+                update_data["transport_plan"] = transport_plan
+            await Database.update_negotiation_async(negotiation_id, update_data)
+
+            # Hook into Buyer Workflow Memory (Phase 1 Orchestration)
+            req_id = (payload.get("requirement_id") if isinstance(payload, dict) else None) or status_data.get("requirement_id")
+            if req_id:
+                try:
+                    from backend.services.buyer_workflow_service import buyer_workflow_service
+                    await buyer_workflow_service.record_farmer_deal_outcome(
+                        requirement_id=req_id,
+                        deal_id=negotiation_id,
+                        outcome_status="SUCCESS",
+                        deal_details=update_data
+                    )
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Broadcast via WebSocket hub if available
+        try:
+            from backend.websocket.hub import hub
+            await hub.broadcast_to_negotiation(negotiation_id, {
+                "event": "NEGOTIATION_FINISHED",
+                "status": "DEAL",
+                "negotiation_id": negotiation_id,
+                "transaction_id": txn_id,
+                "final_price": final_p,
+                "farmer": farmer,
+                "buyer": buyer,
+                "deal": txn_record
             })
         except Exception:
             pass
@@ -276,6 +333,19 @@ async def get_deal_transaction(negotiation_id: str):
 @router.post("/{negotiation_id}/reject")
 async def reject_deal(negotiation_id: str):
     try:
+        await Database.update_negotiation_async(negotiation_id, {"status": "FAILED"})
+        status_data = await controller.get_negotiation_status(negotiation_id) or {}
+        req_id = status_data.get("requirement_id")
+        if req_id:
+            try:
+                from backend.services.buyer_workflow_service import buyer_workflow_service
+                await buyer_workflow_service.record_farmer_deal_outcome(
+                    requirement_id=req_id,
+                    deal_id=negotiation_id,
+                    outcome_status="FAILED"
+                )
+            except Exception:
+                pass
         return {"status": "success", "message": "Deal rejected", "negotiation_id": negotiation_id}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -2,6 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.repositories.user_repository import UserRepository
 import logging
 import asyncio
+import uuid
 from datetime import datetime, timezone
 
 from agents.buyer_agent import BuyerAgent
@@ -839,20 +840,39 @@ class NegotiationService:
         }
 
     async def get_negotiation_status(self, negotiation_id: str):
-        if not negotiation_id.startswith("neg_"):
-            negotiation_id = f"neg_{negotiation_id}"
-        offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
-        if negotiation_id in self.active_negotiations:
-            res = dict(self.active_negotiations[negotiation_id])
+        if not negotiation_id or negotiation_id in ("undefined", "null"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Invalid negotiation id")
+
+        # 1. Check in memory active negotiations with exact id or alternate prefix
+        target_id = negotiation_id
+        if target_id in self.active_negotiations:
+            res = dict(self.active_negotiations[target_id])
+            offers = await self.db_repo.get_offers_for_negotiation_async(target_id)
             if offers:
                 res["offers"] = offers
             return res
 
-        row = await self.db_repo.get_negotiation_async(negotiation_id)
+        alt_id = f"neg_{negotiation_id}" if not negotiation_id.startswith("neg_") else negotiation_id[4:]
+        if alt_id in self.active_negotiations:
+            res = dict(self.active_negotiations[alt_id])
+            offers = await self.db_repo.get_offers_for_negotiation_async(alt_id)
+            if offers:
+                res["offers"] = offers
+            return res
+
+        # 2. Check in database with exact id, then alternate prefix
+        row = await self.db_repo.get_negotiation_async(target_id)
+        if not row:
+            row = await self.db_repo.get_negotiation_async(alt_id)
+            if row:
+                target_id = alt_id
+
         if not row:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Negotiation not found")
 
+        negotiation_id = target_id
         offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
         selected_b = row.get("selected_buyer") or {}
         buyer_name = (selected_b.get("buyer_name") if isinstance(selected_b, dict) else None) or row.get("buyer") or row.get("buyer_name") or "Buyer Agent"
@@ -871,8 +891,8 @@ class NegotiationService:
             "farmer_name": farmer_name,
             "buyer": buyer_name,
             "buyer_name": buyer_name,
-            "crop": row.get("crop", "Tomato"),
-            "quantity": float(row.get("quantity", 500)),
+            "crop": row.get("crop") or "Soybean",
+            "quantity": float(row.get("quantity") or 500.0),
             "market_price": mkt_p,
             "min_price": min_p,
             "target_price": tgt_p,
@@ -1175,8 +1195,34 @@ class NegotiationService:
         """
         row = await self.db_repo.get_negotiation_async(negotiation_id)
         if not row:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="Negotiation not found")
+            row = Database.negotiations.get(negotiation_id)
+            if not row:
+                auto_crop = (payload and payload.get("crop")) or "Soybean"
+                auto_qty = float((payload and payload.get("quantity")) or 500)
+                auto_target = float((payload and payload.get("target_price")) or 48.0)
+                auto_loc = (payload and payload.get("location")) or "Maharashtra"
+                row = {
+                    "id": negotiation_id,
+                    "negotiation_id": negotiation_id,
+                    "crop": auto_crop,
+                    "quantity": auto_qty,
+                    "target_price": auto_target,
+                    "min_price": round(auto_target * 0.9, 2),
+                    "max_price": round(auto_target * 1.2, 2),
+                    "price": auto_target,
+                    "location": auto_loc,
+                    "buyer": (payload and payload.get("buyer_name")) or "Buyer Agent",
+                    "farmer": "Regional APMC Producer",
+                    "status": "ACTIVE",
+                    "current_round": 1,
+                    "offers": [],
+                    "workflow_mode": (payload and payload.get("workflow_mode")) or "FULL_SUPPLY_CHAIN"
+                }
+                Database.negotiations[negotiation_id] = row
+                try:
+                    await self.db_repo.upsert_negotiation_async(row)
+                except Exception:
+                    pass
 
         crop_val = (payload and payload.get("crop")) or (row and row.get("crop")) or "Soybean"
         crop = str(crop_val).strip() if crop_val else "Soybean"
@@ -1207,14 +1253,39 @@ class NegotiationService:
             "sellers": payload.get("sellers") if payload else None,
         }
 
-        # Invoke core Buyer Orchestration Service
-        from backend.services.buyer_orchestrator import buyer_orchestration_service
-        orch_res = await buyer_orchestration_service.orchestrate_negotiation(
-            requirement=requirement_dict,
-            max_candidates=5,
-            max_rounds=5,
-            negotiation_id=negotiation_id,
+        # Determine workflow mode and permitted agents
+        workflow_mode = (payload and payload.get("workflow_mode")) or (row and row.get("workflow_mode")) or "FULL_SUPPLY_CHAIN"
+        permitted_agents = (payload and payload.get("permitted_agents")) or (
+            ["BUYER", "TRANSPORT", "WAREHOUSE", "PROCESSOR"] if workflow_mode == "FULL_SUPPLY_CHAIN" else ["BUYER"]
         )
+
+        initial_graph_state = {
+            "trace_id": f"trace-{uuid.uuid4().hex[:8]}",
+            "negotiation_id": negotiation_id,
+            "crop": crop_norm,
+            "quantity": qty,
+            "target_price": target_p,
+            "reservation_price": reservation_p,
+            "budget": budget,
+            "location": (row and row.get("location")) or "Maharashtra",
+            "buyer_name": (row and (row.get("buyer") or row.get("buyer_name"))) or "Buyer Agent",
+            "persona": (payload and payload.get("persona")) or "bulk_wholesaler",
+            "strategy": (payload and payload.get("strategy")) or "balanced",
+            "workflow_mode": workflow_mode,
+            "permitted_agents": permitted_agents,
+            "need_transport": True,
+            "need_storage": True,
+            "allow_processing": True,
+            "holding_days": 7,
+            "sellers": payload.get("sellers") if payload else None,
+            "max_rounds": int((payload and payload.get("max_rounds")) or 5),
+            "logs": [],
+            "emitted_events": [],
+        }
+
+        # Invoke compiled LangGraph Buyer Graph Orchestrator
+        from backend.agents.buyer_graph import buyer_graph_orchestrator
+        orch_res = await buyer_graph_orchestrator.ainvoke(initial_graph_state)
 
         winner = orch_res.get("winner")
         if winner:
@@ -1226,6 +1297,10 @@ class NegotiationService:
         negotiations = orch_res.get("negotiations", [])
         executable_deals = orch_res.get("executable_deals", [])
         chat_transcript = orch_res.get("chat_transcript", "")
+        transport_assignment = orch_res.get("transport_assignment")
+        warehouse_assignment = orch_res.get("warehouse_assignment")
+        processor_assignment = orch_res.get("processor_assignment")
+        end_to_end_deal = orch_res.get("end_to_end_deal")
 
         # Format suppliers list for frontend dashboard compatibility
         ranked_suppliers = []
@@ -1276,6 +1351,10 @@ class NegotiationService:
             "final_price": final_p,
             "status": db_status,
             "summary": summary_text,
+            "transport_plan": transport_assignment,
+            "warehouse_plan": warehouse_assignment,
+            "processor_plan": processor_assignment,
+            "end_to_end_deal": end_to_end_deal,
         })
 
         # Record parallel summary offer
@@ -1305,6 +1384,10 @@ class NegotiationService:
                 "suppliers": ranked_suppliers,
                 "status": winner_status,
                 "chat_transcript": chat_transcript,
+                "transport_assignment": transport_assignment,
+                "warehouse_assignment": warehouse_assignment,
+                "processor_assignment": processor_assignment,
+                "end_to_end_deal": end_to_end_deal,
             })
         except Exception as ws_err:
             logger.warning(f"WebSocket broadcast error in parallel procurement: {ws_err}")
@@ -1320,10 +1403,15 @@ class NegotiationService:
             "remaining_quantity": orch_res.get("remaining_quantity", 0.0 if winner else qty),
             "min_purchase_quantity": orch_res.get("min_purchase_quantity", 0.0),
             "candidate_count": len(negotiations),
-            "executable_deals_count": len(executable_deals),
             "suppliers": ranked_suppliers,
             "negotiations": negotiations,
+            "executable_deals": executable_deals,
             "chat_transcript": chat_transcript,
+            "transport_assignment": transport_assignment,
+            "warehouse_assignment": warehouse_assignment,
+            "processor_assignment": processor_assignment,
+            "end_to_end_deal": end_to_end_deal,
+            "logs": orch_res.get("logs", []),
         }
 
     async def autonomous_step(self, negotiation_id: str):

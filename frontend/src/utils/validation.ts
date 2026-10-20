@@ -56,7 +56,7 @@ export const registrationSchema = z.object({
   password: passwordSchema,
   confirmPassword: z.string(),
   role: z.enum(['farmer', 'buyer', 'warehouse', 'transport']),
-  terms: z.literal(true, { errorMap: () => ({ message: "You must accept the terms" }) })
+  terms: z.literal(true, { message: "You must accept the terms" })
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"]
@@ -132,17 +132,17 @@ export const matchCrops = (cropA?: string, cropB?: string): boolean => {
   if (a === b || a.includes(b) || b.includes(a)) return true;
 
   // Extract alphabetical words
-  const wordsA = a.match(/[a-z]+/g) || [];
-  const wordsB = b.match(/[a-z]+/g) || [];
+  const wordsA: string[] = a.match(/[a-z]+/g) || [];
+  const wordsB: string[] = b.match(/[a-z]+/g) || [];
 
   for (const wa of wordsA) {
     if (wordsB.includes(wa)) return true;
     const aliasesA = CROP_ALIASES[wa] || [];
-    if (aliasesA.some(al => wordsB.includes(al) || b.includes(al))) return true;
+    if (aliasesA.some((al: string) => wordsB.includes(al) || b.includes(al))) return true;
   }
   for (const wb of wordsB) {
     const aliasesB = CROP_ALIASES[wb] || [];
-    if (aliasesB.some(bl => wordsA.includes(bl) || a.includes(bl))) return true;
+    if (aliasesB.some((bl: string) => wordsA.includes(bl) || a.includes(bl))) return true;
   }
   return false;
 };
@@ -152,8 +152,8 @@ export const requirementSchema = z.object({
     .min(2, "Crop name is required (at least 2 letters)")
     .regex(/^[A-Za-z\s()/-]+$/, "Crop name must only contain letters and standard characters (e.g. 'Jowar (Sorghum)')"),
   quality: z.enum(['A', 'B', 'C', 'ANY']),
-  quantity: z.number({ invalid_type_error: "Volume must be a valid number" }).min(10, "Minimum volume is 10 kg").max(10000000, "Maximum volume is 10,000,000 kg"),
-  maxBudget: z.number({ invalid_type_error: "Budget must be a valid number" }).min(1, "Price must be greater than ₹0/kg").max(10000, "Maximum price limit is ₹10,000/kg"),
+  quantity: z.number({ message: "Volume must be a valid number" }).min(10, "Minimum volume is 10 kg").max(10000000, "Maximum volume is 10,000,000 kg"),
+  maxBudget: z.number({ message: "Budget must be a valid number" }).min(1, "Price must be greater than ₹0/kg").max(10000, "Maximum price limit is ₹10,000/kg"),
   deliveryDate: z.string().min(1, "Delivery deadline is required").refine((val) => {
     if (!val) return false;
     const selected = new Date(val + 'T00:00:00');

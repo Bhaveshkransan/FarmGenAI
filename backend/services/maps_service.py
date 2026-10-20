@@ -22,6 +22,10 @@ def get_coordinates(city_name: str) -> Dict[str, float]:
     for key, value in CITY_COORDINATES.items():
         if key.lower() == city_name.lower():
             return value
+    # Check substring match (e.g. 'Ahmednagar APMC' -> 'Ahmednagar', 'Pune Market Yard' -> 'Pune')
+    for key, value in CITY_COORDINATES.items():
+        if key.lower() in city_name.lower() or city_name.lower() in key.lower():
+            return value
     try:
         geocode_url = f"https://nominatim.openstreetmap.org/search?q={city_name},+Maharashtra,+India&format=json&limit=1"
         headers = {'User-Agent': 'FarmGenAI-App'}

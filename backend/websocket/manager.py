@@ -104,6 +104,8 @@ async def redis_pubsub_listener(redis_client):
 @router.websocket("/api/v1/ws")
 @router.websocket("/ws/negotiation")
 @router.websocket("/api/v1/ws/negotiation")
+@router.websocket("/ws/negotiate/{negotiation_id}")
+@router.websocket("/api/v1/ws/negotiate/{negotiation_id}")
 async def negotiation_updates(websocket: WebSocket, token: str = None, negotiation_id: str = None):
     if not token:
         token = websocket.query_params.get("token")
