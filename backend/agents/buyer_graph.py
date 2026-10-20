@@ -764,9 +764,9 @@ async def processor_agent_node(state: BuyerOrchestrationGraphState) -> Dict[str,
                 "output_product": s_opt.get("output_product"),
                 "primary_yield_kg": s_opt.get("primary_yield_kg"),
                 "byproduct_desc": s_opt.get("byproduct_desc"),
-                "processing_capacity_kg": s_opt.get("processing_capacity_kg"),
-                "processing_cost_per_kg": s_opt.get("processing_cost_per_kg"),
-                "total_processing_cost": s_opt.get("total_processing_cost") or wf_proc.get("cost"),
+                "processing_capacity_kg": s_opt.get("processing_capacity_kg") or 20000,
+                "processing_cost_per_kg": s_opt.get("processing_cost_per_kg") or 2.20,
+                "total_processing_cost": s_opt.get("total_processing_cost") or wf_proc.get("cost") or round(2.20 * qty, 2),
                 "quality_requirements": "APMC Model Act Grade A (Moisture Compliant)",
                 "agreement_id": s_opt.get("order_id") or f"MILL-{uuid.uuid4().hex[:6].upper()}",
                 "lifecycle_state": "CONFIRMED_AGREEMENT",
@@ -801,12 +801,16 @@ async def processor_agent_node(state: BuyerOrchestrationGraphState) -> Dict[str,
         }
 
     events.append("PROCESSOR_ASSIGNED")
-    p_name = proc_res.get("name", "Agro Processor")
-    p_cap = proc_res.get("processing_capacity_kg", 20000)
-    p_out = proc_res.get("output_product", "Processed Goods")
-    conversion_cost = proc_res.get("processing_cost_per_kg", 2.20)
-    total_cost = proc_res.get("total_processing_cost", round(conversion_cost * qty, 2))
-    p_loc = proc_res.get("location", "Maharashtra")
+    p_name = proc_res.get("name") or "Agro Processor"
+    p_cap = proc_res.get("processing_capacity_kg") or 20000
+    p_out = proc_res.get("output_product") or "Processed Goods"
+    conversion_cost = proc_res.get("processing_cost_per_kg")
+    if conversion_cost is None:
+        conversion_cost = 2.20
+    total_cost = proc_res.get("total_processing_cost")
+    if total_cost is None:
+        total_cost = round(float(conversion_cost) * qty, 2)
+    p_loc = proc_res.get("location") or "Maharashtra"
 
     processor_msg = (
         f"[PROCESSOR]\n"

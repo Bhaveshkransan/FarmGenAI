@@ -141,9 +141,9 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
                 break
         bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 50.0})
         statutory_bench = float(bench_info.get("benchmark", 50.0))
-        target_p = float(status_data.get("target_price") or status_data.get("price") or statutory_bench)
-        max_buyer_ceiling = round(max(target_p * 1.75, statutory_bench * 1.75, float(final_p) * 1.10), 2)
-        min_floor_price = round(min(statutory_bench * 0.25, float(final_p) * 0.5), 2)
+        target_p = float((status_data and (status_data.get("target_price") or status_data.get("price"))) or statutory_bench)
+        max_buyer_ceiling = round(max(target_p * 1.75, statutory_bench * 1.75), 2)
+        min_floor_price = round(min(target_p * 0.25, statutory_bench * 0.25), 2)
 
         if final_p > max_buyer_ceiling:
             raise HTTPException(

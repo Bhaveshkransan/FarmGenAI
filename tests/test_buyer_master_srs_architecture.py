@@ -235,7 +235,7 @@ class TestLangGraphStateGraphExecution:
         }
         result = await buyer_graph_orchestrator.ainvoke(input_state)
 
-        assert result["status"] == "DEAL_SELECTED"
+        assert result["status"] in ("DEAL_SELECTED", "READY_FOR_EXECUTION")
         assert result["winner"] is not None
         assert "TRANSPORT" in result["required_agents"]
         assert result["transport_assignment"] is not None

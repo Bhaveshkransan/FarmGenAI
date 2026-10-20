@@ -340,10 +340,10 @@ class NegotiationService:
         db_buyers = await self.db_repo.list_buyers_async()
         from backend.services.matching_service import crops_match
 
-        # Filter to real buyers from DB that match this crop
+        # Filter to real buyers from DB that match this crop (or general commodity buyers)
         matching_db_buyers = [
             b for b in db_buyers
-            if b.get("crop") and crops_match(b.get("crop"), crop)
+            if not b.get("crop") or b.get("crop") in ("ALL", "*", "any") or crops_match(b.get("crop"), crop)
         ]
 
         buyer_profiles = [

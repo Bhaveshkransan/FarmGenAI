@@ -297,7 +297,7 @@ class BuyerOrchestrationService:
             logger.warning(f"Error querying DB listings: {e}")
 
         # 3. Verified Maharashtra Producers Pool (Tailored per crop & scenario)
-        if len(candidates) < max_candidates:
+        if len(candidates) < max_candidates and (allow_test_fixtures or requirement.get("allow_test_fixtures") or requirement.get("allow_synthetic")):
             suppliers = MAHARASHTRA_CROP_SUPPLIERS.get(norm_crop)
             if not suppliers:
                 for k, v in MAHARASHTRA_CROP_SUPPLIERS.items():

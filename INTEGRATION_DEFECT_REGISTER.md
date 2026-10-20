@@ -11,9 +11,9 @@
 | Severity Level | Identified | Resolved | Outstanding Blockers |
 | :--- | :---: | :---: | :---: |
 | **Critical (Sev-1)** | 3 | 3 | **0** |
-| **Major (Sev-2)** | 6 | 6 | **0** |
-| **Minor (Sev-3)** | 4 | 4 | **0** |
-| **Total** | **13** | **13** | **0** |
+| **Major (Sev-2)** | 8 | 8 | **0** |
+| **Minor (Sev-3)** | 6 | 6 | **0** |
+| **Total** | **17** | **17** | **0** |
 
 ---
 
@@ -139,3 +139,39 @@
 - **Root Cause:** ES6 Temporal Dead Zone (TDZ) violation due to variable access preceding `const` declaration.
 - **Resolution:** Relocated the `useQuery` hook for `negState` up to line 256 directly adjacent to WebSocket initialization and preceding all plan evaluation and action handlers.
 - **Verification:** Verified via live browser subagent navigation to `http://localhost:8080/buyer/negotiations/neg_49bdbfad`; page loads cleanly with active statutory APMC bench-marks, live candidate radar, and AI copilot without ErrorBoundary triggers.
+
+### DEF-14: TypeError Format String on NoneType in Processor Agent Node
+- **Severity:** Sev-2 (Major)
+- **Component:** [backend/agents/buyer_graph.py](file:///c:/PROJECT/FarmGenAI/backend/agents/buyer_graph.py)
+- **Description:** `processor_agent_node` formatted `p_cap`, `conversion_cost`, and `total_cost` into string messages (`{p_cap:,}`, `{conversion_cost:.2f}`) assuming non-None values, but domain workflow option dicts occasionally yielded `None` for unselected byproduct/conversion rates.
+- **Impact:** LangGraph execution crashed on node 10 with `TypeError: unsupported format string passed to NoneType.__format__`, failing parallel procurement.
+- **Root Cause:** `dict.get(key, default)` does not fall back if `key` exists with value `None`.
+- **Resolution:** Updated `processor_agent_node` with explicit `or` default guards (`proc_res.get("processing_capacity_kg") or 20000`, `float(conversion_cost)`).
+- **Verification:** `tests/test_07_buyer_guardrail_parallel.py::test_parallel_procurement_auto_selects_best` passed cleanly.
+
+### DEF-15: Self-Referential Guardrail Bounds Defeating Statutory Price Floor/Ceiling Checks
+- **Severity:** Sev-2 (Major)
+- **Component:** [backend/routes/negotiation_routes.py](file:///c:/PROJECT/FarmGenAI/backend/routes/negotiation_routes.py)
+- **Description:** `accept_deal` computed `max_buyer_ceiling = round(max(target_p * 1.75, statutory_bench * 1.75, float(final_p) * 1.10), 2)` and `min_floor_price = round(min(statutory_bench * 0.25, float(final_p) * 0.5), 2)`.
+- **Impact:** The statutory ceiling automatically scaled above any input price (e.g. ₹2000.0/kg produced a ceiling of ₹2200.0/kg), preventing statutory overprice rejection.
+- **Root Cause:** Input `final_p` was erroneously included inside the `max()` and `min()` bounds calculation.
+- **Resolution:** Removed `final_p` from boundary bounds formulas; enforced statutory limits strictly against `target_p` and `statutory_bench`.
+- **Verification:** `test_finalize_deal_rejects_invalid_entries_and_guardrail_violations` passed.
+
+### DEF-16: Ungated Synthetic Candidate Fallback in Production Candidate Discovery
+- **Severity:** Sev-3 (Minor)
+- **Component:** [backend/services/buyer_orchestrator.py](file:///c:/PROJECT/FarmGenAI/backend/services/buyer_orchestrator.py)
+- **Description:** `get_top_candidates` fell back to tier 3 `MAHARASHTRA_CROP_SUPPLIERS` unconditionally when database matches returned `[]`, fabricating synthetic candidates even in production flows.
+- **Impact:** When 0 real eligible sellers existed, the orchestrator returned synthetic candidate records instead of returning `[]` and setting status to `NO_CANDIDATES_FOUND`.
+- **Root Cause:** Tier 3 fallback lacked an explicit check for `allow_test_fixtures` or `allow_synthetic`.
+- **Resolution:** Gated tier 3 fallback with `and (allow_test_fixtures or requirement.get("allow_test_fixtures") or requirement.get("allow_synthetic"))`.
+- **Verification:** `tests/test_09b_buyer_blocker_fixes.py` (all 18 tests passed).
+
+### DEF-17: Strict Crop Filter Excluding General Commodity Buyers
+- **Severity:** Sev-3 (Minor)
+- **Component:** [backend/services/negotiation_service.py](file:///c:/PROJECT/FarmGenAI/backend/services/negotiation_service.py)
+- **Description:** `_generate_market_offers` filtered buyers from database requiring `b.get("crop") and crops_match(b.get("crop"), crop)`. General marketplace buyers (e.g. `Wholesale Hub`, `FreshMart Retail`) that purchase across all agricultural commodities without an explicit crop constraint were excluded.
+- **Impact:** Market offers returned empty list `[]` for listings when only general commodity buyers were available.
+- **Root Cause:** Lack of null-safe general buyer matching.
+- **Resolution:** Updated filter: `if not b.get("crop") or b.get("crop") in ("ALL", "*", "any") or crops_match(...)`.
+- **Verification:** `tests/test_marketplace_requirements.py` (all 3 tests passed).
