@@ -505,14 +505,42 @@ export default function NegotiationRoom() {
         name: b.name || b.seller_name || `Candidate Farmer ${idx + 1}`,
         role: "Farmer / Producer",
         location: b.location || "Maharashtra APMC",
-        distance_km: b.distance_km || Math.round(80 + idx * 35),
+        distance_km: (() => {
+          const loc = (b.location || '').toLowerCase();
+          if (loc.includes('gondia')) return 865;
+          if (loc.includes('nagpur') || loc.includes('hingna')) return 715;
+          if (loc.includes('kolhapur') || loc.includes('hatkanangale')) return 245;
+          if (loc.includes('ratnagiri') || loc.includes('khed')) return 295;
+          if (loc.includes('jalgaon')) return 395;
+          if (loc.includes('amravati')) return 565;
+          if (loc.includes('latur')) return 335;
+          if (loc.includes('solapur')) return 252;
+          if (loc.includes('nashik')) return 210;
+          return b.distance_km && b.distance_km !== 250 ? b.distance_km : (160 + idx * 75);
+        })(),
         match: Math.round(b.match_score || (96 - idx * 3)),
-        offer: Number(b.negotiated_price || b.current_ask || b.initial_ask || bestOfferPrice),
+        offer: Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2)),
         initial_ask: Number(b.initial_ask || bestOfferPrice * 1.05),
-        freight_per_kg: Number(b.freight_per_kg || 1.8),
-        apmc_cess_per_kg: Number(b.apmc_cess_per_kg || 0.52),
-        landed_cost_per_kg: Number(b.landed_cost_per_kg || (b.negotiated_price || bestOfferPrice) + 2.3),
-        total_landed_cost: Number(b.total_landed_cost || ((b.negotiated_price || bestOfferPrice) + 2.3) * cropQty),
+        freight_per_kg: (() => {
+          const loc = (b.location || '').toLowerCase();
+          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
+          return Math.round((dist * 0.0075) * 100) / 100;
+        })(),
+        apmc_cess_per_kg: 0.52,
+        landed_cost_per_kg: (() => {
+          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
+          const loc = (b.location || '').toLowerCase();
+          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
+          const frt = Math.round((dist * 0.0075) * 100) / 100;
+          return Math.round((off + frt + 0.52) * 100) / 100;
+        })(),
+        total_landed_cost: (() => {
+          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
+          const loc = (b.location || '').toLowerCase();
+          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
+          const frt = Math.round((dist * 0.0075) * 100) / 100;
+          return Math.round((off + frt + 0.52) * cropQty);
+        })(),
         status: b.is_best ? "Deal Confirmed" : (b.is_disqualified ? "Exceeded Budget" : (b.status || "Negotiating")),
         is_best: Boolean(b.is_best || idx === 0),
         disqualification_reason: b.disqualification_reason || null,
@@ -1939,34 +1967,45 @@ export default function NegotiationRoom() {
               </div>
             </div>
           ) : (
-            /* Candidate Farmers (FARMER Phase & Fallback) */
+            {/* Candidate Farmers (FARMER Phase & Fallback) - Synchronized with Top 5 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
                   <Star size={17} className="text-amber-500 fill-amber-400" /> Eligible Supplier Candidates
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
-                  {liveSellers.length} Live APMC
+                  {topFiveCandidates.length} Live APMC
                 </span>
               </div>
 
               <div className="space-y-2.5">
-                {liveSellers.map((s, i) => (
-                  <div key={i} className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-slate-800">{s.id}</span>
-                      <span className="font-black text-emerald-700">Rs.{s.offer}/kg</span>
+                {topFiveCandidates.map((s: any, i: number) => {
+                  const isCur = selectedCandidateIndex === i;
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => setSelectedCandidateIndex(i)}
+                      className={`p-3 rounded-xl border text-xs space-y-1.5 cursor-pointer transition ${
+                        isCur
+                          ? 'border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/30'
+                          : 'bg-slate-50/80 border-slate-100 hover:bg-slate-100/70'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-slate-900 truncate max-w-[140px]">{s.name}</span>
+                        <span className="font-black text-emerald-700">Rs.{s.offer}/kg</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] text-slate-500">
+                        <span className="truncate max-w-[150px]">{s.location}</span>
+                        <span className="font-bold text-emerald-600">{s.match}% Match</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
+                        <span>{s.distance_km} km transit</span>
+                        <span className="font-semibold text-emerald-700">{s.status}</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center text-[11px] text-slate-500">
-                      <span>{s.location}</span>
-                      <span className="font-bold text-emerald-600">{s.match}% Match</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
-                      <span>Strategy: {s.aiStatus}</span>
-                      <span className="font-semibold text-emerald-700">{s.status}</span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Action when farmer candidates are unavailable or user bypasses produce */}
@@ -2619,7 +2658,9 @@ export default function NegotiationRoom() {
           ) : (
             /* VIEW: FARMER NEGOTIATION PHASE (Standard Core Flow) */
             <>
-              {recommendation && <RecommendationCard recommendation={recommendation} />}
+              {recommendation && !String(recommendation).toLowerCase().includes('processing route activated') && !String(recommendation).toLowerCase().includes('processing') && (
+                <RecommendationCard recommendation={recommendation} />
+              )}
 
               {/* Active Farmer Negotiation Card */}
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[520px] overflow-hidden">
@@ -2831,7 +2872,7 @@ export default function NegotiationRoom() {
                   <div>
                     <span className="text-slate-500 block text-[11px]">Farmer Ask</span>
                     <span className="font-black text-slate-900 text-base font-mono">
-                      Rs.{bestOfferPrice}/kg
+                      Rs.{activeCandidate?.offer || bestOfferPrice}/kg
                     </span>
                   </div>
                   <div>
@@ -2844,9 +2885,23 @@ export default function NegotiationRoom() {
 
                 <div className="flex items-center justify-between text-xs px-1">
                   <span className="text-slate-500">Price Difference:</span>
-                  <span className="font-bold text-amber-700 font-mono">
-                    +Rs.{(bestOfferPrice - targetPrice).toFixed(1)}/kg (+{Math.round(((bestOfferPrice - targetPrice) / targetPrice) * 100)}%)
-                  </span>
+                  {(() => {
+                    const ask = activeCandidate?.offer || bestOfferPrice;
+                    const diff = ask - targetPrice;
+                    const pct = targetPrice > 0 ? Math.round((diff / targetPrice) * 100) : 0;
+                    if (diff <= 0) {
+                      return (
+                        <span className="font-bold text-emerald-700 font-mono">
+                          -Rs.{Math.abs(diff).toFixed(1)}/kg ({Math.abs(pct)}% below target)
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="font-bold text-amber-700 font-mono">
+                        +Rs.{diff.toFixed(1)}/kg (+{pct}% above target)
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 <div className="flex gap-2 pt-1">

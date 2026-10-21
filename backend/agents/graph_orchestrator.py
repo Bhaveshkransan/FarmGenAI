@@ -1623,39 +1623,15 @@ async def reflection_node(state: NegotiationState) -> Dict[str, Any]:
                 "warehouse": "WarehouseAgent",
                 "storage_cost": round(storage_cost, 2),
             }
-        elif state["market_price"] * 0.8 >= state["min_price"] * 0.6:
-            logs.append("⚙️ [Reflection] Fallback: PROCESSING")
-            final_status = "ESCALATED_PROCESSING"
-            
-            # --- Parallel Processor Bidding ---
-            processors = [f"FoodProcessor_{i}" for i in range(1, 6)]
-            async def get_processor_bid(name):
-                prompt = PROCESSOR_PROMPT.format(
-                    processor_name=name, crop=state["crop"], quantity=state["quantity"],
-                    location=state["location"], market_price=state["market_price"]
-                )
-                resp = await asyncio.to_thread(llm_client.generate, prompt, max_tokens=100)
-                parsed = await _parse_json_response(resp)
-                if parsed and "bid_price" in parsed:
-                    try:
-                        # Farmer Priority: apply 2% edge for the farmer in processors too (select highest bid)
-                        bid_price = float(parsed["bid_price"])  # cast: LLM may return string
-                        priority_score = bid_price * 1.02
-                        return {"name": name, "bid": bid_price, "score": priority_score, "reason": parsed.get("reason", "")}
-                    except (ValueError, TypeError):
-                        pass
-                return {"name": name, "bid": round(state["market_price"] * 0.6, 2), "score": 0, "reason": "Fallback"}
-
-            p_tasks = [get_processor_bid(p) for p in processors]
-            p_bids = await asyncio.gather(*p_tasks)
-            best_processor = max(p_bids, key=lambda x: x["score"]) # Max is best for farmer
-            
-            logs.append(f"⚙️ [Processor] {len(p_bids)} bids received. Selected {best_processor['name']} at ₹{best_processor['bid']}/kg (Farmer Priority Enforced). Reason: {best_processor['reason']}")
+        elif state["spoilage_days"] >= 3:
+            logs.append("🏗️ [Reflection] Cold Storage Retention & Mandi Price Recovery Recommended")
+            final_status = "ESCALATED_STORAGE"
             deal = {
-                "type": "PROCESSING",
-                "price": best_processor["bid"],
+                "type": "STORAGE",
+                "price": round(state["market_price"] * 0.95, 2),
                 "quantity": state["quantity"],
-                "processor": best_processor,
+                "warehouse": "Regional Cold Store Facility",
+                "storage_cost": round(storage_cost, 2),
             }
         else:
             logs.append("♻️ [Reflection] Fallback: COMPOSTING")
@@ -1735,8 +1711,8 @@ async def _generate_recommendation(state: NegotiationState, deal: Optional[Dict]
         )
     elif deal and deal.get("type") == "PROCESSING":
         return (
-            f"Processing route activated at \u20b9{deal.get('price', 0)}/kg. "
-            f"This recovers partial value. Consider FPO membership for better rates next season."
+            f"Direct sale or cold warehouse storage recommended for {state['crop']}. "
+            f"Preserve crop quality and re-engage certified APMC buyers."
         )
     elif deal and deal.get("type") == "STORAGE":
         return (

@@ -55,10 +55,8 @@ export default function RecommendationCard({
   // Detect recommendation type
   const lowerMsg = (messageText + ' ' + (status || '') + ' ' + rawAction).toLowerCase();
   
-  let type: 'DEAL' | 'PROCESSING' | 'STORAGE' | 'HOLD' | 'COMPOST' = 'DEAL';
-  if (lowerMsg.includes('processing') || lowerMsg.includes('derivative') || lowerMsg.includes('crush') || lowerMsg.includes('puree')) {
-    type = 'PROCESSING';
-  } else if (lowerMsg.includes('storage') || lowerMsg.includes('warehouse') || lowerMsg.includes('cold store')) {
+  let type: 'DEAL' | 'STORAGE' | 'HOLD' | 'COMPOST' = 'DEAL';
+  if (lowerMsg.includes('storage') || lowerMsg.includes('warehouse') || lowerMsg.includes('cold store')) {
     type = 'STORAGE';
   } else if (lowerMsg.includes('hold') || lowerMsg.includes('rebound') || lowerMsg.includes('arrival surge')) {
     type = 'HOLD';
@@ -80,17 +78,6 @@ export default function RecommendationCard({
       primaryBtn: 'Confirm Dispatch & Book Transport',
       primaryBtnClass: 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25',
       primaryAction: () => navigate('/transport')
-    },
-    PROCESSING: {
-      title: 'Value-Add Processing Diversion',
-      badge: 'PROCESSING FACILITY',
-      badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-      border: 'border-amber-500/40 shadow-amber-950/20',
-      headerBg: 'bg-gradient-to-r from-amber-950/80 via-slate-900 to-slate-900',
-      icon: <Factory className="text-amber-400" size={20} />,
-      primaryBtn: 'Connect to Processing Mill',
-      primaryBtnClass: 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/25',
-      primaryAction: () => navigate('/processor')
     },
     STORAGE: {
       title: 'Warehouse Cold Storage Retention',

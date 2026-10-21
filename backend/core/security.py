@@ -64,7 +64,10 @@ async def verify_token(token: str) -> Optional[dict]:
     """Parse and validate JWT signature and expiration."""
     try:
         if token == "mock_token":
-            return {"sub": "U_0000", "role": "buyer"}
+            # Guarded mock token allowed only when ALLOW_MOCK_AUTH is explicitly set in environment
+            if os.getenv("ALLOW_MOCK_AUTH", "false").lower() == "true":
+                return {"sub": "U_0000", "role": "buyer", "email": "demo@farmgenai.com"}
+            return None
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
     except JWTError:
