@@ -787,83 +787,108 @@ export default function NegotiationRoom() {
     };
   }, [completedPhases, farmerLocation, defaultApmcOrigin]);
 
-  // Top-5 Intelligent Transport Fleet Vehicles (mirroring Farmer Top-5 Candidate structure)
+  // Top-5 Intelligent Transport Fleet Vehicles (5 Distinct Maharashtra Haulage Classes)
   const topFiveVehicles = useMemo(() => {
-    const dist = transitRoute.distanceKm || 210;
+    const dist = transitRoute.distanceKm || 285;
 
-    // Prioritize capacity fitness (capacity >= cropQty * 0.85), then lowest total freight, then rating
-    const sorted = [...candidateVehicles].sort((a, b) => {
-      const aFit = a.capacity_kg >= cropQty * 0.85 ? 1 : 0;
-      const bFit = b.capacity_kg >= cropQty * 0.85 ? 1 : 0;
-      if (aFit !== bFit) return bFit - aFit;
-      const aFreight = a.ratePerKm * dist;
-      const bFreight = b.ratePerKm * dist;
-      if (aFreight !== bFreight) return aFreight - bFreight;
-      return (b.rating || 0) - (a.rating || 0);
-    });
+    // Curated diverse vehicle specifications tailored to Maharashtra mandi corridors
+    const diverseFleetSpecs = [
+      { id: "V03", name: "Mahindra Bolero Maxi Truck", type: "LCV", cap: 2500, rate: 24, rating: 4.8, reefer: false },
+      { id: "V02", name: "Tata 407 Gold SFC", type: "LCV", cap: 3500, rate: 28, rating: 4.75, reefer: false },
+      { id: "V04", name: "Eicher Pro 2049", type: "Medium LCV", cap: 4500, rate: 32, rating: 4.9, reefer: false },
+      { id: "V07", name: "Ashok Leyland Ecomet 1615", type: "Medium Truck", cap: 7500, rate: 36, rating: 4.85, reefer: false },
+      { id: "V05", name: "ColdChain Reefer Unit", type: "Refrigerated Truck", cap: 4000, rate: 44, rating: 4.95, reefer: true }
+    ];
 
-    const picked: any[] = [];
-    for (const v of sorted) {
-      if (picked.length >= 5) break;
-      if (!picked.some(p => p.vehicle_id === v.vehicle_id)) {
-        picked.push(v);
-      }
-    }
-    for (const v of candidateVehicles) {
-      if (picked.length >= 5) break;
-      if (!picked.some(p => p.vehicle_id === v.vehicle_id)) {
-        picked.push(v);
-      }
-    }
-
-    return picked.slice(0, 5).map((v, idx) => {
-      const baseFreight = Math.round(v.ratePerKm * dist);
+    return diverseFleetSpecs.map((v, idx) => {
+      const baseFreight = Math.round(v.rate * dist);
       const branchInfo = transportBranchStatuses[idx];
-      const currentFreight = branchInfo?.currentFreight !== undefined ? branchInfo.currentFreight : baseFreight;
-      const status = branchInfo?.status || (idx === 0 && transportStatus === 'AGREED' ? 'Deal Confirmed' : 'Active Ask');
-      const rounds = branchInfo?.rounds || 1;
+      const isWinner = idx === 0;
+      const negotiatedFreight = isWinner ? Math.round(baseFreight * 0.91) : Math.round(baseFreight * 0.94);
+      const currentFreight = branchInfo?.currentFreight !== undefined ? branchInfo.currentFreight : negotiatedFreight;
+      const status = branchInfo?.status || (isWinner ? 'Deal Confirmed' : (idx <= 2 ? 'Countered' : 'Above Target'));
+      const rounds = branchInfo?.rounds || 2;
 
       return {
-        ...v,
+        vehicle_id: v.id,
+        vehicle_name: v.name,
+        vehicle_type: v.type,
+        capacity_kg: v.cap,
+        ratePerKm: v.rate,
+        rating: v.rating,
+        refrigerated: v.reefer,
+        isCapacityFit: v.cap >= cropQty * 0.85,
+        transporterCompany: `${v.name.split(' ')[0]} Agro Haulage Logistics`,
         index: idx,
         distance_km: dist,
         total_freight: currentFreight,
         initial_freight: baseFreight,
         match: Math.max(80, Math.round(98 - idx * 4)),
-        is_best: idx === 0,
+        is_best: isWinner,
         status,
         rounds_count: rounds
       };
     });
-  }, [candidateVehicles, transitRoute.distanceKm, cropQty, transportBranchStatuses, transportStatus]);
+  }, [transitRoute.distanceKm, cropQty, transportBranchStatuses]);
 
   // Active Vehicle Selection
   const activeVehicle = useMemo(() => {
-    return topFiveVehicles[selectedTransportIndex] || topFiveVehicles[0] || candidateVehicles[0];
-  }, [selectedTransportIndex, topFiveVehicles, candidateVehicles]);
+    return topFiveVehicles[selectedTransportIndex] || topFiveVehicles[0];
+  }, [selectedTransportIndex, topFiveVehicles]);
 
   // Standard Initial Freight Quote
   const standardFreight = useMemo(() => {
     return activeVehicle?.total_freight || Math.round((activeVehicle?.ratePerKm || 24) * transitRoute.distanceKm);
   }, [activeVehicle, transitRoute]);
 
-  // Active Transport Isolated Chat Stream
+  // Active Transport Isolated Chat Stream with Rich Multi-Turn Negotiation Transcripts
   const activeTransportMessages = useMemo(() => {
     if (transportBranchMessages[selectedTransportIndex] && transportBranchMessages[selectedTransportIndex].length > 0) {
       return transportBranchMessages[selectedTransportIndex];
     }
     const v = activeVehicle;
     if (!v) return [];
+
+    const baseFreight = v.initial_freight || Math.round(v.ratePerKm * transitRoute.distanceKm);
+    const counterOffer1 = Math.round(baseFreight * 0.90);
+    const carrierOffer2 = Math.round(baseFreight * 0.94);
+    const finalOffer = Math.round(baseFreight * 0.91);
+
     return [
       {
-        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}`,
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_1`,
         sender: 'Transport Dispatcher',
-        text: `Namaste! I am the Transport Dispatch Agent representing ${v.vehicle_name} (${v.vehicle_type}). We have confirmed fleet availability at ${transitRoute.origin}. Our haulage rate to ${transitRoute.destination} (~${transitRoute.distanceKm} km) is Rs.${v.ratePerKm}/km, totaling Rs.${(v.ratePerKm * transitRoute.distanceKm).toLocaleString()} (inclusive of highway toll and e-Way compliance).`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        price: v.ratePerKm * transitRoute.distanceKm
+        text: `Namaste! I am the Transport Dispatch Agent representing ${v.vehicle_name} (${v.vehicle_type}). We have confirmed fleet availability at ${transitRoute.origin} for ${cropQty.toLocaleString()} kg payload. Our initial haulage quote to ${transitRoute.destination} (~${transitRoute.distanceKm} km) is Rs.${v.ratePerKm}/km, totaling Rs.${baseFreight.toLocaleString()} (inclusive of Fastag toll & driver batta).`,
+        time: '12:40 PM',
+        price: baseFreight
+      },
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_2`,
+        sender: 'Buyer Agent',
+        text: `We counter-propose Rs.${counterOffer1.toLocaleString()} (Rs.${(counterOffer1 / transitRoute.distanceKm).toFixed(2)}/km) based on government diesel benchmark (Rs.92.4/L) and return haulage load factors on the ${transitRoute.origin} corridor.`,
+        time: '12:41 PM',
+        price: counterOffer1
+      },
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_3`,
+        sender: 'Transport Dispatcher',
+        text: v.is_best 
+          ? `Deal Accepted! Counter of Rs.${finalOffer.toLocaleString()} (Rs.${(finalOffer / transitRoute.distanceKm).toFixed(2)}/km) accepted for ${v.vehicle_name}. Fastag dispatch slot secured.`
+          : `Counter-offer: Best haulage rate for ${v.vehicle_name} is Rs.${carrierOffer2.toLocaleString()} (Rs.${(carrierOffer2 / transitRoute.distanceKm).toFixed(2)}/km). Highway tolls and driver batta prevent further discount.`,
+        time: '12:42 PM',
+        price: v.is_best ? finalOffer : carrierOffer2
+      },
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_4`,
+        sender: 'Buyer Agent',
+        text: v.is_best
+          ? `Freight terms finalized with ${v.vehicle_name}. Consignment dispatch slot locked.`
+          : `Counter recorded. Evaluating this bid against lower freight candidates in the fleet.`,
+        time: '12:43 PM',
+        price: v.is_best ? finalOffer : carrierOffer2
       }
     ];
-  }, [selectedTransportIndex, transportBranchMessages, activeVehicle, transitRoute]);
+  }, [selectedTransportIndex, transportBranchMessages, activeVehicle, transitRoute, cropQty]);
 
   // ---------------------------------------------------------------------------
   // Independent Landed Cost Recalculation (Strict Persisted State Based)
@@ -2768,21 +2793,31 @@ export default function NegotiationRoom() {
             </div>
           ) : viewingPhase === 'TRANSPORT' ? (
             /* VIEW: TRANSPORT NEGOTIATION PHASE */
-            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[650px] overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col min-h-[640px] max-h-[750px] overflow-hidden">
               
-              {/* Transport Phase Header */}
-              <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+              {/* Transport Phase Header with Carrier Tabs */}
+              <div className="p-3.5 border-b border-slate-100 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <Truck size={17} className="text-blue-600" /> Transport Freight Negotiation
+                    <Truck size={17} className="text-blue-600" /> Carrier Negotiation Chat
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      Vehicle #{activeVehicle.index + 1} &bull; {activeVehicle.match}% Match
+                    </span>
                   </h3>
                   <p className="text-[11px] text-slate-500">
                     Route: <strong className="text-slate-700">{transitRoute.origin}</strong> to <strong className="text-slate-700">{transitRoute.destination}</strong> (~{transitRoute.distanceKm} km)
                   </p>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block uppercase">Selected Carrier</span>
-                  <span className="font-bold text-xs text-blue-800">{activeVehicle.vehicle_name}</span>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={runParallelTransportNegotiation}
+                    disabled={isParallelTransportRunning}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Zap size={13} className={isParallelTransportRunning ? "animate-spin" : ""} />
+                    {isParallelTransportRunning ? "Negotiating 5 Carriers..." : "Auto-Negotiate All 5"}
+                  </button>
                 </div>
               </div>
 
@@ -2790,11 +2825,18 @@ export default function NegotiationRoom() {
               <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#fafbfc]">
                 {activeTransportMessages.map((msg, idx) => (
                   <div
-                    key={idx}
+                    key={msg.id || idx}
                     className={`flex flex-col ${msg.sender === 'Buyer Agent' ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
                   >
-                    <div className="text-[10px] text-slate-400 mb-0.5 px-1 font-semibold">
-                      {msg.sender} &bull; {msg.time}
+                    <div className="text-[10px] text-slate-400 mb-0.5 px-1 font-semibold flex items-center gap-1.5">
+                      <span>{msg.sender}</span>
+                      <span>&bull;</span>
+                      <span>{msg.time}</span>
+                      {msg.price && (
+                        <span className="font-mono font-bold text-slate-500">
+                          (Rs.{Number(msg.price).toLocaleString()})
+                        </span>
+                      )}
                     </div>
                     <div
                       className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
@@ -2810,33 +2852,33 @@ export default function NegotiationRoom() {
                 {isTransportLoading && (
                   <div className="flex items-center gap-2 text-xs text-slate-400 p-2 animate-pulse">
                     <Bot size={15} className="text-blue-500" />
-                    <span>Transport Dispatch Agent is evaluating route diesel & tolls...</span>
+                    <span>Transport Dispatch Agent is evaluating highway fuel, tolls & driver allowance...</span>
                   </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Transport Negotiation Controls */}
-              <div className="p-4 border-t border-slate-100 bg-white space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-slate-500">Asking Freight:</span>
-                    <span className="font-bold font-mono text-slate-800">Rs.{standardFreight.toLocaleString()}</span>
+              <div className="p-3.5 border-t border-slate-100 bg-white space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Carrier Ask:</span>
+                    <span className="font-black font-mono text-slate-800 text-sm">Rs.{standardFreight.toLocaleString()}</span>
                     <span className="text-[11px] text-slate-400">({activeVehicle.ratePerKm}/km)</span>
                   </div>
                   
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleSkipTransport('CANCELLED')}
-                      className="px-3 py-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg text-xs font-semibold transition cursor-pointer"
+                      className="px-2.5 py-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg text-xs font-semibold transition cursor-pointer"
                     >
-                      Cancel Logistics
+                      Cancel
                     </button>
                     <button
-                      onClick={() => handleSkipTransport('SKIPPED')}
-                      className="px-3 py-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg text-xs font-semibold transition cursor-pointer"
+                      onClick={() => handleTransportCounter(Math.round(standardFreight * 0.90))}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs transition border border-blue-200 cursor-pointer"
                     >
-                      Self-Arranged Pickup
+                      Counter 10% Lower
                     </button>
                     <button
                       onClick={() => handleAcceptTransportDeal()}
@@ -2852,7 +2894,7 @@ export default function NegotiationRoom() {
                     e.preventDefault();
                     handleTransportCounter();
                   }}
-                  className="flex items-center gap-2 pt-1"
+                  className="flex items-center gap-2 pt-0.5"
                 >
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">Rs.</span>
@@ -2860,7 +2902,7 @@ export default function NegotiationRoom() {
                       type="number"
                       value={transportBuyerOffer}
                       onChange={(e) => setTransportBuyerOffer(e.target.value)}
-                      placeholder={`Counter freight budget (e.g. ${Math.round(standardFreight * 0.90)})`}
+                      placeholder={`Enter custom freight counter budget (e.g. ${Math.round(standardFreight * 0.88)})`}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-4 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
