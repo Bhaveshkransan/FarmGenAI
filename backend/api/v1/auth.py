@@ -49,7 +49,8 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     repo = UserRepository(db)
     user = await repo.get_by_email(request.email)
     
-    if not user or not await verify_password(request.password, user.hashed_password):
+    pwd_hash = getattr(user, "password", None) or getattr(user, "hashed_password", "")
+    if not user or not await verify_password(request.password, pwd_hash):
         raise HTTPException(status_code=400, detail="Invalid email or password")
         
     token = await create_access_token({"sub": user.id, "role": user.role})

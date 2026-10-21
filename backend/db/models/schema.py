@@ -24,6 +24,10 @@ class DBUser(Base):
     def full_name(self) -> str:
         return self.name or ""
 
+    @property
+    def hashed_password(self) -> str:
+        return self.password or ""
+
 class DBFarmer(Base):
     __tablename__ = "farmers"
     id: Mapped[str] = mapped_column(primary_key=True)
