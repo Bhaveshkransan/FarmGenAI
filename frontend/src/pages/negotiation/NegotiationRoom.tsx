@@ -41,7 +41,8 @@ import {
   FileText,
   ExternalLink,
   XCircle,
-  CheckCheck
+  CheckCheck,
+  Navigation
 } from 'lucide-react';
 import ChatBubble from '@/features/negotiation/components/ChatBubble';
 import OfferCard from '@/features/negotiation/components/OfferCard';
@@ -185,6 +186,10 @@ export default function NegotiationRoom() {
 
   // Transport Phase States
   const [selectedTransportVehicle, setSelectedTransportVehicle] = useState<any>(null);
+  const [selectedTransportIndex, setSelectedTransportIndex] = useState<number>(0);
+  const [transportBranchMessages, setTransportBranchMessages] = useState<Record<number, any[]>>({});
+  const [transportBranchStatuses, setTransportBranchStatuses] = useState<Record<number, { status: string; currentFreight: number; rounds: number }>>({});
+  const [isParallelTransportRunning, setIsParallelTransportRunning] = useState(false);
   const [transportBuyerOffer, setTransportBuyerOffer] = useState<string>('');
   const [transportMessages, setTransportMessages] = useState<any[]>([]);
   const [transportStatus, setTransportStatus] = useState<'IDLE' | 'NEGOTIATING' | 'AGREED' | 'DECLINED' | 'CANCELLED'>('IDLE');
@@ -754,13 +759,6 @@ export default function NegotiationRoom() {
     });
   }, [transportFleetData, cropQty]);
 
-  // Active Vehicle Selection
-  const activeVehicle = useMemo(() => {
-    if (selectedTransportVehicle) return selectedTransportVehicle;
-    const fit = candidateVehicles.find(v => v.isCapacityFit);
-    return fit || candidateVehicles[0];
-  }, [selectedTransportVehicle, candidateVehicles]);
-
   // Route & Transit Calculation
   const transitRoute = useMemo(() => {
     const origin = completedPhases['FARMER']?.location || farmerLocation || defaultApmcOrigin;
@@ -787,12 +785,85 @@ export default function NegotiationRoom() {
       distanceKm,
       estTransitHours: Math.round((distanceKm / 42) * 10) / 10
     };
-  }, [completedPhases, farmerLocation]);
+  }, [completedPhases, farmerLocation, defaultApmcOrigin]);
+
+  // Top-5 Intelligent Transport Fleet Vehicles (mirroring Farmer Top-5 Candidate structure)
+  const topFiveVehicles = useMemo(() => {
+    const dist = transitRoute.distanceKm || 210;
+
+    // Prioritize capacity fitness (capacity >= cropQty * 0.85), then lowest total freight, then rating
+    const sorted = [...candidateVehicles].sort((a, b) => {
+      const aFit = a.capacity_kg >= cropQty * 0.85 ? 1 : 0;
+      const bFit = b.capacity_kg >= cropQty * 0.85 ? 1 : 0;
+      if (aFit !== bFit) return bFit - aFit;
+      const aFreight = a.ratePerKm * dist;
+      const bFreight = b.ratePerKm * dist;
+      if (aFreight !== bFreight) return aFreight - bFreight;
+      return (b.rating || 0) - (a.rating || 0);
+    });
+
+    const picked: any[] = [];
+    for (const v of sorted) {
+      if (picked.length >= 5) break;
+      if (!picked.some(p => p.vehicle_id === v.vehicle_id)) {
+        picked.push(v);
+      }
+    }
+    for (const v of candidateVehicles) {
+      if (picked.length >= 5) break;
+      if (!picked.some(p => p.vehicle_id === v.vehicle_id)) {
+        picked.push(v);
+      }
+    }
+
+    return picked.slice(0, 5).map((v, idx) => {
+      const baseFreight = Math.round(v.ratePerKm * dist);
+      const branchInfo = transportBranchStatuses[idx];
+      const currentFreight = branchInfo?.currentFreight !== undefined ? branchInfo.currentFreight : baseFreight;
+      const status = branchInfo?.status || (idx === 0 && transportStatus === 'AGREED' ? 'Deal Confirmed' : 'Active Ask');
+      const rounds = branchInfo?.rounds || 1;
+
+      return {
+        ...v,
+        index: idx,
+        distance_km: dist,
+        total_freight: currentFreight,
+        initial_freight: baseFreight,
+        match: Math.max(80, Math.round(98 - idx * 4)),
+        is_best: idx === 0,
+        status,
+        rounds_count: rounds
+      };
+    });
+  }, [candidateVehicles, transitRoute.distanceKm, cropQty, transportBranchStatuses, transportStatus]);
+
+  // Active Vehicle Selection
+  const activeVehicle = useMemo(() => {
+    return topFiveVehicles[selectedTransportIndex] || topFiveVehicles[0] || candidateVehicles[0];
+  }, [selectedTransportIndex, topFiveVehicles, candidateVehicles]);
 
   // Standard Initial Freight Quote
   const standardFreight = useMemo(() => {
-    return Math.round(activeVehicle.ratePerKm * transitRoute.distanceKm);
+    return activeVehicle?.total_freight || Math.round((activeVehicle?.ratePerKm || 24) * transitRoute.distanceKm);
   }, [activeVehicle, transitRoute]);
+
+  // Active Transport Isolated Chat Stream
+  const activeTransportMessages = useMemo(() => {
+    if (transportBranchMessages[selectedTransportIndex] && transportBranchMessages[selectedTransportIndex].length > 0) {
+      return transportBranchMessages[selectedTransportIndex];
+    }
+    const v = activeVehicle;
+    if (!v) return [];
+    return [
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}`,
+        sender: 'Transport Dispatcher',
+        text: `Namaste! I am the Transport Dispatch Agent representing ${v.vehicle_name} (${v.vehicle_type}). We have confirmed fleet availability at ${transitRoute.origin}. Our haulage rate to ${transitRoute.destination} (~${transitRoute.distanceKm} km) is Rs.${v.ratePerKm}/km, totaling Rs.${(v.ratePerKm * transitRoute.distanceKm).toLocaleString()} (inclusive of highway toll and e-Way compliance).`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        price: v.ratePerKm * transitRoute.distanceKm
+      }
+    ];
+  }, [selectedTransportIndex, transportBranchMessages, activeVehicle, transitRoute]);
 
   // ---------------------------------------------------------------------------
   // Independent Landed Cost Recalculation (Strict Persisted State Based)
@@ -1117,17 +1188,135 @@ export default function NegotiationRoom() {
     handleFarmerDealFinalized(agreedPrice, counterParty);
   };
 
+  // Parallel Autonomous Multi-Carrier Transport Negotiation Runner
+  const runParallelTransportNegotiation = async () => {
+    if (isParallelTransportRunning) return;
+    setIsParallelTransportRunning(true);
+    setLiveTerminalLogs(prev => [
+      ...prev,
+      { time: new Date().toLocaleTimeString(), tag: 'Fleet Engine', text: `Starting autonomous multi-carrier freight negotiation across top 5 vehicles for ${cropQty.toLocaleString()} kg ${cropName}...`, color: 'text-blue-400' }
+    ]);
+
+    const vehicles = [...topFiveVehicles];
+    const delays = [350, 700, 1050, 1400, 1750];
+
+    vehicles.forEach((v, idx) => {
+      setTimeout(() => {
+        const baseFreight = v.initial_freight || Math.round(v.ratePerKm * transitRoute.distanceKm);
+        const buyerRound1 = Math.round(baseFreight * 0.90);
+        const carrierCounter1 = Math.round(baseFreight * 0.94);
+        const buyerRound2 = Math.round(baseFreight * 0.91);
+        const isWinning = idx === 0; // #1 Best Freight Vehicle
+        const agreedAmt = isWinning ? buyerRound2 : carrierCounter1;
+
+        const initialMsg = {
+          id: `trans_init_${v.vehicle_id}_${idx}`,
+          sender: 'Transport Dispatcher',
+          text: `Namaste! Transport Dispatch Agent for ${v.vehicle_name} (${v.vehicle_type}). Available at ${transitRoute.origin}. Our haulage quote to ${transitRoute.destination} is Rs.${v.ratePerKm}/km, totaling Rs.${baseFreight.toLocaleString()} (inclusive of Fastag toll & driver batta).`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: baseFreight
+        };
+
+        const round1Buyer = {
+          id: `para_t_${idx}_1`,
+          sender: 'Buyer Agent',
+          text: `We counter-propose Rs.${buyerRound1.toLocaleString()} (Rs.${(buyerRound1 / transitRoute.distanceKm).toFixed(2)}/km) for ${v.vehicle_name} from ${transitRoute.origin} to ${transitRoute.destination}.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: buyerRound1
+        };
+
+        const round1Carrier = {
+          id: `para_t_${idx}_2`,
+          sender: 'Transport Dispatcher',
+          text: `Counter-offer: We can dispatch ${v.vehicle_name} for Rs.${carrierCounter1.toLocaleString()} (Rs.${(carrierCounter1 / transitRoute.distanceKm).toFixed(2)}/km) covering diesel, toll, and transit insurance.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: carrierCounter1
+        };
+
+        const round2Buyer = {
+          id: `para_t_${idx}_3`,
+          sender: 'Buyer Agent',
+          text: `Buyer target ceiling: Rs.${buyerRound2.toLocaleString()} (Rs.${(buyerRound2 / transitRoute.distanceKm).toFixed(2)}/km) for immediate dispatch slot.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: buyerRound2
+        };
+
+        const round2Carrier = {
+          id: `para_t_${idx}_4`,
+          sender: 'Transport Dispatcher',
+          text: isWinning 
+            ? `Deal Accepted! Confirmed Rs.${agreedAmt.toLocaleString()} for ${v.vehicle_name}. Booking dispatch slot and assigning driver.`
+            : `Carrier threshold limit reached. Firm dispatch quote stands at Rs.${carrierCounter1.toLocaleString()}.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: isWinning ? agreedAmt : carrierCounter1
+        };
+
+        setTransportBranchMessages(prev => ({
+          ...prev,
+          [idx]: [initialMsg, round1Buyer, round1Carrier, round2Buyer, round2Carrier]
+        }));
+
+        setTransportBranchStatuses(prev => ({
+          ...prev,
+          [idx]: {
+            status: isWinning ? 'Deal Confirmed' : 'Countered',
+            currentFreight: isWinning ? agreedAmt : carrierCounter1,
+            rounds: 2
+          }
+        }));
+
+        setLiveTerminalLogs(prev => [
+          ...prev,
+          { 
+            time: new Date().toLocaleTimeString(), 
+            tag: `Carrier #${idx + 1}`, 
+            text: isWinning 
+              ? `[Winner] ${v.vehicle_name}: Deal confirmed at Rs.${agreedAmt.toLocaleString()} (Rs.${(agreedAmt / transitRoute.distanceKm).toFixed(2)}/km). Saved Rs.${(baseFreight - agreedAmt).toLocaleString()}!`
+              : `[Screened] ${v.vehicle_name}: Countered Rs.${carrierCounter1.toLocaleString()} (${v.vehicle_type}).`, 
+            color: isWinning ? 'text-emerald-400' : 'text-blue-300' 
+          }
+        ]);
+
+        if (idx === vehicles.length - 1) {
+          setIsParallelTransportRunning(false);
+          setSelectedTransportIndex(0); // Focus on winner
+          const winningV = vehicles[0];
+          const winningFreight = Math.round((winningV.initial_freight || baseFreight) * 0.91);
+          setTransportStatus('AGREED');
+          setTransportAgreement({
+            vehicle: winningV,
+            agreedFreight: winningFreight,
+            distanceKm: transitRoute.distanceKm,
+            transitHours: transitRoute.estTransitHours
+          });
+          handleAcceptTransportDeal(winningFreight, winningV);
+        }
+      }, delays[idx]);
+    });
+  };
+
   // Transport Counter-Offer Handler
   const handleTransportCounter = async (offerAmt?: number) => {
-    const buyerOffer = offerAmt !== undefined ? offerAmt : (Number(transportBuyerOffer) || Math.round(standardFreight * 0.90));
+    const v = activeVehicle;
+    const baseFreight = v.initial_freight || (v.ratePerKm * transitRoute.distanceKm);
+    const buyerOffer = offerAmt !== undefined ? offerAmt : (Number(transportBuyerOffer) || Math.round(baseFreight * 0.90));
     setIsTransportLoading(true);
 
     const userMsg = {
+      id: `usr_t_${Date.now()}`,
       sender: 'Buyer Agent',
       text: `We counter-propose Rs.${buyerOffer.toLocaleString()} (Rs.${(buyerOffer / transitRoute.distanceKm).toFixed(2)}/km) for ${cropQty.toLocaleString()} kg haulage from ${transitRoute.origin} to ${transitRoute.destination}.`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      price: buyerOffer
     };
-    setTransportMessages(prev => [...prev, userMsg]);
+
+    const currentBranchMsgs = activeTransportMessages;
+    const newMsgs = [...currentBranchMsgs, userMsg];
+    setTransportBranchMessages(prev => ({
+      ...prev,
+      [selectedTransportIndex]: newMsgs
+    }));
+    setTransportMessages(newMsgs);
 
     try {
       const payload = {
@@ -1139,11 +1328,11 @@ export default function NegotiationRoom() {
           pickup_location: transitRoute.origin,
           dropoff_location: transitRoute.destination,
           route_distance_km: transitRoute.distanceKm,
-          is_reefer_required: Boolean(activeVehicle?.refrigerated),
-          current_round: transportRound,
-          agent_floor_price: Math.round(standardFreight * 0.88),
-          agent_target_price: standardFreight,
-          agent_counter_offer: Math.round(standardFreight * 0.96),
+          is_reefer_required: Boolean(v?.refrigerated),
+          current_round: (transportBranchStatuses[selectedTransportIndex]?.rounds || transportRound || 1),
+          agent_floor_price: Math.round(baseFreight * 0.88),
+          agent_target_price: baseFreight,
+          agent_counter_offer: Math.round(baseFreight * 0.94),
           negotiation_status: 'IN_PROGRESS'
         }
       };
@@ -1154,38 +1343,55 @@ export default function NegotiationRoom() {
       setTimeout(() => {
         setIsTransportLoading(false);
         setTransportRound(r => r + 1);
+        const nextRound = (transportBranchStatuses[selectedTransportIndex]?.rounds || transportRound || 1) + 1;
 
         if (data?.negotiation_status === 'ACCEPTED' || (data?.agreed_price && data.agreed_price <= buyerOffer)) {
           const agreedAmt = data?.agreed_price || buyerOffer;
-          setTransportMessages(prev => [
+          const acceptMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `Deal Accepted! ${data?.explanation || `Confirmed Rs.${agreedAmt.toLocaleString()} for ${v.vehicle_name}. Booking dispatch slot.`}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: agreedAmt
+          };
+          setTransportBranchMessages(prev => ({
             ...prev,
-            {
-              sender: 'Transport Dispatcher',
-              text: `Deal Accepted! ${data?.explanation || `Confirmed Rs.${agreedAmt.toLocaleString()} for ${activeVehicle.vehicle_name}. Booking dispatch slot.`}`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]);
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), acceptMsg]
+          }));
+          setTransportMessages(prev => [...prev, acceptMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Deal Confirmed', currentFreight: agreedAmt, rounds: nextRound }
+          }));
           setTransportStatus('AGREED');
           setTransportAgreement({
-            vehicle: activeVehicle,
+            vehicle: v,
             agreedFreight: agreedAmt,
             distanceKm: transitRoute.distanceKm,
             transitHours: transitRoute.estTransitHours
           });
           setLiveTerminalLogs(prev => [
             ...prev,
-            { time: new Date().toLocaleTimeString(), tag: 'Transport Agt', text: `[Transport Agent] ACCEPTED buyer freight offer of Rs.${agreedAmt.toLocaleString()} for vehicle ${activeVehicle.vehicle_name}.`, color: 'text-emerald-400' }
+            { time: new Date().toLocaleTimeString(), tag: 'Transport Agt', text: `[Transport Agent] ACCEPTED buyer freight offer of Rs.${agreedAmt.toLocaleString()} for vehicle ${v.vehicle_name}.`, color: 'text-emerald-400' }
           ]);
         } else {
-          const counterAmt = data?.agent_counter_offer || Math.round(standardFreight * 0.94);
-          setTransportMessages(prev => [
+          const counterAmt = data?.agent_counter_offer || Math.round(baseFreight * 0.94);
+          const counterMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `${data?.explanation || `Counter-offer: We can dispatch ${v.vehicle_name} for Rs.${counterAmt.toLocaleString()} (Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km) covering diesel, toll, and driver batta.`}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: counterAmt
+          };
+          setTransportBranchMessages(prev => ({
             ...prev,
-            {
-              sender: 'Transport Dispatcher',
-              text: `${data?.explanation || `Counter-offer: We can dispatch ${activeVehicle.vehicle_name} for Rs.${counterAmt.toLocaleString()} (Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km) covering diesel, toll, and driver batta.`}`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]);
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), counterMsg]
+          }));
+          setTransportMessages(prev => [...prev, counterMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Countered', currentFreight: counterAmt, rounds: nextRound }
+          }));
           setLiveTerminalLogs(prev => [
             ...prev,
             { time: new Date().toLocaleTimeString(), tag: 'Transport Agt', text: `[Transport Agent] Counter-offered Rs.${counterAmt.toLocaleString()} (Rate: Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km).`, color: 'text-amber-400' }
@@ -1197,40 +1403,58 @@ export default function NegotiationRoom() {
       console.warn('Transport negotiate fallback:', err);
       setTimeout(() => {
         setIsTransportLoading(false);
-        const floorCost = Math.round(standardFreight * 0.88);
+        const floorCost = Math.round(baseFreight * 0.88);
+        const nextRound = (transportBranchStatuses[selectedTransportIndex]?.rounds || transportRound || 1) + 1;
         if (buyerOffer >= floorCost) {
-          setTransportMessages(prev => [
+          const acceptMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `Offer of Rs.${buyerOffer.toLocaleString()} meets our operating threshold for ${v.vehicle_name}. Freight booking confirmed.`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: buyerOffer
+          };
+          setTransportBranchMessages(prev => ({
             ...prev,
-            {
-              sender: 'Transport Dispatcher',
-              text: `Offer of Rs.${buyerOffer.toLocaleString()} meets our operating threshold for ${activeVehicle.vehicle_name}. Freight booking confirmed.`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]);
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), acceptMsg]
+          }));
+          setTransportMessages(prev => [...prev, acceptMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Deal Confirmed', currentFreight: buyerOffer, rounds: nextRound }
+          }));
           setTransportStatus('AGREED');
           setTransportAgreement({
-            vehicle: activeVehicle,
+            vehicle: v,
             agreedFreight: buyerOffer,
             distanceKm: transitRoute.distanceKm,
             transitHours: transitRoute.estTransitHours
           });
         } else {
-          const counterAmt = Math.round((standardFreight + floorCost) / 2);
-          setTransportMessages(prev => [
+          const counterAmt = Math.round((baseFreight + floorCost) / 2);
+          const counterMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `Rs.${buyerOffer.toLocaleString()} is below diesel operating cost. Our best counter is Rs.${counterAmt.toLocaleString()} (Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km).`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: counterAmt
+          };
+          setTransportBranchMessages(prev => ({
             ...prev,
-            {
-              sender: 'Transport Dispatcher',
-              text: `Rs.${buyerOffer.toLocaleString()} is below diesel operating cost. Our best counter is Rs.${counterAmt.toLocaleString()} (Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km).`,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]);
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), counterMsg]
+          }));
+          setTransportMessages(prev => [...prev, counterMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Countered', currentFreight: counterAmt, rounds: nextRound }
+          }));
         }
       }, 400);
     }
   };
 
   // Accept Transport Deal Handler
-  const handleAcceptTransportDeal = async (agreedAmt?: number) => {
+  const handleAcceptTransportDeal = async (agreedAmt?: number, vehicleOverride?: any) => {
+    const chosenVehicle = vehicleOverride || activeVehicle;
     const finalFreight = agreedAmt || transportAgreement?.agreedFreight || standardFreight;
 
     const transportRecord: CompletedPhaseRecord = {
@@ -1238,18 +1462,18 @@ export default function NegotiationRoom() {
       title: 'Inbound Freight Logistics',
       status: 'DEAL',
       agreedPrice: finalFreight,
-      counterParty: activeVehicle.vehicle_name,
+      counterParty: chosenVehicle.vehicle_name,
       location: `${transitRoute.origin} -> ${transitRoute.destination}`,
       lotSize: cropQty,
       details: {
-        vehicle: activeVehicle,
+        vehicle: chosenVehicle,
         distanceKm: transitRoute.distanceKm,
         transitHours: transitRoute.estTransitHours,
         ratePerKm: (finalFreight / transitRoute.distanceKm).toFixed(2)
       },
-      messages: [...transportMessages],
+      messages: transportBranchMessages[chosenVehicle.index !== undefined ? chosenVehicle.index : selectedTransportIndex] || activeTransportMessages,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      explanation: `Freight confirmed: ${activeVehicle.vehicle_name} (${activeVehicle.vehicle_type}) assigned for Rs.${finalFreight.toLocaleString()} (${transitRoute.distanceKm} km).`
+      explanation: `Freight confirmed: ${chosenVehicle.vehicle_name} (${chosenVehicle.vehicle_type}) assigned for Rs.${finalFreight.toLocaleString()} (${transitRoute.distanceKm} km).`
     };
 
     setCompletedPhases(prev => {
@@ -1713,105 +1937,259 @@ export default function NegotiationRoom() {
       )}
 
       {/* =======================================================================
-          TOP MATCHES: 5 Candidate Cards Across Central/Top Section (Phase 6A)
+          CELEBRATORY PHASE 1 FINISHED BANNER & PHASE 2 TRANSITION NOTICE
       ======================================================================= */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
-              <Sparkles size={16} />
+      {completedPhases['FARMER'] && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/50 to-blue-50 border border-emerald-300/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0">
+              ✓
             </div>
             <div>
-              <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
-                Top-5 Intelligent Candidate Screening
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
-                  {topFiveCandidates.length} Screened
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  Phase 1 Finished
                 </span>
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Ranked by multi-attribute RL utility (distance, APMC modal spread, landed cost, and freshness). Click any candidate to view isolated WhatsApp-style conversation.
+                <span className="text-xs font-black text-slate-800">
+                  Farmer Produce Agreement Finalized!
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Procured <strong>{cropQty.toLocaleString()} kg</strong> of <strong>{cropName}</strong> at <strong className="text-emerald-700">Rs.{completedPhases['FARMER'].agreedPrice}/kg</strong> from <strong>{completedPhases['FARMER'].counterParty}</strong> ({completedPhases['FARMER'].location}).
               </p>
             </div>
           </div>
-          
-          <button
-            onClick={runParallelAutonomousNegotiation}
-            disabled={isParallelRunning}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
-              isParallelRunning 
-                ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
-                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-            }`}
-          >
-            <Zap size={13} className={isParallelRunning ? 'animate-spin' : ''} />
-            {isParallelRunning ? 'Parallel Engine Running...' : 'Auto-Negotiate All 5 in Parallel'}
-          </button>
-        </div>
-
-        {/* 5 Horizontal / Responsive Candidate Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {topFiveCandidates.map((c, idx) => {
-            const isSelected = selectedCandidateIndex === idx;
-            return (
-              <div
-                key={idx}
-                onClick={() => setSelectedCandidateIndex(idx)}
-                className={`relative p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between ${
-                  isSelected
-                    ? 'border-emerald-600 bg-emerald-50/50 shadow-md ring-2 ring-emerald-500/20'
-                    : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm'
-                }`}
+          <div className="flex items-center gap-2 shrink-0">
+            {viewingPhase === 'TRANSPORT' ? (
+              <span className="text-[11px] font-black text-blue-800 bg-blue-100/90 border border-blue-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs">
+                <Truck size={14} className="text-blue-600" /> Phase 2: Active Transport Freight
+              </span>
+            ) : (
+              <button
+                onClick={() => setViewingPhase('TRANSPORT')}
+                className="text-[11px] font-black text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition cursor-pointer"
               >
-                {c.is_best && (
-                  <div className="absolute -top-2.5 right-2 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full shadow-xs flex items-center gap-1">
-                    <Trophy size={10} /> BEST DEAL
-                  </div>
-                )}
+                <Truck size={14} /> Go to Phase 2 Transport &rarr;
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
+      {/* =======================================================================
+          TOP MATCHES: 5 Candidate Cards Across Central/Top Section
+          - In TRANSPORT Phase: Top 5 Transport Fleet Vehicles & Parallel Carrier Engine
+          - In FARMER Phase: Top 5 Candidate Farmers & Parallel Seller Engine
+      ======================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-3">
+        {viewingPhase === 'TRANSPORT' ? (
+          /* ===================================================================
+             TOP 5 TRANSPORT FLEET VEHICLES SCREENING
+          =================================================================== */
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                  <Truck size={16} />
+                </div>
                 <div>
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="text-[10px] font-black text-slate-400 font-mono">#{idx + 1}</span>
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
-                      {c.match}% Match
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    Top-5 Intelligent Transport Fleet Screening
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
+                      5 Screened Carriers
                     </span>
-                  </div>
-
-                  <h4 className="text-xs font-black text-slate-900 truncate flex items-center gap-1" title={c.name}>
-                    {c.name}
-                  </h4>
-                  <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
-                    <MapPin size={10} className="text-slate-400 shrink-0" /> {c.location}
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Ranked by payload compatibility ({cropQty.toLocaleString()} kg), transit highway tolls, and haulage freight. Click any vehicle to view isolated carrier chat.
                   </p>
-                  <p className="text-[10px] text-slate-400">
-                    {c.distance_km} km transit
-                  </p>
-                </div>
-
-                <div className="mt-2.5 pt-2 border-t border-slate-100/90 flex items-end justify-between">
-                  <div>
-                    <div className="text-[10px] text-slate-400 font-medium">Negotiated Base</div>
-                    <div className="text-sm font-black text-slate-900">Rs.{c.offer}/kg</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-[9px] text-slate-400">True Landed</div>
-                    <div className="text-[11px] font-extrabold text-emerald-700">Rs.{c.landed_cost_per_kg}/kg</div>
-                  </div>
-                </div>
-
-                <div className="mt-1.5 flex items-center justify-between text-[9px]">
-                  <span className={`px-1.5 py-0.5 rounded font-bold ${
-                    c.status?.includes('Deal') ? 'bg-emerald-100 text-emerald-800' :
-                    c.status?.includes('Exceeded') || c.status?.includes('Reject') ? 'bg-rose-100 text-rose-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>
-                    {c.status}
-                  </span>
-                  <span className="text-slate-400">{c.rounds_count} rounds</span>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              
+              <button
+                onClick={runParallelTransportNegotiation}
+                disabled={isParallelTransportRunning}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
+                  isParallelTransportRunning 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                }`}
+              >
+                <Zap size={13} className={isParallelTransportRunning ? 'animate-spin' : ''} />
+                {isParallelTransportRunning ? 'Parallel Dispatch Running...' : 'Auto-Negotiate All 5 Carriers in Parallel'}
+              </button>
+            </div>
+
+            {/* 5 Horizontal / Responsive Vehicle Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {topFiveVehicles.map((v, idx) => {
+                const isSelected = selectedTransportIndex === idx;
+                return (
+                  <div
+                    key={v.vehicle_id || idx}
+                    onClick={() => {
+                      setSelectedTransportIndex(idx);
+                      setSelectedTransportVehicle(v);
+                    }}
+                    className={`relative p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-50/50 shadow-md ring-2 ring-blue-500/20'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                  >
+                    {v.is_best && (
+                      <div className="absolute -top-2.5 right-2 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full shadow-xs flex items-center gap-1">
+                        <Trophy size={10} /> BEST FREIGHT
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-black text-slate-400 font-mono">#{idx + 1}</span>
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                          {v.match}% Match
+                        </span>
+                      </div>
+
+                      <h4 className="text-xs font-black text-slate-900 truncate flex items-center gap-1" title={v.vehicle_name}>
+                        {v.vehicle_name}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                        <Truck size={10} className="text-slate-400 shrink-0" /> {v.vehicle_type}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {v.capacity_kg.toLocaleString()} kg &bull; {v.isCapacityFit ? 'Payload Fit' : 'Tight Load'}
+                      </p>
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-slate-100/90 flex items-end justify-between">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-medium">Haulage Rate</div>
+                        <div className="text-sm font-black text-slate-900">Rs.{v.ratePerKm}/km</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-400">Total Freight</div>
+                        <div className="text-[11px] font-extrabold text-blue-700">Rs.{v.total_freight.toLocaleString()}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-1.5 flex items-center justify-between text-[9px]">
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${
+                        v.status?.includes('Deal') ? 'bg-emerald-100 text-emerald-800' :
+                        v.status?.includes('Exceeded') || v.status?.includes('Reject') ? 'bg-rose-100 text-rose-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {v.status}
+                      </span>
+                      <span className="text-slate-400">{v.rounds_count} rounds</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          /* ===================================================================
+             TOP 5 FARMER CANDIDATES SCREENING (FARMER PHASE)
+          =================================================================== */
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    Top-5 Intelligent Candidate Screening
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                      {topFiveCandidates.length} Screened
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Ranked by multi-attribute RL utility (distance, APMC modal spread, landed cost, and freshness). Click any candidate to view isolated WhatsApp-style conversation.
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                onClick={runParallelAutonomousNegotiation}
+                disabled={isParallelRunning}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
+                  isParallelRunning 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                }`}
+              >
+                <Zap size={13} className={isParallelRunning ? 'animate-spin' : ''} />
+                {isParallelRunning ? 'Parallel Engine Running...' : 'Auto-Negotiate All 5 in Parallel'}
+              </button>
+            </div>
+
+            {/* 5 Horizontal / Responsive Candidate Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {topFiveCandidates.map((c, idx) => {
+                const isSelected = selectedCandidateIndex === idx;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => setSelectedCandidateIndex(idx)}
+                    className={`relative p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-emerald-600 bg-emerald-50/50 shadow-md ring-2 ring-emerald-500/20'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                  >
+                    {c.is_best && (
+                      <div className="absolute -top-2.5 right-2 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full shadow-xs flex items-center gap-1">
+                        <Trophy size={10} /> BEST DEAL
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-black text-slate-400 font-mono">#{idx + 1}</span>
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                          {c.match}% Match
+                        </span>
+                      </div>
+
+                      <h4 className="text-xs font-black text-slate-900 truncate flex items-center gap-1" title={c.name}>
+                        {c.name}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} className="text-slate-400 shrink-0" /> {c.location}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {c.distance_km} km transit
+                      </p>
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-slate-100/90 flex items-end justify-between">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-medium">Negotiated Base</div>
+                        <div className="text-sm font-black text-slate-900">Rs.{c.offer}/kg</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-400">True Landed</div>
+                        <div className="text-[11px] font-extrabold text-emerald-700">Rs.{c.landed_cost_per_kg}/kg</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-1.5 flex items-center justify-between text-[9px]">
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${
+                        c.status?.includes('Deal') ? 'bg-emerald-100 text-emerald-800' :
+                        c.status?.includes('Exceeded') || c.status?.includes('Reject') ? 'bg-rose-100 text-rose-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {c.status}
+                      </span>
+                      <span className="text-slate-400">{c.rounds_count} rounds</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {/* =======================================================================
@@ -1834,50 +2212,77 @@ export default function NegotiationRoom() {
 
           {/* Phase-Aware Candidate Panel */}
           {viewingPhase === 'TRANSPORT' ? (
-            /* Transport Fleet Candidates */
+            /* Transport Route & Freight Intelligence Card (Cleaned - 64 carriers removed) */
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                 <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <Truck size={17} className="text-blue-600" /> Available Fleet Vehicles
+                  <Truck size={17} className="text-blue-600" /> Logistics Haulage Corridor
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
-                  {candidateVehicles.length} Carriers Live
+                  Phase 2 Active
                 </span>
               </div>
 
-              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
-                {candidateVehicles.map((v: any) => {
-                  const isSelected = activeVehicle.vehicle_id === v.vehicle_id;
-                  const estimatedCost = Math.round(v.ratePerKm * transitRoute.distanceKm);
-                  return (
-                    <div
-                      key={v.vehicle_id}
-                      onClick={() => setSelectedTransportVehicle(v)}
-                      className={`p-3 rounded-xl border text-xs cursor-pointer transition ${
-                        isSelected 
-                          ? 'border-blue-500 bg-blue-50/60 ring-2 ring-blue-100' 
-                          : 'border-slate-200/80 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="font-bold text-slate-800">{v.vehicle_name}</span>
-                        <span className="font-black text-blue-700">Rs.{v.ratePerKm}/km</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                        <span>{v.vehicle_type} &bull; {v.capacity_kg} kg cap</span>
-                        <span className="flex items-center gap-1 text-amber-600 font-semibold">
-                          <Star size={11} className="fill-amber-400" /> {v.rating}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-                        <span>Est. Trip: Rs.{estimatedCost.toLocaleString()}</span>
-                        <span className={v.isCapacityFit ? 'text-emerald-600 font-bold' : 'text-amber-600'}>
-                          {v.isCapacityFit ? 'Payload Compatible' : 'Partial Load'}
-                        </span>
-                      </div>
+              {/* Origin to Destination Route Spec */}
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-slate-50/80 rounded-xl space-y-2 border border-slate-100">
+                  <div className="flex items-start gap-2">
+                    <MapPin size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Pickup Origin Mandi</span>
+                      <span className="font-bold text-slate-800">{transitRoute.origin}</span>
                     </div>
-                  );
-                })}
+                  </div>
+
+                  <div className="flex items-start gap-2 pt-1 border-t border-slate-200/60">
+                    <MapPin size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Delivery Destination Hub</span>
+                      <span className="font-bold text-slate-800">{transitRoute.destination}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block">Corridor Distance</span>
+                    <span className="font-black text-slate-800 text-sm">{transitRoute.distanceKm} km</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block">Est. Transit Time</span>
+                    <span className="font-black text-blue-700 text-sm">~{transitRoute.estTransitHours} hrs</span>
+                  </div>
+                </div>
+
+                {/* Active Carrier Specifications */}
+                <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/60 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-blue-900 font-bold uppercase">Active Carrier Selected</span>
+                    <span className="text-[10px] font-black text-amber-700 flex items-center gap-0.5">
+                      <Star size={10} className="fill-amber-400" /> {activeVehicle.rating || 4.8}
+                    </span>
+                  </div>
+                  <div className="font-black text-slate-900 text-xs">{activeVehicle.vehicle_name}</div>
+                  <div className="text-[11px] text-slate-500">
+                    {activeVehicle.vehicle_type} &bull; {activeVehicle.capacity_kg.toLocaleString()} kg cap
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-blue-200/50">
+                    <span className="text-slate-600">Base Rate: Rs.{activeVehicle.ratePerKm}/km</span>
+                    <span className={activeVehicle.isCapacityFit ? 'text-emerald-700 font-bold' : 'text-amber-700 font-semibold'}>
+                      {activeVehicle.isCapacityFit ? '✓ Payload Fit' : 'Tight Load'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Corridor Regulatory & Fastag Note */}
+                <div className="p-2.5 bg-slate-50/90 rounded-xl text-[10px] text-slate-500 space-y-1 border border-slate-100">
+                  <div className="font-bold text-slate-700 flex items-center gap-1">
+                    <ShieldCheck size={12} className="text-blue-500" /> State Haulage Compliance
+                  </div>
+                  <p>
+                    NH-60 / NH-48 Fastag corridor. Rates include toll transit, driver batta, and e-Way bill registration.
+                  </p>
+                </div>
               </div>
             </div>
           ) : viewingPhase === 'WAREHOUSE' ? (
@@ -1967,7 +2372,6 @@ export default function NegotiationRoom() {
               </div>
             </div>
           ) : (
-            {/* Candidate Farmers (FARMER Phase & Fallback) - Synchronized with Top 5 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -2384,7 +2788,7 @@ export default function NegotiationRoom() {
 
               {/* Transport Messages Stream */}
               <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#fafbfc]">
-                {transportMessages.map((msg, idx) => (
+                {activeTransportMessages.map((msg, idx) => (
                   <div
                     key={idx}
                     className={`flex flex-col ${msg.sender === 'Buyer Agent' ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
