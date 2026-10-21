@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.db.session import AsyncSessionLocal
-from backend.repositories.user_repo import UserRepository
+from backend.repositories.user_repository import UserRepository
 from backend.services.security import verify_password, create_access_token
 from backend.schemas.auth_model import SignupRequest, LoginRequest
 from pydantic import BaseModel

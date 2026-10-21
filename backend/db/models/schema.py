@@ -16,6 +16,14 @@ class DBUser(Base):
     preferences: Mapped[str] = mapped_column(default="{}")
     trust_score: Mapped[float] = mapped_column(default=4.0)
 
+    @property
+    def id(self) -> str:
+        return self.user_id
+
+    @property
+    def full_name(self) -> str:
+        return self.name or ""
+
 class DBFarmer(Base):
     __tablename__ = "farmers"
     id: Mapped[str] = mapped_column(primary_key=True)
