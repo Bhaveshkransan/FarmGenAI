@@ -1537,8 +1537,8 @@ export default function NegotiationRoom() {
       if (targetNegId) {
         await api.post(`/negotiations/${targetNegId}/accept`, {
           transport_plan: {
-            vehicle_name: activeVehicle.vehicle_name,
-            vehicle_type: activeVehicle.vehicle_type,
+            vehicle_name: chosenVehicle.vehicle_name,
+            vehicle_type: chosenVehicle.vehicle_type,
             agreed_freight: finalFreight,
             distance_km: transitRoute.distanceKm,
             origin: transitRoute.origin,
@@ -1552,7 +1552,7 @@ export default function NegotiationRoom() {
 
     setLiveTerminalLogs(prev => [
       ...prev,
-      { time: new Date().toLocaleTimeString(), tag: 'Phase 2 Complete', text: `[Phase 2 Transport] Agreement finalized at Rs.${finalFreight.toLocaleString()} with ${activeVehicle.vehicle_name}.`, color: 'text-emerald-400' },
+      { time: new Date().toLocaleTimeString(), tag: 'Phase 2 Complete', text: `[Phase 2 Transport] Agreement finalized at Rs.${finalFreight.toLocaleString()} with ${chosenVehicle.vehicle_name}.`, color: 'text-emerald-400' },
       { time: new Date().toLocaleTimeString(), tag: 'Orchestrator', text: `[Orchestrator] Multi-agent negotiation complete. Generating Landed Cost Term Sheet.`, color: 'text-purple-400' }
     ]);
 
