@@ -226,7 +226,7 @@ export default function NegotiationRoom() {
   const cropQty = Number(negState?.quantity || negState?.quantity_kg || 2500);
   const targetPrice = Number(negState?.expected_price || negState?.target_price || 51);
   const farmerName = negState?.farmer_name || negState?.farmer || 'Maharashtra Producer';
-  const buyerName = negState?.buyer_name || negState?.buyer || user?.name || 'Buyer Enterprise';
+  const buyerName = negState?.buyer_name || negState?.buyer || (user?.role !== 'farmer' ? user?.name : null) || 'Commercial Buyer Enterprise';
   // Dynamic APMC district origin fallback (Requirement 7: dynamic origin based on actual district)
   const resolvedDistrict = useMemo(() => {
     const raw = negState?.district || negState?.buyer_district || 
@@ -528,24 +528,32 @@ export default function NegotiationRoom() {
         offer: Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2)),
         initial_ask: Number(b.initial_ask || bestOfferPrice * 1.05),
         freight_per_kg: (() => {
+          if (b.freight_per_kg) return Number(b.freight_per_kg);
           const loc = (b.location || '').toLowerCase();
           const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
           return Math.round((dist * 0.0075) * 100) / 100;
         })(),
-        apmc_cess_per_kg: 0.52,
+        apmc_cess_per_kg: (() => {
+          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
+          return Math.round(off * 0.01 * 100) / 100;
+        })(),
         landed_cost_per_kg: (() => {
+          if (b.landed_cost_per_kg) return Number(b.landed_cost_per_kg);
           const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
           const loc = (b.location || '').toLowerCase();
           const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
           const frt = Math.round((dist * 0.0075) * 100) / 100;
-          return Math.round((off + frt + 0.52) * 100) / 100;
+          const cess = Math.round(off * 0.01 * 100) / 100;
+          return Math.round((off + frt + cess) * 100) / 100;
         })(),
         total_landed_cost: (() => {
+          if (b.total_landed_cost) return Number(b.total_landed_cost);
           const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
           const loc = (b.location || '').toLowerCase();
           const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
           const frt = Math.round((dist * 0.0075) * 100) / 100;
-          return Math.round((off + frt + 0.52) * cropQty);
+          const cess = Math.round(off * 0.01 * 100) / 100;
+          return Math.round((off + frt + cess) * cropQty);
         })(),
         status: b.is_best ? "Deal Confirmed" : (b.is_disqualified ? "Exceeded Budget" : (b.status || "Negotiating")),
         is_best: Boolean(b.is_best || idx === 0),
@@ -3491,7 +3499,7 @@ export default function NegotiationRoom() {
                 type="text"
                 value={copilotCommand}
                 onChange={e => setCopilotCommand(e.target.value)}
-                placeholder="Give instruction to Buyer Agent..."
+                placeholder="Give instruction to Buyer Agent... (e.g. Target Rs. 48/kg, protect P_max reservation ceiling)"
                 className="w-full bg-[#1e293b]/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
               <button

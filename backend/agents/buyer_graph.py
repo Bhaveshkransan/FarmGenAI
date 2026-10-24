@@ -347,24 +347,32 @@ async def dependency_assessment_node(state: BuyerOrchestrationGraphState) -> Dic
     if winner:
         # Check Transport dependency
         needs_transport = state.get("need_transport", False) or state.get("delivery_option") in ("buyer_pickup", "need_transport")
+        needs_storage = state.get("need_storage", False)
+        needs_processing = state.get("allow_processing", False) or state.get("need_processing", False)
+        
         if needs_transport and "TRANSPORT" in permitted:
             if "TRANSPORT" not in required:
                 required.append("TRANSPORT")
             events.append("TRANSPORT_REQUIRED")
             next_agent = "TRANSPORT"
-            logs.append("🚚 [7. Dependency Assessment] Buyer requires transport and TRANSPORT is permitted. Routing to Transport Agent.")
-        elif state.get("need_storage", False) and "WAREHOUSE" in permitted:
+            logs.append("🚜 [7. Dependency Assessment] Buyer requires transport and TRANSPORT is permitted. Routing to Transport Agent.")
+        elif needs_storage and "WAREHOUSE" in permitted:
             if "WAREHOUSE" not in required:
                 required.append("WAREHOUSE")
             next_agent = "WAREHOUSE"
-            logs.append("🏭 [7. Dependency Assessment] Buyer requires cold storage and WAREHOUSE is permitted. Routing to Warehouse Agent.")
-    else:
-        # Deal failed: check processor escalation
-        if state.get("allow_processing", False) and "PROCESSOR" in permitted:
+            logs.append("🏢 [7. Dependency Assessment] Buyer requires cold storage and WAREHOUSE is permitted. Routing to Warehouse Agent.")
+        elif needs_processing and "PROCESSOR" in permitted:
             if "PROCESSOR" not in required:
                 required.append("PROCESSOR")
             next_agent = "PROCESSOR"
-            logs.append("⚙️ [7. Dependency Assessment] Procurement deal failed. Escalating to Processor Agent as value-added alternative.")
+            logs.append("🏭 [7. Dependency Assessment] Buyer requested value-added processing and PROCESSOR is permitted. Routing to Processor Agent.")
+    else:
+        # Deal failed: check processor escalation as secondary alternative
+        if (state.get("allow_processing", False) or state.get("need_processing", False)) and "PROCESSOR" in permitted:
+            if "PROCESSOR" not in required:
+                required.append("PROCESSOR")
+            next_agent = "PROCESSOR"
+            logs.append("🔄 [7. Dependency Assessment] Procurement deal failed. Escalating to Processor Agent as value-added alternative.")
 
     return {
         "next_node": next_agent,
@@ -537,8 +545,18 @@ def route_after_dependencies(state: BuyerOrchestrationGraphState) -> str:
 
 
 def route_after_transport(state: BuyerOrchestrationGraphState) -> str:
-    if state.get("need_storage", False) and "WAREHOUSE" in state.get("permitted_agents", []):
+    permitted = state.get("permitted_agents", [])
+    if state.get("need_storage", False) and "WAREHOUSE" in permitted:
         return "warehouse_agent"
+    if (state.get("allow_processing", False) or state.get("need_processing", False)) and "PROCESSOR" in permitted:
+        return "processor_agent"
+    return "workflow_completion"
+
+
+def route_after_warehouse(state: BuyerOrchestrationGraphState) -> str:
+    permitted = state.get("permitted_agents", [])
+    if (state.get("allow_processing", False) or state.get("need_processing", False)) and "PROCESSOR" in permitted:
+        return "processor_agent"
     return "workflow_completion"
 
 
@@ -594,10 +612,18 @@ buyer_workflow.add_conditional_edges(
     route_after_transport,
     {
         "warehouse_agent": "warehouse_agent",
+        "processor_agent": "processor_agent",
         "workflow_completion": "workflow_completion",
     },
 )
-buyer_workflow.add_edge("warehouse_agent", "workflow_completion")
+buyer_workflow.add_conditional_edges(
+    "warehouse_agent",
+    route_after_warehouse,
+    {
+        "processor_agent": "processor_agent",
+        "workflow_completion": "workflow_completion",
+    },
+)
 buyer_workflow.add_edge("processor_agent", "workflow_completion")
 buyer_workflow.add_edge("workflow_completion", END)
 
