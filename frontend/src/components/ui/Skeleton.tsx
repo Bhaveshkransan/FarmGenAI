@@ -1,8 +1,8 @@
 import React from 'react';
 
-function SkeletonBlock({ className = '' }) {
+function SkeletonBlock({ className = '', style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <div className={`bg-slate-200 rounded-xl animate-pulse ${className}`} />
+    <div className={`bg-slate-200 rounded-xl animate-pulse ${className}`} style={style} />
   );
 }
 

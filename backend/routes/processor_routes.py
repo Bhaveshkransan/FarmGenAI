@@ -27,6 +27,8 @@ class ProcessingOrderRequest(BaseModel):
 
 @router.get("")
 @router.get("/")
+@router.get("")
+@router.get("/matching")
 async def get_processors(
     crop: str = None,
     current_user: dict = Depends(get_current_user_optional),

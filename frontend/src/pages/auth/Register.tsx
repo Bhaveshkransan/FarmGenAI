@@ -4,14 +4,33 @@ import { Sprout, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { isMaharashtraLocation } from '@/utils/validation';
 
+interface RegisterFormData {
+  name: string;
+  email: string;
+  location: string;
+  password: string;
+  role: string;
+  buyerPersona?: string;
+  businessName?: string;
+  fssaiLicense?: string;
+  procurementWindow?: string;
+  kitchenLocation?: string;
+  mandiLicense?: string;
+  gstin?: string;
+  primaryMandi?: string;
+  centralHub?: string;
+  dailyMealVolume?: string;
+  [key: string]: any;
+}
+
 export default function Register() {
-  const [formData, setFormData] = useState({ name: '', email: '', location: '', password: '', role: 'farmer' });
+  const [formData, setFormData] = useState<RegisterFormData>({ name: '', email: '', location: '', password: '', role: 'farmer' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 

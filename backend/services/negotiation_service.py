@@ -2,11 +2,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.repositories.user_repository import UserRepository
 import logging
 import asyncio
+import uuid
 from datetime import datetime, timezone
 
 from agents.buyer_agent import BuyerAgent
 from agents.compost_agent import CompostAgent
-from backend.agents.stakeholders.farmer_agent import FarmerAgent
+from agents.farmer_agent import FarmerAgent
 from agents.processor_agent import ProcessorAgent
 from agents.transporter_agent import TransporterAgent
 from agents.warehouse_agent import WarehouseAgent
@@ -339,10 +340,10 @@ class NegotiationService:
         db_buyers = await self.db_repo.list_buyers_async()
         from backend.services.matching_service import crops_match
 
-        # Filter to real buyers from DB that match this crop
+        # Filter to real buyers from DB that match this crop (or general commodity buyers)
         matching_db_buyers = [
             b for b in db_buyers
-            if b.get("crop") and crops_match(b.get("crop"), crop)
+            if not b.get("crop") or b.get("crop") in ("ALL", "*", "any") or crops_match(b.get("crop"), crop)
         ]
 
         buyer_profiles = [
@@ -596,16 +597,39 @@ class NegotiationService:
             initial_offers[0]
         )
 
+        # Check if distributed worker execution is active or requested
+        use_worker = bool(payload.get("use_worker") or payload.get("dispatch_mode") == "worker")
+        active_worker_detected = False
+        stream_job_id = None
+
+        try:
+            from backend.core.redis import redis_manager
+            if redis_manager.client:
+                active_worker_detected = await redis_manager.has_active_stream_workers()
+                stream_job_id = await redis_manager.enqueue_negotiation_job(negotiation_id, payload)
+                if stream_job_id:
+                    negotiation_payload["stream_job_id"] = stream_job_id
+                    negotiation_payload["dispatched_to_stream"] = True
+                    await self.db_repo.update_negotiation_async(negotiation_id, {"stream_job_id": stream_job_id})
+        except Exception as e:
+            logger.warning(f"Redis stream dispatch note for {negotiation_id}: {e}")
+
         # If sync=True is requested, await completion (used for CLI scripts / unit tests)
         if payload.get("sync") is True:
             return await self._run_negotiation_workflow(
                 negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
             )
 
-        # Default async execution: dispatch background task and return immediately (50ms response time)
-        asyncio.create_task(self._run_negotiation_workflow(
-            negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
-        ))
+        # Execution routing:
+        # If an active worker is detected or use_worker was requested and job was enqueued,
+        # let agent_worker.py process the job.
+        # Otherwise, run in-process background task via asyncio.create_task.
+        if (active_worker_detected or use_worker) and stream_job_id:
+            logger.info(f"⚡ Negotiation {negotiation_id} assigned to distributed agent_worker via stream job {stream_job_id}.")
+        else:
+            asyncio.create_task(self._run_negotiation_workflow(
+                negotiation_id, manager, transporter, payload, scenario, farmer_row, produce_row, selected_offer, market_offers, farmer, live_event_callback
+            ))
 
         return {
             "negotiation_id": negotiation_id,
@@ -621,7 +645,10 @@ class NegotiationService:
             "summary": negotiation_payload["summary"],
             "crop": payload["crop"],
             "quantity": float(payload["quantity"]),
-            "farmer": farmer_row["name"]
+            "farmer": farmer_row["name"],
+            "stream_job_id": stream_job_id,
+            "dispatched_to_stream": bool(stream_job_id),
+            "execution_mode": "worker" if ((active_worker_detected or use_worker) and stream_job_id) else "in_process"
         }
 
     async def _run_negotiation_workflow(
@@ -902,14 +929,49 @@ class NegotiationService:
         }
 
     async def get_negotiation_status(self, negotiation_id: str):
-        if not negotiation_id.startswith("neg_"):
-            negotiation_id = f"neg_{negotiation_id}"
+        if not negotiation_id or negotiation_id in ("undefined", "null"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Invalid negotiation id")
 
-        row = await self.db_repo.get_negotiation_async(negotiation_id)
+        # 1. Check in memory active negotiations with exact id or alternate prefix
+        target_id = negotiation_id
+        if target_id in self.active_negotiations:
+            res = dict(self.active_negotiations[target_id])
+            offers = await self.db_repo.get_offers_for_negotiation_async(target_id)
+            if offers:
+                res["offers"] = offers
+            db_row = await self.db_repo.get_negotiation_async(target_id)
+            if db_row:
+                for k in ("warehouse_plan", "processor_plan", "end_to_end_deal", "contract_hash", "transport_plan", "final_price", "status"):
+                    if db_row.get(k) and not res.get(k):
+                        res[k] = db_row[k]
+            return res
+
+        alt_id = f"neg_{negotiation_id}" if not negotiation_id.startswith("neg_") else negotiation_id[4:]
+        if alt_id in self.active_negotiations:
+            res = dict(self.active_negotiations[alt_id])
+            offers = await self.db_repo.get_offers_for_negotiation_async(alt_id)
+            if offers:
+                res["offers"] = offers
+            db_row = await self.db_repo.get_negotiation_async(alt_id)
+            if db_row:
+                for k in ("warehouse_plan", "processor_plan", "end_to_end_deal", "contract_hash", "transport_plan", "final_price", "status"):
+                    if db_row.get(k) and not res.get(k):
+                        res[k] = db_row[k]
+            return res
+
+        # 2. Check in database with exact id, then alternate prefix
+        row = await self.db_repo.get_negotiation_async(target_id)
+        if not row:
+            row = await self.db_repo.get_negotiation_async(alt_id)
+            if row:
+                target_id = alt_id
+
         if not row:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Negotiation not found")
 
+        negotiation_id = target_id
         offers = await self.db_repo.get_offers_for_negotiation_async(negotiation_id)
         selected_b = row.get("selected_buyer") or {}
         buyer_name = (selected_b.get("buyer_name") if isinstance(selected_b, dict) else None) or row.get("buyer") or row.get("buyer_name") or "Buyer Agent"
@@ -929,8 +991,8 @@ class NegotiationService:
             "farmer_name": farmer_name,
             "buyer": buyer_name,
             "buyer_name": buyer_name,
-            "crop": row.get("crop", "Soybean"),
-            "quantity": float(row.get("quantity", 500)),
+            "crop": row.get("crop") or "Soybean",
+            "quantity": float(row.get("quantity") or 500.0),
             "market_price": mkt_p,
             "min_price": min_p,
             "target_price": tgt_p,
@@ -944,12 +1006,16 @@ class NegotiationService:
             "transport_plan": row.get("transport_plan"),
             "warehouse_plan": row.get("warehouse_plan"),
             "processor_plan": row.get("processor_plan"),
+            "end_to_end_deal": row.get("end_to_end_deal"),
             "workflow_mode": row.get("workflow_mode") or (selected_b.get("workflow_mode") if isinstance(selected_b, dict) else None) or "FULL_SUPPLY_CHAIN",
+            "permitted_agents": row.get("permitted_agents"),
             "selected_services": row.get("selected_services") or (selected_b.get("selected_services") if isinstance(selected_b, dict) else {}),
             "district": row.get("district") or (selected_b.get("district") if isinstance(selected_b, dict) else None),
             "location": row.get("location") or (selected_b.get("location") if isinstance(selected_b, dict) else None),
             "buyer_location": row.get("buyer_location") or (selected_b.get("buyer_location") if isinstance(selected_b, dict) else None) or row.get("location"),
             "parallel_branches": self.active_negotiations.get(negotiation_id, {}).get("parallel_branches") or row.get("market_offers") or [],
+            "logs": row.get("logs", []),
+            "contract_hash": row.get("contract_hash"),
         }
 
         # Merge active memory state if present without overwriting database truth
@@ -1137,7 +1203,7 @@ class NegotiationService:
 
         # 2. Instantiate FarmerAgent to evaluate the counter offer
         min_p = float(row.get("min_price") or 18.0)
-        farmer_floor = float(row.get("farmer_floor") or round(min_p * 0.75, 2))
+        farmer_floor = float(row.get("farmer_floor") or min_p)
         farmer = FarmerAgent(
             name=farmer_name,
             crop=crop,
@@ -1271,8 +1337,34 @@ class NegotiationService:
         """
         row = await self.db_repo.get_negotiation_async(negotiation_id)
         if not row:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="Negotiation not found")
+            row = Database.negotiations.get(negotiation_id)
+            if not row:
+                auto_crop = (payload and payload.get("crop")) or "Soybean"
+                auto_qty = float((payload and payload.get("quantity")) or 500)
+                auto_target = float((payload and payload.get("target_price")) or 48.0)
+                auto_loc = (payload and payload.get("location")) or "Maharashtra"
+                row = {
+                    "id": negotiation_id,
+                    "negotiation_id": negotiation_id,
+                    "crop": auto_crop,
+                    "quantity": auto_qty,
+                    "target_price": auto_target,
+                    "min_price": round(auto_target * 0.9, 2),
+                    "max_price": round(auto_target * 1.2, 2),
+                    "price": auto_target,
+                    "location": auto_loc,
+                    "buyer": (payload and payload.get("buyer_name")) or "Buyer Agent",
+                    "farmer": "Regional APMC Producer",
+                    "status": "ACTIVE",
+                    "current_round": 1,
+                    "offers": [],
+                    "workflow_mode": (payload and payload.get("workflow_mode")) or "FULL_SUPPLY_CHAIN"
+                }
+                Database.negotiations[negotiation_id] = row
+                try:
+                    await self.db_repo.upsert_negotiation_async(row)
+                except Exception:
+                    pass
 
         crop_val = (payload and payload.get("crop")) or (row and row.get("crop")) or "Soybean"
         crop = str(crop_val).strip() if crop_val else "Soybean"
@@ -1303,14 +1395,67 @@ class NegotiationService:
             "sellers": payload.get("sellers") if payload else None,
         }
 
-        # Invoke core Buyer Orchestration Service
-        from backend.services.buyer_orchestrator import buyer_orchestration_service
-        orch_res = await buyer_orchestration_service.orchestrate_negotiation(
-            requirement=requirement_dict,
-            max_candidates=5,
-            max_rounds=5,
-            negotiation_id=negotiation_id,
-        )
+        # Determine workflow mode and permitted agents
+        workflow_mode_raw = (payload and payload.get("workflow_mode")) or (row and row.get("workflow_mode")) or "FULL_SUPPLY_CHAIN"
+        if str(workflow_mode_raw).upper() in ("BUYER_ONLY", "SINGLE", "SINGLE_AGENT"):
+            workflow_mode = "SINGLE_AGENT"
+            permitted_agents = ["BUYER"]
+            need_transport = False
+            need_storage = False
+            allow_processing = False
+        else:
+            workflow_mode = "FULL_SUPPLY_CHAIN"
+            permitted_agents = (payload and payload.get("permitted_agents")) or (row and row.get("permitted_agents")) or [
+                "BUYER", "TRANSPORT", "WAREHOUSE", "PROCESSOR"
+            ]
+            permitted_agents = [str(a).upper() for a in permitted_agents]
+            
+            # Dynamic downstream needs check
+            need_transport = bool(
+                payload.get("need_transport", payload.get("req_transport", row.get("need_transport", row.get("req_transport", True))))
+            ) and ("TRANSPORT" in permitted_agents)
+            need_storage = bool(
+                payload.get("need_storage", payload.get("need_warehouse", payload.get("req_warehouse", row.get("need_storage", row.get("need_warehouse", True)))))
+            ) and ("WAREHOUSE" in permitted_agents)
+            allow_processing = bool(
+                payload.get("allow_processing", payload.get("need_processor", payload.get("req_processor", row.get("allow_processing", row.get("need_processor", True)))))
+            ) and ("PROCESSOR" in permitted_agents)
+
+            # Check if farmer owns transport or storage
+            if payload.get("has_transport") or (row and row.get("has_transport")):
+                need_transport = False
+            if payload.get("has_storage") or (row and row.get("has_storage")):
+                need_storage = False
+
+        holding_days = int((payload and (payload.get("holding_days") or payload.get("shelf_life"))) or (row and (row.get("holding_days") or row.get("shelf_life"))) or 7)
+
+        initial_graph_state = {
+            "trace_id": f"trace-{uuid.uuid4().hex[:8]}",
+            "negotiation_id": negotiation_id,
+            "crop": crop_norm,
+            "quantity": qty,
+            "target_price": target_p,
+            "reservation_price": reservation_p,
+            "budget": budget,
+            "location": (row and row.get("location")) or "Maharashtra",
+            "buyer_name": (row and (row.get("buyer") or row.get("buyer_name"))) or "Buyer Agent",
+            "persona": (payload and payload.get("persona")) or "bulk_wholesaler",
+            "strategy": (payload and payload.get("strategy")) or "balanced",
+            "workflow_mode": workflow_mode,
+            "permitted_agents": permitted_agents,
+            "need_transport": need_transport,
+            "need_storage": need_storage,
+            "allow_processing": allow_processing,
+            "holding_days": holding_days,
+            "sellers": payload.get("sellers") if payload else None,
+            "max_rounds": int((payload and payload.get("max_rounds")) or 5),
+            "logs": [],
+            "emitted_events": [],
+        }
+
+        # Invoke compiled LangGraph Buyer Graph Orchestrator
+        from backend.agents.buyer_graph import buyer_graph_orchestrator
+        orch_res = await buyer_graph_orchestrator.ainvoke(initial_graph_state)
 
         winner = orch_res.get("winner")
         if winner:
@@ -1322,6 +1467,10 @@ class NegotiationService:
         negotiations = orch_res.get("negotiations", [])
         executable_deals = orch_res.get("executable_deals", [])
         chat_transcript = orch_res.get("chat_transcript", "")
+        transport_assignment = orch_res.get("transport_assignment")
+        warehouse_assignment = orch_res.get("warehouse_assignment")
+        processor_assignment = orch_res.get("processor_assignment")
+        end_to_end_deal = orch_res.get("end_to_end_deal")
 
         # Format suppliers list for frontend dashboard compatibility
         ranked_suppliers = []
@@ -1373,7 +1522,7 @@ class NegotiationService:
 
         self.active_negotiations.setdefault(negotiation_id, {})["parallel_branches"] = ranked_suppliers
         self.active_negotiations[negotiation_id]["parallel_results"] = negotiations
-        await self.db_repo.update_negotiation_async(negotiation_id, {
+        update_payload = {
             "crop": crop_norm,
             "quantity": qty,
             "farmer_name": winner["seller_name"] if winner else "No Deal",
@@ -1381,8 +1530,20 @@ class NegotiationService:
             "final_price": final_p,
             "status": db_status,
             "summary": summary_text,
+            "transport_plan": transport_assignment,
+            "warehouse_plan": warehouse_assignment,
+            "processor_plan": processor_assignment,
+            "end_to_end_deal": end_to_end_deal,
+            "logs": orch_res.get("logs", []),
+            "contract_hash": end_to_end_deal.get("contract_hash") if end_to_end_deal else None,
             "market_offers": ranked_suppliers,
-        })
+        }
+        await self.db_repo.update_negotiation_async(negotiation_id, update_payload)
+        if negotiation_id in self.active_negotiations:
+            self.active_negotiations[negotiation_id].update(update_payload)
+        alt_id = f"neg_{negotiation_id}" if not negotiation_id.startswith("neg_") else negotiation_id[4:]
+        if alt_id in self.active_negotiations:
+            self.active_negotiations[alt_id].update(update_payload)
 
         # Record parallel summary offer
         parallel_offer = {
@@ -1411,6 +1572,10 @@ class NegotiationService:
                 "suppliers": ranked_suppliers,
                 "status": winner_status,
                 "chat_transcript": chat_transcript,
+                "transport_assignment": transport_assignment,
+                "warehouse_assignment": warehouse_assignment,
+                "processor_assignment": processor_assignment,
+                "end_to_end_deal": end_to_end_deal,
             })
         except Exception as ws_err:
             logger.warning(f"WebSocket broadcast error in parallel procurement: {ws_err}")
@@ -1426,10 +1591,15 @@ class NegotiationService:
             "remaining_quantity": orch_res.get("remaining_quantity", 0.0 if winner else qty),
             "min_purchase_quantity": orch_res.get("min_purchase_quantity", 0.0),
             "candidate_count": len(negotiations),
-            "executable_deals_count": len(executable_deals),
             "suppliers": ranked_suppliers,
             "negotiations": negotiations,
+            "executable_deals": executable_deals,
             "chat_transcript": chat_transcript,
+            "transport_assignment": transport_assignment,
+            "warehouse_assignment": warehouse_assignment,
+            "processor_assignment": processor_assignment,
+            "end_to_end_deal": end_to_end_deal,
+            "logs": orch_res.get("logs", []),
         }
 
     async def autonomous_step(self, negotiation_id: str):

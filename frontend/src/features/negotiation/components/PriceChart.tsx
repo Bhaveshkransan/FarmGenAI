@@ -1,7 +1,12 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export default function PriceChart({ data, isTransport = false }) {
+interface PriceChartProps {
+  data?: Array<{ name: string; price: number; [key: string]: any }>;
+  isTransport?: boolean;
+}
+
+export default function PriceChart({ data, isTransport = false }: PriceChartProps) {
   // Fallback data if none provided
   const chartData = data || [
     { name: 'Day 1', price: 18 },

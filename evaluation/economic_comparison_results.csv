@@ -1,0 +1,4 @@
+Scenario,FarmGenAI_Selected,FarmGenAI_Net_INR,Highest_Nominal_Pick,Highest_Nominal_Net_INR,Improvement_vs_Nominal_pct,Nearest_Pick,Nearest_Net_INR,Improvement_vs_Nearest_pct
+"Onion Nashik Lot (1,000 kg)",Buyer B (Moderate Freight),26664.2,Buyer C (Max Nominal Distant),23142.4,15.22,Buyer D (Local Direct),26344.8,1.21
+"Soybean Latur Lot (2,000 kg)",Buyer 1 (Latur Mandi),105842.4,Buyer 3 (Pune Exporter),105384.0,0.43,Buyer 1 (Latur Mandi),105842.4,0.0
+"Cotton Amravati Lot (1,500 kg)",Buyer C (Nagpur Mill),105015.0,Buyer C (Nagpur Mill),105015.0,0.0,Buyer B (Local Amravati),102474.75,2.48

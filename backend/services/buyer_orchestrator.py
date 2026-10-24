@@ -39,6 +39,7 @@ logger = logging.getLogger("BuyerOrchestrator")
 # Verified Maharashtra suppliers pool from negotiation service
 from backend.services.negotiation_service import (
     STATUTORY_BENCHMARKS,
+    MAHARASHTRA_CROP_SUPPLIERS,
 )
 from backend.agents.transport_agent.graph import run_transport_workflow
 from backend.services.storage_service import assign_storage
@@ -58,6 +59,21 @@ async def _broadcast_safe(payload: dict):
             await agent_update_hub.broadcast(payload)
         except Exception as e:
             logger.debug(f"Broadcast error: {e}")
+
+
+def safe_print(*args, **kwargs):
+    """Safely prints to stdout without raising UnicodeEncodeError on Windows CP1252."""
+    try:
+        print(*args, **kwargs)
+    except Exception:
+        try:
+            cleaned = []
+            for a in args:
+                s = str(a).encode("ascii", errors="replace").decode("ascii")
+                cleaned.append(s)
+            print(*cleaned, **kwargs)
+        except Exception:
+            pass
 
 
 def validate_copilot_buyer_override(
@@ -255,7 +271,10 @@ class BuyerOrchestrationService:
             db_matches = await match_requirement_to_listings(requirement)
             for idx, m in enumerate(db_matches):
                 s_id = m.get("listing_id") or f"listing_{idx + 1}"
-                s_name = m.get("farmer_name") or f"Farmer {m.get('farmer_id', idx + 1)}"
+                raw_name = m.get("farmer_name")
+                if not raw_name or str(raw_name).strip().lower() in ("none", "null", "unknown", ""):
+                    raw_name = f"{m.get('location', 'Maharashtra')} Progressive Producer"
+                s_name = raw_name
                 s_price = float(m.get("min_price", target_p))
                 initial_ask = round(s_price * 1.15, 2)
                 candidates.append({
@@ -273,16 +292,54 @@ class BuyerOrchestrationService:
                     "special": f"Grade {m.get('quality', 'A')} Listing",
                     "match_score": float(m.get("compatibility_score", 90.0)),
                     "source": "db_listings",
+                    "source_priority": 1,
                 })
         except Exception as e:
             logger.warning(f"Error querying DB listings: {e}")
 
+        # 3. Verified Maharashtra Producers Pool (Tailored per crop & scenario)
+        if len(candidates) < max_candidates and (allow_test_fixtures or requirement.get("allow_test_fixtures") or requirement.get("allow_synthetic")):
+            suppliers = MAHARASHTRA_CROP_SUPPLIERS.get(norm_crop)
+            if not suppliers:
+                for k, v in MAHARASHTRA_CROP_SUPPLIERS.items():
+                    if k.lower() in norm_crop.lower() or norm_crop.lower() in k.lower():
+                        suppliers = v
+                        break
+            
+            if suppliers:
+                existing_names = {c["name"] for c in candidates}
+                for s in suppliers:
+                    if len(candidates) >= max_candidates:
+                        break
+                    if s["name"] in existing_names:
+                        continue
+                    idx = len(candidates)
+                    ask_p = round(target_p * (1.04 + idx * 0.02), 2)
+                    floor_p = round(target_p * (0.95 + idx * 0.01), 2)
+                    avail_q = max(req_qty, round(req_qty * (1.05 + idx * 0.1), -1))
+                    candidates.append({
+                        "id": f"supplier_{norm_crop.lower()}_{idx + 1}",
+                        "seller_id": f"supplier_{norm_crop.lower()}_{idx + 1}",
+                        "name": s["name"],
+                        "crop": norm_crop,
+                        "quantity": avail_q,
+                        "price": ask_p,
+                        "initial_ask": ask_p,
+                        "floor_price": floor_p,
+                        "flexibility": round(0.12 + idx * 0.02, 2),
+                        "location": s["loc"],
+                        "distance_km": float(s.get("dist", 100.0)),
+                        "special": s.get("special", "APMC Certified Lot"),
+                        "match_score": float(s.get("match", 95.0 - idx * 2)),
+                        "source": "verified_maharashtra_suppliers",
+                        "source_priority": 2,
+                    })
+
         if candidates:
-            # Deterministic ranking
-            candidates.sort(key=lambda c: (-c["match_score"], c["distance_km"], c["floor_price"]))
+            # Deterministic ranking: real DB listings prioritized, then by match score (desc), distance (asc), floor price (asc)
+            candidates.sort(key=lambda c: (c.get("source_priority", 1), -c["match_score"], c["distance_km"], c["floor_price"]))
             return candidates[:max_candidates]
 
-        # In production flow with 0 real matches: strictly return empty list (NO_CANDIDATES_FOUND)
         return []
 
     async def _negotiate_single_seller_branch(
@@ -437,7 +494,8 @@ class BuyerOrchestrationService:
             })
 
         # 2. Multi-Round Negotiation Loop
-        for r in range(1, max_rounds + 1):
+        rounds_limit = int(max_rounds or 5)
+        for r in range(1, rounds_limit + 1):
             # Seller proposal in round r
             if r > 1:
                 last_buyer_bid = buyer_agent.current_bid
@@ -529,6 +587,7 @@ class BuyerOrchestrationService:
 
             messages.append(f"Round {r} | Seller: ₹{seller_ask:.2f}/kg ({executable_qty:.0f}kg)")
             messages.append(f"Round {r} | Buyer: {decision_type} - {resp_msg}")
+            safe_print(f"⚡ [ROUND {r}] Branch #{branch_idx + 1} | {seller['name']} ({seller['location']}): Seller Ask ₹{seller_ask:.2f} | Buyer Bid ₹{buyer_bid_val:.2f} -> {decision_type}", flush=True)
 
             # Record structured WhatsApp-style chat bubbles for this candidate branch
             chat_messages.append({
@@ -855,7 +914,7 @@ class BuyerOrchestrationService:
             winner = None
             winner_status = "PRODUCE_BYPASSED" if not run_farmer_matching else "NO_ELIGIBLE_FARMERS"
         else:
-                # Broadcast Step 2: Discovery & Selection of Top 5
+            # Broadcast Step 2: Discovery & Selection of Top 5
             if neg_id:
                 await _broadcast_safe({
                     "event": "TOP5_DISCOVERY",
@@ -883,6 +942,13 @@ class BuyerOrchestrationService:
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 })
                 await asyncio.sleep(0.3)
+
+            safe_print(f"\n{'='*78}", flush=True)
+            safe_print(f"🌾 [LIVE BUYER PROCUREMENT] Crop: {norm_crop} | Qty: {req_qty:,.0f} kg | Target: ₹{target_p:.2f}/kg | Ceiling: ₹{reservation_p:.2f}/kg", flush=True)
+            safe_print(f"🎯 Sourcing Top-{candidate_count} Candidate Suppliers across Maharashtra mandis:", flush=True)
+            for i, c in enumerate(candidates, 1):
+                safe_print(f"   [{i}] {c['name']} ({c['location']}) | Ask: ₹{c['price']:.2f}/kg | Dist: {c['distance_km']} km | Special: {c.get('special', '')}", flush=True)
+            safe_print(f"{'-'*78}", flush=True)
 
             # 2b. Initialize Concurrent Budget Tracker
             budget_tracker = BudgetReservationTracker(budget)
@@ -1070,6 +1136,12 @@ class BuyerOrchestrationService:
                         "message": f"🏆 Deal officially finalized with {winner['seller_name']}. Transaction ID: {txn_id}.",
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     })
+
+                safe_print(f"{'-'*78}", flush=True)
+                safe_print(f"🏆 [DEAL FINALIZED] Winning Supplier: {winner['seller_name']} ({winner.get('location', '')})", flush=True)
+                safe_print(f"   Final Agreed Price: ₹{winner['final_price']:.2f}/kg | Freight: ₹{winner['freight_per_kg']:.2f}/kg | Landed Cost: ₹{winner['landed_cost_per_kg']:.2f}/kg", flush=True)
+                safe_print(f"   Total Value: ₹{winner['final_price'] * req_qty:,.2f} | Savings vs Ceiling: ₹{(reservation_p - winner['final_price']) * req_qty:,.2f}", flush=True)
+                safe_print(f"{'='*78}\n", flush=True)
             else:
                 winner = None
                 winner_status = "NO_EXECUTABLE_DEAL"
@@ -1092,6 +1164,8 @@ class BuyerOrchestrationService:
                     )
                 except Exception as e:
                     logger.debug(f"Negotiation memory failure persistence: {e}")
+
+                safe_print(f"❌ [NO WINNER]: No candidate agreed within reservation ceiling ₹{reservation_p:.2f}/kg.\n{'='*78}\n", flush=True)
 
         # 5b. Workflow Scope & Downstream Agent Assessment (FR-6, SRS Section 4)
         raw_mode = str(requirement.get("workflow_mode") or "SINGLE_AGENT").upper()

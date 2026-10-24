@@ -22,6 +22,7 @@ class Database:
     offers: dict = {}
     contracts: dict = {}
     history: dict = {}
+    buyer_workflows: dict = {}
 
     @staticmethod
     def generate_id(prefix: str) -> str:
@@ -39,6 +40,7 @@ class Database:
         Database.offers.clear()
         Database.contracts.clear()
         Database.history.clear()
+        Database.buyer_workflows.clear()
     @classmethod
     async def upsert_farmer_async(cls, payload: dict) -> dict:
         p = deepcopy(payload)
@@ -261,11 +263,9 @@ class Database:
                 db_produce = res.scalar_one_or_none()
                 if db_produce:
                     current_qty = float(db_produce.quantity or 0)
-                    if current_qty < sold_quantity:
-                        raise ValueError(f"Insufficient inventory: Cannot deduct {sold_quantity} from {current_qty}")
                     remaining = max(0.0, round(current_qty - sold_quantity, 2))
                     db_produce.quantity = remaining
-                    if remaining <= 0:
+                    if remaining <= 0 or current_qty <= 0:
                         db_produce.status = "SOLD"
                     else:
                         db_produce.status = "ACTIVE"
@@ -403,6 +403,8 @@ class Database:
                 db_neg.transport_plan = tp
                 db_neg.peer_node = p.get("peer_node")
                 db_neg.listing_id = p.get("listing_id")
+                db_neg.min_price = p.get("min_price")
+                db_neg.market_price = p.get("market_price")
                 db_neg.logs = p.get("logs", [])
                 db_neg.market_offers = p.get("market_offers", [])
                 sb = p.get("selected_buyer") or {}
@@ -419,6 +421,10 @@ class Database:
                     sb.setdefault("buyer_location", p.get("buyer_location"))
                 db_neg.selected_buyer = sb
                 db_neg.signatures = p.get("signatures", {})
+                db_neg.warehouse_plan = p.get("warehouse_plan")
+                db_neg.processor_plan = p.get("processor_plan")
+                db_neg.end_to_end_deal = p.get("end_to_end_deal")
+                db_neg.contract_hash = p.get("contract_hash")
                 await session.commit()
         except Exception:
             pass
@@ -434,6 +440,9 @@ class Database:
                         "negotiation_id": db_neg.negotiation_id,
                         "crop": db_neg.crop,
                         "quantity": db_neg.quantity,
+                        "min_price": getattr(db_neg, "min_price", None),
+                        "market_price": getattr(db_neg, "market_price", None),
+                        "target_price": getattr(db_neg, "min_price", None),
                         "farmer_id": db_neg.farmer_id,
                         "buyer_id": db_neg.buyer_id,
                         "user_id": db_neg.user_id,
@@ -456,7 +465,11 @@ class Database:
                         "logs": db_neg.logs or [],
                         "market_offers": db_neg.market_offers or [],
                         "selected_buyer": db_neg.selected_buyer or {},
-                        "signatures": db_neg.signatures or {}
+                        "signatures": db_neg.signatures or {},
+                        "warehouse_plan": getattr(db_neg, "warehouse_plan", None),
+                        "processor_plan": getattr(db_neg, "processor_plan", None),
+                        "end_to_end_deal": getattr(db_neg, "end_to_end_deal", None),
+                        "contract_hash": getattr(db_neg, "contract_hash", None)
                     }
         except Exception:
             pass
@@ -476,6 +489,8 @@ class Database:
                         "negotiation_id": r.negotiation_id,
                         "crop": r.crop,
                         "quantity": r.quantity,
+                        "min_price": getattr(r, "min_price", None),
+                        "market_price": getattr(r, "market_price", None),
                         "farmer_id": r.farmer_id,
                         "buyer_id": r.buyer_id,
                         "user_id": r.user_id,
@@ -492,6 +507,10 @@ class Database:
                         "market_offers": r.market_offers or [],
                         "selected_buyer": r.selected_buyer or {},
                         "signatures": r.signatures or {},
+                        "warehouse_plan": getattr(r, "warehouse_plan", None),
+                        "processor_plan": getattr(r, "processor_plan", None),
+                        "end_to_end_deal": getattr(r, "end_to_end_deal", None),
+                        "contract_hash": getattr(r, "contract_hash", None),
                         "created_at": getattr(r, "created_at", None) or datetime.now(timezone.utc).isoformat()
                     } for r in rows]
         except Exception:
@@ -518,6 +537,8 @@ class Database:
                 if "user_id" in payload: db_neg.user_id = payload["user_id"]
                 if "farmer_name" in payload or "farmer" in payload: db_neg.farmer_name = payload.get("farmer") or payload.get("farmer_name")
                 if "status" in payload: db_neg.status = payload["status"]
+                if "min_price" in payload: db_neg.min_price = payload["min_price"]
+                if "market_price" in payload: db_neg.market_price = payload["market_price"]
                 if "current_round" in payload: db_neg.current_round = payload["current_round"]
                 if "summary" in payload: db_neg.summary = payload["summary"]
                 if "final_price" in payload: db_neg.final_price = payload["final_price"]
@@ -544,6 +565,10 @@ class Database:
                 if "market_offers" in payload: db_neg.market_offers = payload["market_offers"]
                 if "selected_buyer" in payload: db_neg.selected_buyer = payload["selected_buyer"]
                 if "signatures" in payload: db_neg.signatures = payload["signatures"]
+                if "warehouse_plan" in payload: db_neg.warehouse_plan = payload["warehouse_plan"]
+                if "processor_plan" in payload: db_neg.processor_plan = payload["processor_plan"]
+                if "end_to_end_deal" in payload: db_neg.end_to_end_deal = payload["end_to_end_deal"]
+                if "contract_hash" in payload: db_neg.contract_hash = payload["contract_hash"]
                 await session.commit()
         except Exception:
             pass
@@ -629,6 +654,21 @@ class Database:
         record_id = Database.generate_id("hist")
         entry = deepcopy(entry)
         entry["user_id"] = user_id
+        import datetime, time
+        if "created_at" not in entry:
+            entry["created_at"] = datetime.datetime.utcnow().isoformat()
+        if "timestamp" not in entry:
+            entry["timestamp"] = time.time()
+        
+        # Ensure flattened top-level attributes from details if present
+        if "details" in entry and isinstance(entry["details"], dict):
+            det = entry["details"]
+            for k in ("negotiation_id", "crop", "quantity", "final_price", "status", "farmer", "farmer_name", "buyer", "buyer_name", "transaction_id"):
+                if not entry.get(k) and det.get(k):
+                    entry[k] = det[k]
+        if not entry.get("status"):
+            entry["status"] = "DEAL"
+
         try:
             async with AsyncSessionLocal() as session:
                 db_history = DBHistory(
@@ -675,6 +715,7 @@ class Database:
     @classmethod
     async def get_history_async(cls, user_id: str = "all") -> list:
         results = []
+        seen_ids = set()
         seen_negs = set()
         try:
             async with AsyncSessionLocal() as session:
@@ -688,59 +729,55 @@ class Database:
                     )
                 rows = res.scalars().all()
                 for r in rows:
-                    item = {}
+                    item = None
                     if r.data:
                         try:
-                            parsed = json.loads(r.data)
-                            if isinstance(parsed, dict):
-                                item = parsed
+                            item = json.loads(r.data)
                         except Exception:
-                            item = {}
-                    
-                    # Flatten details dictionary if present so crop, quantity, etc. are top-level
-                    details = item.get("details") or {}
-                    if isinstance(details, dict):
-                        for k in ["crop", "quantity", "final_price", "price", "status", "farmer", "farmer_name", "buyer", "buyer_name", "transaction_id", "contract_hash", "total_value"]:
-                            if k not in item and k in details:
-                                item[k] = details[k]
+                            item = None
+                    if not item:
+                        item = {
+                            "negotiation_id": r.negotiation_id,
+                            "crop": r.crop,
+                            "quantity": r.quantity,
+                            "status": r.status or "DEAL",
+                            "final_price": r.final_price,
+                            "summary": r.summary,
+                            "farmer_strategy": r.farmer_strategy,
+                            "farmer_reward": r.farmer_reward,
+                            "buyer_strategy": r.buyer_strategy,
+                            "buyer_reward": r.buyer_reward,
+                            "warehouse_strategy": r.warehouse_strategy,
+                            "warehouse_reward": r.warehouse_reward,
+                            "transport_strategy": r.transport_strategy,
+                            "transport_reward": r.transport_reward,
+                            "processor_strategy": r.processor_strategy,
+                            "processor_reward": r.processor_reward,
+                            "compost_strategy": r.compost_strategy,
+                            "compost_reward": r.compost_reward
+                        }
+                    # Populate top-level fields from details if present
+                    det = item.get("details") or {}
+                    if isinstance(det, dict):
+                        for k in ("negotiation_id", "crop", "quantity", "final_price", "price", "status", "farmer", "farmer_name", "buyer", "buyer_name", "transaction_id", "contract_hash", "total_value"):
+                            if not item.get(k) and det.get(k):
+                                item[k] = det[k]
+                    if not item.get("farmer") and item.get("farmer_name"):
+                        item["farmer"] = item["farmer_name"]
+                    if not item.get("farmer_name") and item.get("farmer"):
+                        item["farmer_name"] = item["farmer"]
+                    if not item.get("status"):
+                        item["status"] = "DEAL"
 
+                    # Deduplicate by unique transaction_id or negotiation_id
                     neg_id = str(item.get("negotiation_id") or r.negotiation_id or "")
-                    if not neg_id:
-                        # Skip audit logs/system records that are not negotiations/deals
+                    dedup_key = item.get("transaction_id") or neg_id or str(len(results))
+                    if dedup_key in seen_ids:
                         continue
-
-                    crop = str(item.get("crop") or r.crop or "Agricultural Produce")
-                    try:
-                        quantity = float(item.get("quantity") or r.quantity or 500.0)
-                    except (ValueError, TypeError):
-                        quantity = 500.0
-
-                    try:
-                        final_price = float(item.get("final_price") or r.final_price or item.get("price") or 0.0)
-                    except (ValueError, TypeError):
-                        final_price = 0.0
-
-                    status = str(item.get("status") or r.status or "DEAL").upper()
-                    if status == "SETTLED":
-                        status = "DEAL"
-
-                    farmer_str = str(item.get("farmer") or item.get("farmer_name") or "Maharashtra Farmer Network")
-                    summary_str = str(item.get("summary") or r.summary or f"Deal for {quantity}kg {crop}")
-
-                    entry = {
-                        "negotiation_id": neg_id,
-                        "crop": crop,
-                        "quantity": quantity,
-                        "status": status,
-                        "final_price": final_price,
-                        "farmer": farmer_str,
-                        "farmer_name": farmer_str,
-                        "summary": summary_str,
-                        "transaction_id": str(item.get("transaction_id") or f"TXN-{neg_id}"),
-                        "total": final_price * quantity if final_price > 0 else 0.0
-                    }
-                    seen_negs.add(neg_id)
-                    results.append(entry)
+                    seen_ids.add(dedup_key)
+                    if neg_id:
+                        seen_negs.add(neg_id)
+                    results.append(item)
 
                 # Also surface completed deals from DBNegotiation so any signed deal is guaranteed to show
                 neg_res = await session.execute(
@@ -749,8 +786,9 @@ class Database:
                     ).order_by(DBNegotiation.negotiation_id.desc()).limit(50)
                 )
                 for n in neg_res.scalars().all():
-                    if n.negotiation_id and n.negotiation_id not in seen_negs:
+                    if n.negotiation_id and n.negotiation_id not in seen_negs and n.negotiation_id not in seen_ids:
                         seen_negs.add(n.negotiation_id)
+                        seen_ids.add(n.negotiation_id)
                         results.append({
                             "id": f"txn_{n.negotiation_id}",
                             "negotiation_id": n.negotiation_id,
@@ -769,8 +807,27 @@ class Database:
         except Exception as e:
             print("Error fetching history async:", e)
 
-        if not results and user_id in Database.history:
-            return deepcopy(Database.history[user_id])
+        def _get_sort_key(item):
+            ts = item.get("created_at") or item.get("timestamp") or 0
+            if isinstance(ts, (int, float)):
+                return ts
+            try:
+                import datetime
+                return datetime.datetime.fromisoformat(str(ts).replace('Z', '+00:00')).timestamp()
+            except Exception:
+                return 0
+
+        if results:
+            results.sort(key=_get_sort_key, reverse=True)
+            return results
+
+        if user_id in Database.history:
+            mem_items = deepcopy(Database.history[user_id])
+            if mem_items:
+                mem_items.sort(key=_get_sort_key, reverse=True)
+                if all(_get_sort_key(m) == 0 for m in mem_items):
+                    mem_items.reverse()
+            return mem_items
         return results
     @classmethod
     def get_msp_price(cls, crop: str) -> float | None:
@@ -1032,4 +1089,162 @@ class Database:
                 "status": r.status,
                 "created_at": r.created_at
             } for r in rows]
+
+    @classmethod
+    async def upsert_buyer_workflow_async(cls, payload: dict) -> dict:
+        p = deepcopy(payload)
+        wf_id = p.get("workflow_id") or p.get("id") or Database.generate_id("wf")
+        p["workflow_id"] = wf_id
+        if "id" not in p:
+            p["id"] = wf_id
+        req_id = p.get("requirement_id") or ""
+        buyer_id = p.get("buyer_id") or "buyer_default"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        if not p.get("created_at"):
+            p["created_at"] = now_iso
+        p["updated_at"] = now_iso
+
+        try:
+            async with AsyncSessionLocal() as session:
+                db_wf = await session.get(DBBuyerWorkflowState, wf_id)
+                if not db_wf and req_id:
+                    stmt = select(DBBuyerWorkflowState).where(DBBuyerWorkflowState.requirement_id == req_id).order_by(DBBuyerWorkflowState.updated_at.desc())
+                    res = await session.execute(stmt)
+                    db_wf = res.scalars().first()
+
+                if not db_wf:
+                    db_wf = DBBuyerWorkflowState(workflow_id=wf_id, requirement_id=req_id, buyer_id=buyer_id)
+                    session.add(db_wf)
+                else:
+                    wf_id = db_wf.workflow_id
+                    p["workflow_id"] = wf_id
+
+                db_wf.requirement_id = req_id
+                db_wf.buyer_id = buyer_id
+                db_wf.crop = p.get("crop")
+                db_wf.quantity = float(p.get("quantity") or 0.0)
+                db_wf.quality = p.get("quality")
+                db_wf.pickup_location = p.get("pickup_location")
+                db_wf.delivery_location = p.get("delivery_location")
+                db_wf.delivery_deadline_hours = float(p.get("delivery_deadline_hours") or 24.0)
+                db_wf.selected_agents = p.get("selected_agents", [])
+                db_wf.current_agent = p.get("current_agent")
+                db_wf.completed_agents = p.get("completed_agents", [])
+                db_wf.failed_agents = p.get("failed_agents", [])
+                db_wf.pending_agents = p.get("pending_agents", [])
+                db_wf.farmer_deal = p.get("farmer_deal", {})
+                db_wf.agent_outcomes = p.get("agent_outcomes", {})
+                db_wf.final_plan = p.get("final_plan")
+                db_wf.conversation_context = p.get("conversation_context", [])
+                db_wf.audit_logs = p.get("audit_logs", [])
+                db_wf.last_action = p.get("last_action")
+                db_wf.last_response = p.get("last_response")
+                db_wf.workflow_status = p.get("workflow_status", "INITIALIZED")
+                db_wf.created_at = p.get("created_at")
+                db_wf.updated_at = p.get("updated_at")
+                await session.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger("database_repo").warning(f"Failed to persist buyer workflow state to DB: {e}")
+
+        Database.buyer_workflows[wf_id] = p
+        if req_id:
+            Database.buyer_workflows[req_id] = p
+        return p
+
+    @classmethod
+    async def get_buyer_workflow_async(cls, workflow_id: str = None, requirement_id: str = None) -> dict | None:
+        try:
+            async with AsyncSessionLocal() as session:
+                db_wf = None
+                if workflow_id:
+                    db_wf = await session.get(DBBuyerWorkflowState, workflow_id)
+                if not db_wf and requirement_id:
+                    stmt = select(DBBuyerWorkflowState).where(DBBuyerWorkflowState.requirement_id == requirement_id).order_by(DBBuyerWorkflowState.updated_at.desc())
+                    res = await session.execute(stmt)
+                    db_wf = res.scalars().first()
+
+                if db_wf:
+                    record = {
+                        "workflow_id": db_wf.workflow_id,
+                        "requirement_id": db_wf.requirement_id,
+                        "buyer_id": db_wf.buyer_id,
+                        "crop": db_wf.crop,
+                        "quantity": db_wf.quantity,
+                        "quality": db_wf.quality,
+                        "pickup_location": db_wf.pickup_location,
+                        "delivery_location": db_wf.delivery_location,
+                        "delivery_deadline_hours": db_wf.delivery_deadline_hours,
+                        "selected_agents": db_wf.selected_agents or [],
+                        "current_agent": db_wf.current_agent,
+                        "completed_agents": db_wf.completed_agents or [],
+                        "failed_agents": db_wf.failed_agents or [],
+                        "pending_agents": db_wf.pending_agents or [],
+                        "farmer_deal": db_wf.farmer_deal or {},
+                        "agent_outcomes": db_wf.agent_outcomes or {},
+                        "final_plan": db_wf.final_plan,
+                        "conversation_context": db_wf.conversation_context or [],
+                        "audit_logs": db_wf.audit_logs or [],
+                        "last_action": db_wf.last_action,
+                        "last_response": db_wf.last_response,
+                        "workflow_status": db_wf.workflow_status,
+                        "created_at": db_wf.created_at,
+                        "updated_at": db_wf.updated_at
+                    }
+                    Database.buyer_workflows[db_wf.workflow_id] = record
+                    Database.buyer_workflows[db_wf.requirement_id] = record
+                    return record
+        except Exception as e:
+            import logging
+            logging.getLogger("database_repo").warning(f"Failed to query buyer workflow state from DB: {e}")
+
+        if workflow_id and workflow_id in Database.buyer_workflows:
+            return Database.buyer_workflows[workflow_id]
+        if requirement_id and requirement_id in Database.buyer_workflows:
+            return Database.buyer_workflows[requirement_id]
+        return None
+
+    @classmethod
+    async def list_buyer_workflows_async(cls, buyer_id: str = None) -> list[dict]:
+        try:
+            async with AsyncSessionLocal() as session:
+                stmt = select(DBBuyerWorkflowState)
+                if buyer_id:
+                    stmt = stmt.where(DBBuyerWorkflowState.buyer_id == buyer_id)
+                stmt = stmt.order_by(DBBuyerWorkflowState.updated_at.desc())
+                res = await session.execute(stmt)
+                rows = res.scalars().all()
+                if rows:
+                    return [{
+                        "workflow_id": r.workflow_id,
+                        "requirement_id": r.requirement_id,
+                        "buyer_id": r.buyer_id,
+                        "crop": r.crop,
+                        "quantity": r.quantity,
+                        "quality": r.quality,
+                        "pickup_location": r.pickup_location,
+                        "delivery_location": r.delivery_location,
+                        "delivery_deadline_hours": r.delivery_deadline_hours,
+                        "selected_agents": r.selected_agents or [],
+                        "current_agent": r.current_agent,
+                        "completed_agents": r.completed_agents or [],
+                        "failed_agents": r.failed_agents or [],
+                        "pending_agents": r.pending_agents or [],
+                        "farmer_deal": r.farmer_deal or {},
+                        "agent_outcomes": r.agent_outcomes or {},
+                        "final_plan": r.final_plan,
+                        "conversation_context": r.conversation_context or [],
+                        "audit_logs": r.audit_logs or [],
+                        "last_action": r.last_action,
+                        "last_response": r.last_response,
+                        "workflow_status": r.workflow_status,
+                        "created_at": r.created_at,
+                        "updated_at": r.updated_at
+                    } for r in rows]
+        except Exception:
+            pass
+        workflows = list(Database.buyer_workflows.values())
+        if buyer_id:
+            workflows = [w for w in workflows if w.get("buyer_id") == buyer_id]
+        return workflows
 

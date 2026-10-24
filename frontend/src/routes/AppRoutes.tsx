@@ -105,7 +105,7 @@ export default function AppRoutes() {
 
         {/* Transport Dashboard */}
         <Route element={<TransportLayout />}>
-          <Route element={<ProtectedRoute allowedRoles={['transport', 'admin']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['transport', 'transporter', 'admin']} />}>
             <Route path="/dashboard/transport" element={<TransportDashboard />} />
             <Route path="/dashboard/transport/negotiation" element={<TransportNegotiationRoom />} />
             <Route path="/dashboard/transport/transactions" element={<TransportTransactions />} />

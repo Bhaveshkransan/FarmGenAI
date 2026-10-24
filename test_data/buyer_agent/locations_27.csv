@@ -1,0 +1,28 @@
+location_id,city,taluka,district,state,latitude,longitude,distance_from_buyer_hub_km,distance_band,buyer_hub
+L001,Panvel,Panvel,Raigad,Maharashtra,18.9894,73.1175,10.4,NEAR_0_50,Navi Mumbai
+L002,Uran,Uran,Raigad,Maharashtra,18.8781,72.9392,19.7,NEAR_0_50,Navi Mumbai
+L003,Karjat,Karjat,Raigad,Maharashtra,18.9106,73.3236,33.8,NEAR_0_50,Navi Mumbai
+L004,Alibag,Alibag,Raigad,Maharashtra,18.6411,72.8722,46.6,NEAR_0_50,Navi Mumbai
+L005,Shahapur,Shahapur,Thane,Maharashtra,19.452,73.325,56.0,MID_51_100,Navi Mumbai
+L006,Igatpuri,Igatpuri,Nashik,Maharashtra,19.6959,73.5622,92.5,MID_51_100,Navi Mumbai
+L007,Talegaon,Maval,Pune,Maharashtra,18.735,73.675,75.5,MID_51_100,Navi Mumbai
+L008,Kalyan,Kalyan,Thane,Maharashtra,19.2437,73.1355,25.9,MID_51_100,Navi Mumbai
+L009,Pune,Pune City,Pune,Maharashtra,18.5204,73.8567,104.1,REGIONAL_101_200,Navi Mumbai
+L010,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,133.6,REGIONAL_101_200,Navi Mumbai
+L011,Satara,Satara,Satara,Maharashtra,17.6805,74.0183,183.0,REGIONAL_101_200,Navi Mumbai
+L012,Ahmednagar,Ahmednagar,Ahmednagar,Maharashtra,19.0952,74.7496,180.9,REGIONAL_101_200,Navi Mumbai
+L013,Solapur,Solapur North,Solapur,Maharashtra,17.6599,75.9064,339.8,FAR_201_350,Navi Mumbai
+L014,Sangli,Miraj,Sangli,Maharashtra,16.8524,74.5815,292.8,FAR_201_350,Navi Mumbai
+L015,Kolhapur,Karveer,Kolhapur,Maharashtra,16.705,74.2433,289.0,FAR_201_350,Navi Mumbai
+L016,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,343.8,FAR_201_350,Navi Mumbai
+L017,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,276.7,FAR_201_350,Navi Mumbai
+L018,Beed,Beed,Beed,Maharashtra,18.9891,75.7601,287.1,FAR_201_350,Navi Mumbai
+L019,Osmanabad,Dharashiv,Dharashiv,Maharashtra,18.186,76.0419,331.1,FAR_201_350,Navi Mumbai
+L020,Latur,Latur,Latur,Maharashtra,18.4088,76.5604,378.2,VERY_FAR_351_PLUS,Navi Mumbai
+L021,Nanded,Nanded,Nanded,Maharashtra,19.1383,77.321,451.1,VERY_FAR_351_PLUS,Navi Mumbai
+L022,Parbhani,Parbhani,Parbhani,Maharashtra,19.2608,76.7767,394.4,VERY_FAR_351_PLUS,Navi Mumbai
+L023,Akola,Akola,Akola,Maharashtra,20.7002,77.0082,455.5,VERY_FAR_351_PLUS,Navi Mumbai
+L024,Amravati,Amravati,Amravati,Maharashtra,20.9374,77.7796,539.6,VERY_FAR_351_PLUS,Navi Mumbai
+L025,Yavatmal,Yavatmal,Yavatmal,Maharashtra,20.3888,78.1204,553.8,VERY_FAR_351_PLUS,Navi Mumbai
+L026,Washim,Washim,Washim,Maharashtra,20.1118,77.131,446.1,VERY_FAR_351_PLUS,Navi Mumbai
+L027,Nagpur,Nagpur Rural,Nagpur,Maharashtra,21.1458,79.0882,674.8,VERY_FAR_351_PLUS,Navi Mumbai

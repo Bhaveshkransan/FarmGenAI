@@ -1,0 +1,2 @@
+Total_Route_Calculations,Mean_Latency_ms,P50_Latency_ms,P95_Latency_ms,P99_Latency_ms,Vehicle_Capacity_Satisfaction_Rate_pct,Delivery_Feasibility_Pass_Rate_pct
+50,190.779,0.008,1330.269,1594.805,100.0,100.0

@@ -110,7 +110,6 @@ DEMO_USERS = [
 async def seed_users():
     print("=== Seeding Authenticated Demo Users ===")
     async with AsyncSessionLocal() as session:
-        from backend.db.models.user import User
         for u in DEMO_USERS:
             # Check existing in DBUser
             res = await session.execute(select(DBUser).where(DBUser.email == u["email"]))
@@ -123,27 +122,6 @@ async def seed_users():
                 print(f"Creating DBUser: {u['email']}")
                 new_user = DBUser(**u)
                 session.add(new_user)
-            
-            # Check existing in User (v1_users)
-            res_v1 = await session.execute(select(User).where(User.email == u["email"]))
-            existing_v1 = res_v1.scalars().first()
-            if existing_v1:
-                print(f"Updating User (v1): {u['email']}")
-                existing_v1.hashed_password = u["password"]
-                existing_v1.full_name = u["name"]
-                existing_v1.role = u["role"]
-                existing_v1.is_active = True
-            else:
-                print(f"Creating User (v1): {u['email']}")
-                new_v1 = User(
-                    id=u["user_id"],
-                    email=u["email"],
-                    hashed_password=u["password"],
-                    full_name=u["name"],
-                    role=u["role"],
-                    is_active=True
-                )
-                session.add(new_v1)
         
         # Also ensure buyer entry exists in DBBuyer
         buyer_res = await session.execute(select(DBBuyer).where(DBBuyer.user_id == "usr_buyer_demo"))

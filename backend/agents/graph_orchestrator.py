@@ -13,6 +13,8 @@ import json
 import re
 import random
 import logging
+import uuid
+from uuid import uuid4
 from typing import TypedDict, List, Dict, Any, Optional
 from langgraph.graph import StateGraph, END
 
@@ -1280,7 +1282,6 @@ async def dynamic_routing_node(state: NegotiationState) -> Dict[str, Any]:
     else:
         # --- Invoke full Transport Agent LangGraph workflow ---
         from backend.agents.transport_agent.graph import run_transport_workflow
-        import uuid
 
         spoilage_days = state.get("spoilage_days", 5)
         shelf_life_hours = spoilage_days * 24
@@ -1550,7 +1551,6 @@ async def reflection_node(state: NegotiationState) -> Dict[str, Any]:
             logger.warning(f"Failed to generate Final Agreement: {e}")
 
     # Save Full Supply Chain RL Memory to Database
-    from uuid import uuid4
     try:
         history_entry = {
             "negotiation_id": f"neg_{uuid4().hex[:8]}",

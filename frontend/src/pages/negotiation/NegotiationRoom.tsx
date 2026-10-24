@@ -592,7 +592,15 @@ export default function NegotiationRoom() {
     }
 
     // 3. Fallback APMC candidates & padding up to exactly 5 candidates
-    const districts = [
+    const buyerDistricts = [
+      { name: "AgroCorp Procurement Director", loc: "Pune APMC Terminal, Maharashtra", dist: 120, match: 96, price: Math.round(bestOfferPrice * 1.05 * 10) / 10 },
+      { name: "Sahyadri Agro Processing Ltd", loc: "Nashik Food Park, Maharashtra", dist: 168, match: 93, price: Math.round(bestOfferPrice * 1.02 * 10) / 10 },
+      { name: "Mahalaxmi Grain Exports", loc: "JNPT Port Terminal, Navi Mumbai", dist: 210, match: 90, price: Math.round(bestOfferPrice * 1.00 * 10) / 10 },
+      { name: "Vidarbha Solvent Extractions", loc: "Nagpur Industrial Hub, Maharashtra", dist: 280, match: 88, price: Math.round(bestOfferPrice * 0.98 * 10) / 10 },
+      { name: "Marathwada Agro Millers Union", loc: "Latur Agro Cluster, Maharashtra", dist: 245, match: 85, price: Math.round(bestOfferPrice * 0.96 * 10) / 10 }
+    ];
+
+    const farmerDistricts = [
       { name: "Vasantrao Meshram (Dhule APMC)", loc: "Dhule APMC, Maharashtra", dist: 142, match: 96, price: 49.5 },
       { name: "Nitin Patil (Jalgaon APMC)", loc: "Jalgaon APMC, Maharashtra", dist: 185, match: 92, price: 51.0 },
       { name: "Anand Deshmukh (Latur APMC)", loc: "Latur APMC, Maharashtra", dist: 245, match: 89, price: 52.5 },
@@ -600,34 +608,36 @@ export default function NegotiationRoom() {
       { name: "Balasaheb Shinde (Amravati APMC)", loc: "Amravati APMC, Maharashtra", dist: 310, match: 83, price: 54.0 }
     ];
 
+    const fallbackList = isBuyer ? farmerDistricts : buyerDistricts;
+
     const result = [...initialList];
-    for (let i = 0; i < districts.length && result.length < 5; i++) {
-      const d = districts[i];
+    for (let i = 0; i < fallbackList.length && result.length < 5; i++) {
+      const d = fallbackList[i];
       const idx = result.length;
       result.push({
         index: idx,
         id: `cand_synth_${idx}`,
         name: d.name,
-        role: "Farmer / Producer",
+        role: isBuyer ? "Farmer / Producer" : "Institutional Buyer",
         location: d.loc,
         distance_km: d.dist,
         match: d.match,
         offer: d.price,
-        initial_ask: Math.round(d.price * 1.06 * 10) / 10,
+        initial_ask: Math.round(d.price * (isBuyer ? 1.06 : 0.94) * 10) / 10,
         freight_per_kg: Math.round(d.dist * 0.018 * 10) / 10,
         apmc_cess_per_kg: 0.52,
         landed_cost_per_kg: Math.round((d.price + d.dist * 0.018 + 0.52) * 10) / 10,
         total_landed_cost: Math.round((d.price + d.dist * 0.018 + 0.52) * cropQty),
         status: idx === 0 ? "Deal Confirmed" : "Countered",
         is_best: idx === 0,
-        disqualification_reason: idx >= 3 ? "Price exceeds buyer target reservation" : null,
+        disqualification_reason: idx >= 3 ? (isBuyer ? "Price exceeds buyer target reservation" : "Bid below farmer floor reserve price") : null,
         rounds_count: 2,
         chat_messages: []
       });
     }
 
     return result;
-  }, [parallelBranchesData, negState, matchedListings, bestOfferPrice, cropQty]);
+  }, [parallelBranchesData, negState, matchedListings, bestOfferPrice, cropQty, isBuyer]);
 
   const activeCandidate = topFiveCandidates[selectedCandidateIndex] || topFiveCandidates[0];
 
@@ -641,10 +651,12 @@ export default function NegotiationRoom() {
     return [
       {
         id: `init_cand_${selectedCandidateIndex}_1`,
-        sender: activeCandidate.name,
+        sender: isBuyer ? activeCandidate.name : (farmerName || user?.name || "Farmer Producer"),
         sender_role: "seller",
-        text: `Namaste! Initial quote registered at Rs.${activeCandidate.initial_ask}/kg for ${cropQty.toLocaleString()}kg of ${cropName}. Verified APMC Grade A stock located in ${activeCandidate.location}. Transit distance is ${activeCandidate.distance_km} km.`,
-        price: activeCandidate.initial_ask,
+        text: isBuyer 
+          ? `Namaste! Initial quote registered at Rs.${activeCandidate.initial_ask}/kg for ${cropQty.toLocaleString()}kg of ${cropName}. Verified APMC Grade A stock located in ${activeCandidate.location}. Transit distance is ${activeCandidate.distance_km} km.`
+          : `Namaste! Listing registered for ${cropQty.toLocaleString()}kg of ${cropName}. Verified APMC Grade A lot ready for dispatch. Minimum floor target is Rs.${targetPrice}/kg.`,
+        price: isBuyer ? activeCandidate.initial_ask : targetPrice,
         quantity: cropQty,
         round: 1,
         decision: "OFFER",
@@ -652,17 +664,19 @@ export default function NegotiationRoom() {
       },
       {
         id: `init_cand_${selectedCandidateIndex}_2`,
-        sender: buyerName,
+        sender: isBuyer ? (buyerName || "Buyer Enterprise") : activeCandidate.name,
         sender_role: "buyer",
-        text: `Procurement intent received. Buyer target benchmark is Rs.${targetPrice}/kg with reservation ceiling of Rs.${maxAllowedCeiling}/kg. Ready for automated multi-turn discovery.`,
-        price: targetPrice,
+        text: isBuyer
+          ? `Procurement intent received. Buyer target benchmark is Rs.${targetPrice}/kg with reservation ceiling of Rs.${maxAllowedCeiling}/kg. Ready for automated multi-turn discovery.`
+          : `Institutional procurement bid submitted from ${activeCandidate.location}. Our opening offer is Rs.${activeCandidate.offer}/kg for prompt gate delivery.`,
+        price: isBuyer ? targetPrice : activeCandidate.offer,
         quantity: cropQty,
         round: 1,
         decision: "COUNTER",
         time: "10:01"
       }
     ];
-  }, [branchMessagesMap, selectedCandidateIndex, activeCandidate, cropQty, cropName, targetPrice, maxAllowedCeiling, buyerName]);
+  }, [branchMessagesMap, selectedCandidateIndex, activeCandidate, cropQty, cropName, targetPrice, maxAllowedCeiling, buyerName, isBuyer, farmerName, user?.name]);
 
   // Candidate Farmers for Buyer Procurement View
   const liveSellers = useMemo(() => {
@@ -2144,13 +2158,15 @@ export default function NegotiationRoom() {
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
-                    Top-5 Intelligent Candidate Screening
+                    {isBuyer ? 'Top-5 Intelligent Candidate Screening' : 'Top-5 Institutional Buyer Demand Radar'}
                     <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
                       {topFiveCandidates.length} Screened
                     </span>
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Ranked by multi-attribute RL utility (distance, APMC modal spread, landed cost, and freshness). Click any candidate to view isolated WhatsApp-style conversation.
+                    {isBuyer
+                      ? 'Ranked by multi-attribute RL utility (distance, APMC modal spread, landed cost, and freshness). Click any candidate to view isolated WhatsApp-style conversation.'
+                      : 'Ranked by buyer bid premium, creditworthiness, and transit proximity to your farm lot. Click any buyer to review parallel negotiation.'}
                   </p>
                 </div>
               </div>
@@ -2420,10 +2436,10 @@ export default function NegotiationRoom() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <Star size={17} className="text-amber-500 fill-amber-400" /> Eligible Supplier Candidates
+                  <Star size={17} className="text-amber-500 fill-amber-400" /> {isBuyer ? 'Eligible Supplier Candidates' : 'Interested Institutional Buyers'}
                 </h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
-                  {topFiveCandidates.length} Live APMC
+                  {topFiveCandidates.length} {isBuyer ? 'Live APMC' : 'Verified Bids'}
                 </span>
               </div>
 
@@ -2740,7 +2756,9 @@ export default function NegotiationRoom() {
                           <td className="p-2">
                             {c.is_best ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
-                                Selected #1: Lowest landed cost within budget, Grade A certified.
+                                {isBuyer 
+                                  ? 'Selected #1: Lowest landed cost within budget, Grade A certified.' 
+                                  : 'Selected #1: Highest net realization above farmer floor price, Grade A verified.'}
                               </span>
                             ) : (
                               <span className="text-[10px] text-slate-500">
@@ -3418,18 +3436,20 @@ export default function NegotiationRoom() {
             {reflection && <ReflectionCard reflection={reflection} />}
           </div>
 
-          {/* Buyer Procurement Copilot */}
+          {/* Buyer / Farmer Copilot */}
           <div className="bg-[#0f172a] rounded-2xl shadow-lg border border-slate-800 p-5 text-white flex-1 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-bold text-sm flex items-center gap-2 text-white">
-                  <ShieldCheck size={16} className="text-blue-400" />
-                  <span>Buyer Procurement Copilot</span>
+                  <ShieldCheck size={16} className={isBuyer ? "text-blue-400" : "text-emerald-400"} />
+                  <span>{isBuyer ? 'Buyer Procurement Copilot' : 'Farmer Selling Copilot'}</span>
                 </h3>
               </div>
 
               <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                Autonomous guidance for {cropName} across Maharashtra APMC hubs.
+                {isBuyer 
+                  ? `Autonomous guidance for ${cropName} across Maharashtra APMC hubs.`
+                  : `Autonomous selling & floor protection for ${cropName} across Maharashtra APMC buyers.`}
               </p>
 
               {/* Copilot Action Presets adapted to active phase */}
@@ -3455,7 +3475,7 @@ export default function NegotiationRoom() {
                       Enforce 24h
                     </button>
                   </>
-                ) : (
+                ) : isBuyer ? (
                   <>
                     <button
                       onClick={() => setCopilotCommand(`Counter at target Rs.${Math.round(targetPrice)}`)}
@@ -3476,13 +3496,34 @@ export default function NegotiationRoom() {
                       Counter best farmer
                     </button>
                   </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setCopilotCommand(`Defend floor price Rs.${Math.round(targetPrice * 0.95)}`)}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Defend Floor Rs.{Math.round(targetPrice * 0.95)}
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand(`Counter best buyer at Rs.${Math.round(targetPrice * 1.08)}`)}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Counter Best Buyer
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand('Accept top bid if above reserve')}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Accept Top Bid
+                    </button>
+                  </>
                 )}
               </div>
 
               {/* Last Copilot Response Feedback */}
               {copilotMessages.length > 0 && (
                 <div className="mb-3 p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-[11px] text-slate-300 flex items-start gap-2 shadow-inner">
-                  <Bot size={14} className="text-blue-400 shrink-0 mt-0.5" />
+                  <Bot size={14} className={isBuyer ? "text-blue-400 shrink-0 mt-0.5" : "text-emerald-400 shrink-0 mt-0.5"} />
                   <div className="flex-1">
                     <span className="text-slate-400 font-semibold text-[10px]">
                       {copilotMessages[copilotMessages.length - 1].sender === 'AI' ? 'AI Copilot: ' : 'Instruction: '}
@@ -3499,12 +3540,16 @@ export default function NegotiationRoom() {
                 type="text"
                 value={copilotCommand}
                 onChange={e => setCopilotCommand(e.target.value)}
-                placeholder="Give instruction to Buyer Agent... (e.g. Target Rs. 48/kg, protect P_max reservation ceiling)"
-                className="w-full bg-[#1e293b]/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                placeholder={isBuyer ? "Give instruction to Buyer Agent... (e.g. Target Rs. 48/kg, protect P_max reservation ceiling)" : "Give instruction to Farmer Agent (e.g. 'Defend floor price', 'Counter at ₹35')..."}
+                className={`w-full bg-[#1e293b]/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none ${
+                  isBuyer ? 'focus:border-blue-500' : 'focus:border-emerald-500'
+                }`}
               />
               <button
                 type="submit"
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition cursor-pointer shadow-sm"
+                className={`w-full py-2.5 font-bold text-xs rounded-xl transition cursor-pointer shadow-sm ${
+                  isBuyer ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
               >
                 Send Instruction
               </button>
@@ -3516,7 +3561,7 @@ export default function NegotiationRoom() {
       </div>
 
       {/* Intact RAG Drawer Component */}
-      <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} crop={cropName} />
+      <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} crop={cropName} role={isBuyer ? 'buyer' : 'farmer'} />
 
       {/* Intact Cryptographic Transaction Validation Modal */}
       <TransactionValidationModal

@@ -25,6 +25,7 @@ export default function OfferCard({
   warehouseIncluded?: boolean;
   validity?: string;
   isFarmer?: boolean;
+  isTransport?: boolean;
   isBuyer?: boolean;
   onAction?: (type: string, price: number) => void;
 }) {

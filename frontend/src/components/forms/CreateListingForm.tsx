@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, FormProvider } from 'react-hook-form';
-import { X, Sprout, Loader2, CheckCircle2, TrendingUp, BrainCircuit, MapPin } from 'lucide-react';
+import { X, Sprout, Loader2, CheckCircle2, TrendingUp, BrainCircuit, MapPin, Sparkles, Truck, Bot, CheckCircle } from 'lucide-react';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { api } from '../../services/api';
@@ -171,6 +171,11 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
 
       // Automatically launch the AI Negotiation session for this listing and enter room
       let negId: string | null = null;
+      const isFullSupplyChain = Boolean(data.req_full_logistics);
+      const isNeedTransport = Boolean(data.req_full_logistics || data.req_transport);
+      const isNeedWarehouse = Boolean(data.req_full_logistics || data.req_warehouse);
+      const isNeedProcessor = Boolean(data.req_full_logistics || data.req_processor);
+
       try {
         const negPayload = {
           user_id: user?.id,
@@ -183,7 +188,13 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
           location: `${data.village}, ${data.taluka}, ${data.district}` || 'Nashik',
           quality: data.grade || 'A',
           language: 'English',
-          listing_id: listingId
+          listing_id: listingId,
+          selected_services,
+          full_supply_chain: isFullSupplyChain,
+          req_transport: isNeedTransport,
+          req_warehouse: isNeedWarehouse,
+          req_processor: isNeedProcessor,
+          workflow_mode: isFullSupplyChain ? 'FULL_SUPPLY_CHAIN' : (isNeedTransport && !isNeedWarehouse && !isNeedProcessor && !data.req_buyer_match ? 'TRANSPORT_ONLY' : 'SINGLE_AGENT')
         };
         const negRes = await api.post('/negotiations/', negPayload);
         negId = negRes.data?.negotiation_id || negRes.data?.id;
@@ -201,14 +212,30 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
       addNotification('Produce listing validated! Entering AI Negotiation Room...', 'success');
       reset();
       onSuccess?.();
+
+      const routeState = {
+        autoStart: true,
+        fromListing: true,
+        fullSupplyChain: isFullSupplyChain,
+        full_supply_chain: isFullSupplyChain,
+        workflow_mode: isFullSupplyChain ? 'FULL_SUPPLY_CHAIN' : (isNeedTransport && !isNeedWarehouse && !isNeedProcessor && !data.req_buyer_match ? 'TRANSPORT_ONLY' : 'SINGLE_AGENT'),
+        selectedServices: selected_services,
+        selected_services: selected_services,
+        needTransport: isNeedTransport,
+        needWarehouse: isNeedWarehouse,
+        needProcessor: isNeedProcessor,
+        crop: data.crop,
+        quantity: data.quantity,
+        min_price: data.min_price,
+        expected_price: data.expected_price,
+        location: `${data.village}, ${data.taluka}, ${data.district}`
+      };
+
       if (actionStr === 'transport') {
         navigate('/dashboard/transport', { state: { prefillData: payload } });
-      } else if (actionStr === 'buyer' && negId) {
-        navigate(`/negotiations/${negId}`, { state: { autoStart: true } });
-      } else if (actionStr === 'buyer') {
-        navigate('/negotiations', { state: { autoStart: true } });
       } else {
-        onClose();
+        const dest = negId ? `/negotiations/${negId}` : '/negotiations';
+        navigate(dest, { state: routeState });
       }
     } catch (err: any) {
       addNotification(err.response?.data?.detail || 'Failed to submit listing', 'error');
@@ -593,13 +620,38 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
                   Matching, Quality Checks, and AI Negotiation are included by default. Do you need help with finding buyers or physical logistics?
                 </p>
 
-                <label className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200 cursor-pointer mb-4">
+                <label className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200 cursor-pointer mb-2">
                   <input type="checkbox" {...register('req_full_logistics')} className="w-5 h-5 text-blue-600 rounded" />
                   <div>
                     <p className="font-bold text-blue-900">Full Logistics Assistance</p>
                     <p className="text-sm text-blue-700">Let AI handle finding buyers, booking transport, matching warehouses, and processors.</p>
                   </div>
                 </label>
+                
+                {formData.req_full_logistics && (
+                  <div className="p-3.5 bg-blue-100/60 border border-blue-200/80 rounded-xl text-xs space-y-2 mb-2 animate-in fade-in duration-200">
+                    <p className="font-bold text-blue-950 flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-amber-500" /> Complete 5-Agent Coordinated Ecosystem Active:
+                    </p>
+                    <p className="text-blue-800 text-[11px] leading-relaxed">
+                      All agents will coordinate together in one combined autonomous negotiation room:
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-semibold text-slate-800">
+                      <span className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-blue-100 text-[11px] shadow-xs">
+                        🏢 Buyer Agent
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-blue-100 text-[11px] shadow-xs">
+                        🚚 Transport Fleet
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-blue-100 text-[11px] shadow-xs">
+                        🏭 Warehouse Godown
+                      </span>
+                      <span className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-lg border border-blue-100 text-[11px] shadow-xs">
+                        ⚙️ Processor Mill
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 {!formData.req_full_logistics && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
@@ -633,33 +685,53 @@ export default function CreateListingForm({ isOpen, onClose, onSuccess }: { isOp
             type="button" 
             onClick={onClose} 
             disabled={isSubmitting}
-            className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl transition disabled:opacity-30 flex items-center gap-2 shadow-sm"
+            className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold rounded-xl transition disabled:opacity-30 flex items-center gap-2 shadow-sm cursor-pointer"
           >
             Cancel
           </button>
           
           <div className="flex gap-3 flex-wrap justify-end">
-            {(formData.req_full_logistics || formData.req_transport) && (
+            {formData.req_full_logistics ? (
+              <button 
+                type="button" 
+                onClick={handleSubmit((data) => onSubmitAction(data, 'full_supply_chain'))}
+                disabled={isSubmitting} 
+                className="px-6 py-2.5 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 via-teal-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-lg whitespace-nowrap cursor-pointer"
+              >
+                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} className="text-amber-300" />}
+                Submit & Launch Combined Supply Chain (All Agents)
+              </button>
+            ) : formData.req_transport && !formData.req_buyer_match && !formData.req_warehouse && !formData.req_processor ? (
               <button 
                 type="button" 
                 onClick={handleSubmit((data) => onSubmitAction(data, 'transport'))}
                 disabled={isSubmitting} 
-                className="px-6 py-2.5 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md whitespace-nowrap"
+                className="px-6 py-2.5 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md whitespace-nowrap cursor-pointer"
               >
-                {isSubmitting && nextAction === 'transport' ? <Loader2 size={18} className="animate-spin" /> : null}
+                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Truck size={18} />}
                 Submit & Negotiate Transport
               </button>
+            ) : (formData.req_buyer_match || formData.req_warehouse || formData.req_processor || formData.req_transport) ? (
+              <button 
+                type="button" 
+                onClick={handleSubmit((data) => onSubmitAction(data, 'selected_services'))}
+                disabled={isSubmitting} 
+                className="px-6 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md whitespace-nowrap cursor-pointer"
+              >
+                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Bot size={18} />}
+                Submit & Negotiate Selected Agents
+              </button>
+            ) : (
+              <button 
+                type="button" 
+                onClick={handleSubmit((data) => onSubmitAction(data, 'default'))}
+                disabled={isSubmitting} 
+                className="px-6 py-2.5 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md whitespace-nowrap cursor-pointer"
+              >
+                {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+                Submit Listing
+              </button>
             )}
-
-            <button 
-              type="button" 
-              onClick={handleSubmit((data) => onSubmitAction(data, 'buyer'))}
-              disabled={isSubmitting} 
-              className="px-6 py-2.5 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition shadow-md whitespace-nowrap"
-            >
-              {isSubmitting && nextAction === 'buyer' ? <Loader2 size={18} className="animate-spin" /> : null}
-              {formData.req_buyer_match || formData.req_full_logistics ? 'Submit & Negotiate with Buyer' : 'Submit Listing'}
-            </button>
           </div>
         </div>
 

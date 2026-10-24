@@ -91,7 +91,7 @@ const procurementSchema = z.object({
   req_farmer_match: z.boolean(),
   req_transport: z.boolean(),
   req_warehouse: z.boolean(),
-  req_processor: z.boolean(),
+  req_processor: z.boolean().optional(),
   description: z.string().optional()
 }).refine(data => data.min_batch_size <= data.quantity, {
   message: "Minimum batch size cannot exceed total procurement quantity",
@@ -157,7 +157,7 @@ export default function PostRequirementModal({
       req_farmer_match: true,
       req_transport: true,
       req_warehouse: false,
-      req_processor: true,
+      req_processor: false,
       description: ''
     }
   });
@@ -276,11 +276,16 @@ export default function PostRequirementModal({
       const selected_services = {
         market_intelligence: true,
         negotiation: true,
-        processor: data.req_full_logistics || data.req_processor,
         farmer_matching: data.req_full_logistics || data.req_farmer_match,
         transport: data.req_full_logistics || data.req_transport,
-        warehouse: data.req_full_logistics || data.req_warehouse
+        warehouse: data.req_full_logistics || data.req_warehouse,
+        processor: data.req_full_logistics || data.req_processor
       };
+
+      const selected_agents = ["FARMER"];
+      if (selected_services.transport) selected_agents.push("TRANSPORT");
+      if (selected_services.warehouse) selected_agents.push("WAREHOUSE");
+      if (selected_services.processor) selected_agents.push("PROCESSOR");
 
       const payload = {
         crop: data.crop,
@@ -311,10 +316,13 @@ export default function PostRequirementModal({
         location: `${data.delivery_hub}, ${data.taluka}, ${data.district}, Maharashtra`,
         preferredLocation: `${data.district}, Maharashtra`,
         selected_services,
+        selected_agents,
         transport_required: data.req_full_logistics || data.req_transport,
         transportRequired: data.req_full_logistics || data.req_transport,
         warehouse_required: data.req_full_logistics || data.req_warehouse,
         storageRequired: data.req_full_logistics || data.req_warehouse,
+        processor_required: data.req_full_logistics || data.req_processor,
+        processorRequired: data.req_full_logistics || data.req_processor,
         buyer_mode: true,
         max_rounds: 5,
         description: data.description || '',
@@ -794,7 +802,7 @@ export default function PostRequirementModal({
                 </label>
                 
                 {!formData.req_full_logistics && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-1">
                     <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
                       <input 
                         type="checkbox" 
@@ -802,7 +810,7 @@ export default function PostRequirementModal({
                         className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
                       /> 
                       <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                        <Bot size={14} className="text-emerald-600" /> Farmer Sourcing & Seller Matching
+                        <Bot size={14} className="text-emerald-600" /> Farmer Sourcing
                       </span>
                     </label>
                     <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
@@ -812,7 +820,7 @@ export default function PostRequirementModal({
                         className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
                       /> 
                       <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                        <Truck size={14} className="text-blue-600" /> Transport Agent (Highway Haulage)
+                        <Truck size={14} className="text-blue-600" /> Transport Agent
                       </span>
                     </label>
                     <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">
@@ -822,7 +830,7 @@ export default function PostRequirementModal({
                         className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" 
                       /> 
                       <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                        <Warehouse size={14} className="text-amber-600" /> Warehouse Allocation & Storage
+                        <Warehouse size={14} className="text-amber-600" /> Warehouse Agent
                       </span>
                     </label>
                     <label className="flex items-center gap-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs cursor-pointer hover:bg-slate-100 transition">

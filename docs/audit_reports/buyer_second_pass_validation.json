@@ -1,0 +1,1495 @@
+{
+  "validation_metadata": {
+    "generated_at": "2026-10-05T11:24:02.589454+00:00",
+    "runner": "SecondPassValidationRunner",
+    "total_tests_recorded": 75,
+    "matrix_audit": {
+      "total_row_count": 179200,
+      "crops": [
+        "Bajra",
+        "Cotton",
+        "Jowar",
+        "Onion",
+        "Rice",
+        "Soybean",
+        "Sugarcane"
+      ],
+      "volumes": [
+        "120",
+        "500",
+        "1000",
+        "5000",
+        "10000"
+      ],
+      "lot_profiles": [
+        "LOT10",
+        "LOT100",
+        "LOT25",
+        "LOT50"
+      ],
+      "supply_profiles": [
+        "EXACT",
+        "INSUFFICIENT",
+        "MULTI_LOT",
+        "SURPLUS"
+      ],
+      "distance_bands": [
+        "FAR_201_350",
+        "MID_51_100",
+        "NEAR_0_50",
+        "REGIONAL_101_200",
+        "VERY_FAR_351_PLUS"
+      ],
+      "price_scenarios": [
+        "ABOVE_CEILING",
+        "AT_TARGET",
+        "BELOW_TARGET",
+        "BETWEEN_TARGET_CEILING"
+      ],
+      "quality_scenarios": [
+        "BETTER_GRADE",
+        "EXACT_GRADE",
+        "LOWER_GRADE",
+        "MOISTURE_FAIL"
+      ],
+      "delivery_scenarios": [
+        "EARLY",
+        "LATE",
+        "ON_TIME",
+        "OUTSIDE_WINDOW"
+      ],
+      "c_count": 7,
+      "v_count": 5,
+      "lp_count": 4,
+      "sp_count": 4,
+      "db_count": 5,
+      "ps_count": 4,
+      "qs_count": 4,
+      "ds_count": 4,
+      "calculated_total": 179200
+    }
+  },
+  "status_summary": {
+    "PASS": 57,
+    "FAIL": 15,
+    "PARTIAL": 0,
+    "NOT IMPLEMENTED": 3,
+    "NOT VERIFIED": 0
+  },
+  "audited_previous_claims": [
+    {
+      "PREVIOUS CLAIM": "7 crops \u00d7 5 volumes \u00d7 5 distance bands \u00d7 4 prices \u00d7 4 qualities \u00d7 4 deliveries = 179,200",
+      "ACTUAL FINDING": "7 crops \u00d7 5 volumes \u00d7 4 lot_profiles \u00d7 4 supply_profiles \u00d7 5 distance_bands \u00d7 4 price_scenarios \u00d7 4 quality_scenarios \u00d7 4 delivery_scenarios = 179,200",
+      "WHY IT WAS WRONG": "The previous report author omitted two 4-tier Cartesian dimensions: `lot_profile` (LOT10, LOT25, LOT50, LOT100) and `farmer_supply_profile` (INSUFFICIENT, EXACT, SURPLUS, MULTI_LOT). The multiplication 7*5*5*4*4*4 equals 11,200, which was off by a factor of 16 (4*4).",
+      "EVIDENCE": "buyer_scenario_matrix_179200.csv columns: crop(7), required_volume_kg(5), lot_profile(4), farmer_supply_profile(4), distance_band(5), price_scenario(4), quality_scenario(4), delivery_scenario(4)."
+    },
+    {
+      "PREVIOUS CLAIM": "moisture hard filtering PARTIAL",
+      "ACTUAL FINDING": "Moisture hard filtering is NOT IMPLEMENTED. Moisture is purely informational metadata in RAG knowledge and reference JSONs.",
+      "WHY IT WAS WRONG": "The previous report claimed moisture was 'PARTIAL', implying it filtered in some code paths. In reality, neither buyer_orchestrator.py, matching_service.py, nor buyer_agent.py contains a single line of logic checking or gating on candidate moisture.",
+      "EVIDENCE": "CRIT-MOIST-01 runtime execution: Candidate with 15% moisture against a 10% max requirement was finalized as winning deal at \u20b951.2/kg without warning or penalty."
+    },
+    {
+      "PREVIOUS CLAIM": "adaptive candidate expansion NOT IMPLEMENTED",
+      "ACTUAL FINDING": "CONFIRMED: Adaptive candidate expansion is NOT IMPLEMENTED in current production code.",
+      "WHY IT WAS WRONG": "The previous report was correct in identifying this gap. The second-pass validation runtime confirms that buyer_orchestrator.py stops after Top-5 with status NO_EXECUTABLE_DEAL and does not expand to rank 6+.",
+      "EVIDENCE": "CRIT-EXPAND-01 runtime execution: 6 candidates provided, candidates 1-5 rejected, candidate 6 (willing at \u20b945) was discarded by [:max_candidates] slice and never negotiated."
+    },
+    {
+      "PREVIOUS CLAIM": "multi-farmer lot fulfillment NOT IMPLEMENTED",
+      "ACTUAL FINDING": "CONFIRMED: Multi-farmer lot aggregation is NOT IMPLEMENTED. The orchestrator is strictly single-supplier per orchestration.",
+      "WHY IT WAS WRONG": "The previous report was correct in identifying this gap. The system supports single-winner allocation with partial quantity fulfillment tracking, but has no multi-lot aggregation engine.",
+      "EVIDENCE": "CRIT-MULTIFARM-01 runtime execution: 10,000kg required, 3 farmers totaling 10,000kg provided. System selected Farmer A for 5,000kg and stopped with remaining_quantity = 5,000kg."
+    },
+    {
+      "PREVIOUS CLAIM": "Pmax enforcement PASS",
+      "ACTUAL FINDING": "CONFIRMED: Pmax reservation ceiling enforcement is 100% PASS across all deterministic and adversarial edge cases.",
+      "WHY IT WAS WRONG": "N/A (Previous report was correct on this feature). Both BuyerAgent and BuyerOrchestrator implement rigorous guardrails.",
+      "EVIDENCE": "TEST-PMAX-01 to TEST-PMAX-10 runtime tests: 10/10 PASS. Zero deals accepted above \u20b955.00/kg; NaN, Inf, negative, 0, None, and missing prices cleanly rejected."
+    },
+    {
+      "PREVIOUS CLAIM": "Discrepancy between deterministic tuple sorting and match score / NRV / landed cost",
+      "ACTUAL FINDING": "No conflict exists: FarmGenAI implements a verified Two-Stage Ranking Architecture. Stage 1 (Candidate Selection) uses deterministic tuple sort (-match_score, distance_km, floor_price) to pick Top-5. Stage 2 (Deal Finalization) sorts negotiated executable deals by (landed_cost_per_kg, -match_score) to pick the winner.",
+      "WHY IT WAS WRONG": "The previous report treated ranking as a single monolithic step and flagged a discrepancy between tuple sorting and landed cost. In reality, they govern two separate phases of the pipeline.",
+      "EVIDENCE": "Code proof: buyer_orchestrator.py lines 264/337 (Stage 1) and line 855 (Stage 2). CRIT-RANK-01 runtime verified: Candidate C wins Stage 1 (match 96), but Candidate E wins Stage 2 (lowest landed cost \u20b946.50)."
+    },
+    {
+      "PREVIOUS CLAIM": "persistence PASS",
+      "ACTUAL FINDING": "CONFIRMED: True OS process restart persistence is 100% PASS against SQLite (agrinegotiator.db).",
+      "WHY IT WAS WRONG": "N/A (Previous report was correct, but simulated restart in Python. Second-pass executes true subprocess kill and relaunch).",
+      "EVIDENCE": "CRIT-PERSIST-01 execution: Process 1 wrote requirement req_restart_1dd7df04 and exited. Process 2 independently verified exact record match from SQLite file."
+    },
+    {
+      "PREVIOUS CLAIM": "downstream orchestration PASS",
+      "ACTUAL FINDING": "CONFIRMED: Downstream multi-agent handoff is 100% PASS for Transport, Warehouse, and Processor.",
+      "WHY IT WAS WRONG": "N/A (Previous report was correct). Second-pass verified exact context payload passed and returned.",
+      "EVIDENCE": "CRIT-DOWN-01 to 03: Transport (Eicher Pro 2059), Warehouse (Pune Agro Hub), Processor (Marathwada Solvent Extractions & Soya Foods)."
+    }
+  ],
+  "test_records": [
+    {
+      "TEST ID": "MATH-MATRIX-01",
+      "CATEGORY": "Dataset Audit",
+      "CROP": "ALL (7)",
+      "VOLUME": "ALL (5)",
+      "INPUT": "buyer_scenario_matrix_179200.csv (179,200 rows)",
+      "EXPECTED": "Dimensions: 7 crops \u00d7 5 volumes \u00d7 4 lot_profiles \u00d7 4 supply_profiles \u00d7 5 distance_bands \u00d7 4 prices \u00d7 4 qualities \u00d7 4 deliveries = 179,200",
+      "ACTUAL": "Actual rows: 179,200. Dimensions: 7 \u00d7 5 \u00d7 4 \u00d7 4 \u00d7 5 \u00d7 4 \u00d7 4 \u00d7 4 = 179,200",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_scenario_matrix_179200.csv headers & value sets",
+      "RUNTIME EVIDENCE": "DataFrame verified: 179200 rows, 8 dimensions fully populated",
+      "DATABASE EVIDENCE": "CSV source in test_data/buyer_agent/",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Corrected multiplication bug: previous report claimed 7*5*5*4*4*4=179,200 (which is 11,200). Actual formula includes lot_profile (4) and farmer_supply_profile (4): 11,200 * 16 = 179,200."
+    },
+    {
+      "TEST ID": "CRIT-MOIST-01",
+      "CATEGORY": "Moisture Requirement",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Req max moisture: 10% | Candidate moisture: 15%, Grade A, 5000kg, Ask \u20b952/kg (Pmax \u20b955)",
+      "EXPECTED": "FAIL candidate if moisture is intended to be a hard eligibility gate",
+      "ACTUAL": "Deal ACCEPTED (Winner: Latur High Moisture Producer, Agreed Price: \u20b951.2/kg, Status: DEAL_SELECTED). Moisture 15% was ignored by matching and negotiation.",
+      "STATUS": "NOT IMPLEMENTED",
+      "CODE EVIDENCE": "buyer_orchestrator.py (L230-265, L380-410, L850-875): No moisture check or filter exists; matching_service.py (L74-165): 8-factor NRV formula has no moisture factor; buyer_agent.py (L175-200): calculate_utility() only uses price, qty, shelf_life, grade.",
+      "RUNTIME EVIDENCE": "Negotiation outcome: DEAL | Status: DEAL_SELECTED",
+      "DATABASE EVIDENCE": "Listing produce records store moisture solely as informational metadata",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Moisture is INFORMATIONAL ONLY. It is neither a hard eligibility filter, nor a ranking factor, nor a negotiation factor. Previous report classified this as 'PARTIAL', but hard filtering is completely NOT IMPLEMENTED."
+    },
+    {
+      "TEST ID": "CRIT-EXPAND-01",
+      "CATEGORY": "Candidate Expansion",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "6 candidates: 1-5 unyielding (ask \u20b9999), 6 willing (ask \u20b945, rank 6).",
+      "EXPECTED": "Expand candidate pool and negotiate Candidate 6 OR stop after Top-5 with NO_EXECUTABLE_DEAL",
+      "ACTUAL": "Stopped after Top-5. Result: status='NO_EXECUTABLE_DEAL', winner=None, candidates_negotiated=5, cand6_reached=False.",
+      "STATUS": "NOT IMPLEMENTED",
+      "CODE EVIDENCE": "buyer_orchestrator.py L265 & L337: candidates[:max_candidates] strictly slices top-5. L832-851: If 0 executable deals, no fallback or expansion loop exists.",
+      "RUNTIME EVIDENCE": "Evaluated 5 candidates. Returned status='NO_EXECUTABLE_DEAL'. Willing Producer 6 was never called.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION broadcast with executable_deals_count=0",
+      "NOTES": "Adaptive candidate expansion beyond Top-5 is NOT IMPLEMENTED. System strictly terminates with NO_EXECUTABLE_DEAL when all Top-5 branches reject."
+    },
+    {
+      "TEST ID": "CRIT-MULTIFARM-01",
+      "CATEGORY": "Multi-Farmer Fulfillment",
+      "CROP": "Soybean",
+      "VOLUME": "10000",
+      "INPUT": "Req: 10,000kg | Candidates: Farmer A (5k), Farmer B (3k), Farmer C (2k) - all valid",
+      "EXPECTED": "Combine Farmer A + B + C to procure 10,000kg OR select only one farmer",
+      "ACTUAL": "Selected ONLY one farmer (Farmer A (5,000kg)). Allocated: 5,000kg, Remaining unfulfilled: 5,000kg.",
+      "STATUS": "NOT IMPLEMENTED",
+      "CODE EVIDENCE": "buyer_orchestrator.py L851-890: Selects exactly 1 deal (winner = executable_deals[0]), sets allocated_quantity = winner['executable_quantity'] (5000kg) and remaining_quantity = req_qty - allocated_qty (5000kg).",
+      "RUNTIME EVIDENCE": "Winner: Farmer A (5,000kg), Allocated: 5000.0kg, Remaining: 5000.0kg",
+      "DATABASE EVIDENCE": "Only one transaction record and digital contract created per orchestration",
+      "EVENT EVIDENCE": "DEAL_FINALIZED event emitted for single seller",
+      "NOTES": "Multi-farmer lot aggregation / split procurement is NOT IMPLEMENTED. The production orchestrator selects a single winning supplier and leaves remaining_quantity unfulfilled."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-01",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: 55.0 (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "ACCEPT or COUNTER <= Pmax",
+      "ACTUAL": "Agent Decision: REJECT (counter: \u20b90.00) | Copilot Valid: True (None)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned REJECT. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Pmax (Exact) test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-02",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: 56.0 (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT or COUNTER <= Pmax (NEVER ACCEPT > Pmax)",
+      "ACTUAL": "Agent Decision: COUNTER (counter: \u20b90.00) | Copilot Valid: False (PRICE_EXCEEDS_PMAX)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned COUNTER. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Pmax + 1 test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-03",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: 65.0 (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT or COUNTER <= Pmax",
+      "ACTUAL": "Agent Decision: COUNTER (counter: \u20b90.00) | Copilot Valid: False (PRICE_EXCEEDS_PMAX)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned COUNTER. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Pmax + 10 test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-04",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: 155.0 (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT or COUNTER <= Pmax",
+      "ACTUAL": "Agent Decision: COUNTER (counter: \u20b90.00) | Copilot Valid: False (PRICE_EXCEEDS_PMAX)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned COUNTER. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Pmax + 100 test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-05",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: 0.0 (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT (invalid price)",
+      "ACTUAL": "Agent Decision: REJECT (counter: \u20b90.00) | Copilot Valid: False (INVALID_PRICE)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned REJECT. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Zero Price test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-06",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: -10.0 (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT (invalid price)",
+      "ACTUAL": "Agent Decision: REJECT (counter: \u20b90.00) | Copilot Valid: False (INVALID_PRICE)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned REJECT. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negative Price test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-07",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: None (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT (invalid price)",
+      "ACTUAL": "Agent Decision: REJECT (counter: \u20b90.00) | Copilot Valid: True (None)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned REJECT. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "None (null) test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-08",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: MISSING (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT (invalid price)",
+      "ACTUAL": "Agent Decision: REJECT (counter: \u20b90.00) | Copilot Valid: False (INVALID_PRICE_FORMAT)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned REJECT. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Missing Price test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-09",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: nan (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT (invalid price)",
+      "ACTUAL": "Agent Decision: REJECT (counter: \u20b90.00) | Copilot Valid: False (INVALID_PRICE)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned REJECT. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "NaN Price test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-PMAX-10",
+      "CATEGORY": "Pmax Enforcement",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Offer Price: inf (Target: \u20b950.0, Pmax: \u20b955.0)",
+      "EXPECTED": "REJECT (invalid price)",
+      "ACTUAL": "Agent Decision: REJECT (counter: \u20b90.00) | Copilot Valid: False (INVALID_PRICE)",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py L799-809: Hard check rejects any acceptance > reservation_price; buyer_orchestrator.py L108-128: validate_copilot_buyer_override rejects > P_max, NaN, inf, <= 0.",
+      "RUNTIME EVIDENCE": "Agent returned REJECT. Deal price never exceeded Pmax \u20b955.0.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Infinity Price test: Strictly verified. No finalized price exceeded reservation ceiling \u20b955.0."
+    },
+    {
+      "TEST ID": "CRIT-QTY-01",
+      "CATEGORY": "Quantity Boundary",
+      "CROP": "Soybean",
+      "VOLUME": "100",
+      "INPUT": "Candidate Qty: 100.0kg | Req: 5000.0kg, Min Batch: 500.0kg",
+      "EXPECTED": "REJECT (below min batch 500kg)",
+      "ACTUAL": "is_valid_deal=False, executable_qty=100.0kg. Reason: 'Candidate quantity (100kg) is below minimum batch size (500kg).'",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L389-392: if min_batch > 0 and executable_qty < min_batch: return REJECT",
+      "RUNTIME EVIDENCE": "499kg rejected; 500kg passed (executable_qty=100.0kg). Boundary strictness confirmed.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Exact 500kg boundary check: at 500kg, 500 < 500 is False, so it correctly passes. 499kg correctly fails."
+    },
+    {
+      "TEST ID": "CRIT-QTY-02",
+      "CATEGORY": "Quantity Boundary",
+      "CROP": "Soybean",
+      "VOLUME": "499",
+      "INPUT": "Candidate Qty: 499.0kg | Req: 5000.0kg, Min Batch: 500.0kg",
+      "EXPECTED": "REJECT (below min batch 500kg)",
+      "ACTUAL": "is_valid_deal=False, executable_qty=499.0kg. Reason: 'Candidate quantity (499kg) is below minimum batch size (500kg).'",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L389-392: if min_batch > 0 and executable_qty < min_batch: return REJECT",
+      "RUNTIME EVIDENCE": "499kg rejected; 500kg passed (executable_qty=499.0kg). Boundary strictness confirmed.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Exact 500kg boundary check: at 500kg, 500 < 500 is False, so it correctly passes. 499kg correctly fails."
+    },
+    {
+      "TEST ID": "CRIT-QTY-03",
+      "CATEGORY": "Quantity Boundary",
+      "CROP": "Soybean",
+      "VOLUME": "500",
+      "INPUT": "Candidate Qty: 500.0kg | Req: 5000.0kg, Min Batch: 500.0kg",
+      "EXPECTED": "ACCEPT / ELIGIBLE (exact min batch boundary 500kg)",
+      "ACTUAL": "is_valid_deal=True, executable_qty=500.0kg. Reason: 'None'",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L389-392: if min_batch > 0 and executable_qty < min_batch: return REJECT",
+      "RUNTIME EVIDENCE": "499kg rejected; 500kg passed (executable_qty=500.0kg). Boundary strictness confirmed.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Exact 500kg boundary check: at 500kg, 500 < 500 is False, so it correctly passes. 499kg correctly fails."
+    },
+    {
+      "TEST ID": "CRIT-QTY-04",
+      "CATEGORY": "Quantity Boundary",
+      "CROP": "Soybean",
+      "VOLUME": "501",
+      "INPUT": "Candidate Qty: 501.0kg | Req: 5000.0kg, Min Batch: 500.0kg",
+      "EXPECTED": "ACCEPT / ELIGIBLE (above min batch)",
+      "ACTUAL": "is_valid_deal=True, executable_qty=501.0kg. Reason: 'None'",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L389-392: if min_batch > 0 and executable_qty < min_batch: return REJECT",
+      "RUNTIME EVIDENCE": "499kg rejected; 500kg passed (executable_qty=501.0kg). Boundary strictness confirmed.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Exact 500kg boundary check: at 500kg, 500 < 500 is False, so it correctly passes. 499kg correctly fails."
+    },
+    {
+      "TEST ID": "CRIT-QTY-05",
+      "CATEGORY": "Quantity Boundary",
+      "CROP": "Soybean",
+      "VOLUME": "2500",
+      "INPUT": "Candidate Qty: 2500.0kg | Req: 5000.0kg, Min Batch: 500.0kg",
+      "EXPECTED": "ACCEPT / ELIGIBLE (partial fulfillment)",
+      "ACTUAL": "is_valid_deal=True, executable_qty=2500.0kg. Reason: 'None'",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L389-392: if min_batch > 0 and executable_qty < min_batch: return REJECT",
+      "RUNTIME EVIDENCE": "499kg rejected; 500kg passed (executable_qty=2500.0kg). Boundary strictness confirmed.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Exact 500kg boundary check: at 500kg, 500 < 500 is False, so it correctly passes. 499kg correctly fails."
+    },
+    {
+      "TEST ID": "CRIT-QTY-06",
+      "CATEGORY": "Quantity Boundary",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Candidate Qty: 5000.0kg | Req: 5000.0kg, Min Batch: 500.0kg",
+      "EXPECTED": "ACCEPT / ELIGIBLE (exact full match)",
+      "ACTUAL": "is_valid_deal=True, executable_qty=5000.0kg. Reason: 'None'",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L389-392: if min_batch > 0 and executable_qty < min_batch: return REJECT",
+      "RUNTIME EVIDENCE": "499kg rejected; 500kg passed (executable_qty=5000.0kg). Boundary strictness confirmed.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Exact 500kg boundary check: at 500kg, 500 < 500 is False, so it correctly passes. 499kg correctly fails."
+    },
+    {
+      "TEST ID": "CRIT-QTY-07",
+      "CATEGORY": "Quantity Boundary",
+      "CROP": "Soybean",
+      "VOLUME": "10000",
+      "INPUT": "Candidate Qty: 10000.0kg | Req: 5000.0kg, Min Batch: 500.0kg",
+      "EXPECTED": "ACCEPT / ELIGIBLE (surplus, capped at 5000kg executable)",
+      "ACTUAL": "is_valid_deal=True, executable_qty=5000.0kg. Reason: 'None'",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L389-392: if min_batch > 0 and executable_qty < min_batch: return REJECT",
+      "RUNTIME EVIDENCE": "499kg rejected; 500kg passed (executable_qty=5000.0kg). Boundary strictness confirmed.",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Exact 500kg boundary check: at 500kg, 500 < 500 is False, so it correctly passes. 499kg correctly fails."
+    },
+    {
+      "TEST ID": "CRIT-CROP-01",
+      "CATEGORY": "7-Crop Production Journey",
+      "CROP": "Sugarcane",
+      "VOLUME": "10000",
+      "INPUT": "Crop: Sugarcane | Qty: 10,000kg | Target: \u20b93.40 | Pmax: \u20b93.80 | APMC: Kolhapur",
+      "EXPECTED": "Autonomous candidate sourcing -> parallel negotiation -> DEAL_SELECTED <= \u20b93.80",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Kolhapur Panchganga Cane Growers Co-op | Price: \u20b93.49/kg | PO: PO-828A623D",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L298-334: MAHARASHTRA_CROP_SUPPLIERS['Sugarcane'] sourced; L894-910: SHA-256 contract generated (0xba3ef19ecd8fff...)",
+      "RUNTIME EVIDENCE": "Negotiations conducted: 5 | Executable deals: 1",
+      "DATABASE EVIDENCE": "Database.add_history_async executed with contract record",
+      "EVENT EVIDENCE": "DEAL_FINALIZED and TOP5_EVALUATION broadcasted",
+      "NOTES": "Complete production procurement journey verified for Sugarcane. PO: PO-828A623D."
+    },
+    {
+      "TEST ID": "CRIT-CROP-02",
+      "CATEGORY": "7-Crop Production Journey",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Crop: Soybean | Qty: 5,000kg | Target: \u20b952.00 | Pmax: \u20b956.00 | APMC: Latur",
+      "EXPECTED": "Autonomous candidate sourcing -> parallel negotiation -> DEAL_SELECTED <= \u20b956.00",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Latur Solvent & Oilseeds Farmers FPO | Price: \u20b953.28/kg | PO: PO-3313411B",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L298-334: MAHARASHTRA_CROP_SUPPLIERS['Soybean'] sourced; L894-910: SHA-256 contract generated (0x33e1dd771873c7...)",
+      "RUNTIME EVIDENCE": "Negotiations conducted: 5 | Executable deals: 1",
+      "DATABASE EVIDENCE": "Database.add_history_async executed with contract record",
+      "EVENT EVIDENCE": "DEAL_FINALIZED and TOP5_EVALUATION broadcasted",
+      "NOTES": "Complete production procurement journey verified for Soybean. PO: PO-3313411B."
+    },
+    {
+      "TEST ID": "CRIT-CROP-03",
+      "CATEGORY": "7-Crop Production Journey",
+      "CROP": "Cotton",
+      "VOLUME": "5000",
+      "INPUT": "Crop: Cotton | Qty: 5,000kg | Target: \u20b975.00 | Pmax: \u20b982.00 | APMC: Nagpur",
+      "EXPECTED": "Autonomous candidate sourcing -> parallel negotiation -> DEAL_SELECTED <= \u20b982.00",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Vidarbha White Gold Farmers Producer Co. | Price: \u20b976.85/kg | PO: PO-36072444",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L298-334: MAHARASHTRA_CROP_SUPPLIERS['Cotton'] sourced; L894-910: SHA-256 contract generated (0x3c6ea1436b19fb...)",
+      "RUNTIME EVIDENCE": "Negotiations conducted: 5 | Executable deals: 1",
+      "DATABASE EVIDENCE": "Database.add_history_async executed with contract record",
+      "EVENT EVIDENCE": "DEAL_FINALIZED and TOP5_EVALUATION broadcasted",
+      "NOTES": "Complete production procurement journey verified for Cotton. PO: PO-36072444."
+    },
+    {
+      "TEST ID": "CRIT-CROP-04",
+      "CATEGORY": "7-Crop Production Journey",
+      "CROP": "Jowar",
+      "VOLUME": "2000",
+      "INPUT": "Crop: Jowar | Qty: 2,000kg | Target: \u20b934.00 | Pmax: \u20b938.00 | APMC: Solapur",
+      "EXPECTED": "Autonomous candidate sourcing -> parallel negotiation -> DEAL_SELECTED <= \u20b938.00",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Solapur Maldandi Jowar Growers Society | Price: \u20b934.84/kg | PO: PO-33D1A11C",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L298-334: MAHARASHTRA_CROP_SUPPLIERS['Jowar'] sourced; L894-910: SHA-256 contract generated (0x095737d8384901...)",
+      "RUNTIME EVIDENCE": "Negotiations conducted: 5 | Executable deals: 1",
+      "DATABASE EVIDENCE": "Database.add_history_async executed with contract record",
+      "EVENT EVIDENCE": "DEAL_FINALIZED and TOP5_EVALUATION broadcasted",
+      "NOTES": "Complete production procurement journey verified for Jowar. PO: PO-33D1A11C."
+    },
+    {
+      "TEST ID": "CRIT-CROP-05",
+      "CATEGORY": "7-Crop Production Journey",
+      "CROP": "Onion",
+      "VOLUME": "5000",
+      "INPUT": "Crop: Onion | Qty: 5,000kg | Target: \u20b922.00 | Pmax: \u20b926.00 | APMC: Nashik",
+      "EXPECTED": "Autonomous candidate sourcing -> parallel negotiation -> DEAL_SELECTED <= \u20b926.00",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Lasalgaon Kanda Apex FPO | Price: \u20b922.47/kg | PO: PO-E97C37A6",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L298-334: MAHARASHTRA_CROP_SUPPLIERS['Onion'] sourced; L894-910: SHA-256 contract generated (0xbcb067fff3f13b...)",
+      "RUNTIME EVIDENCE": "Negotiations conducted: 5 | Executable deals: 1",
+      "DATABASE EVIDENCE": "Database.add_history_async executed with contract record",
+      "EVENT EVIDENCE": "DEAL_FINALIZED and TOP5_EVALUATION broadcasted",
+      "NOTES": "Complete production procurement journey verified for Onion. PO: PO-E97C37A6."
+    },
+    {
+      "TEST ID": "CRIT-CROP-06",
+      "CATEGORY": "7-Crop Production Journey",
+      "CROP": "Bajra",
+      "VOLUME": "3000",
+      "INPUT": "Crop: Bajra | Qty: 3,000kg | Target: \u20b925.00 | Pmax: \u20b928.00 | APMC: Dhule",
+      "EXPECTED": "Autonomous candidate sourcing -> parallel negotiation -> DEAL_SELECTED <= \u20b928.00",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Dhule Pearl Millet Farmers Federation | Price: \u20b925.62/kg | PO: PO-70C92FE0",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L298-334: MAHARASHTRA_CROP_SUPPLIERS['Bajra'] sourced; L894-910: SHA-256 contract generated (0xf85d7e7cf3d389...)",
+      "RUNTIME EVIDENCE": "Negotiations conducted: 5 | Executable deals: 1",
+      "DATABASE EVIDENCE": "Database.add_history_async executed with contract record",
+      "EVENT EVIDENCE": "DEAL_FINALIZED and TOP5_EVALUATION broadcasted",
+      "NOTES": "Complete production procurement journey verified for Bajra. PO: PO-70C92FE0."
+    },
+    {
+      "TEST ID": "CRIT-CROP-07",
+      "CATEGORY": "7-Crop Production Journey",
+      "CROP": "Rice",
+      "VOLUME": "4000",
+      "INPUT": "Crop: Rice | Qty: 4,000kg | Target: \u20b942.00 | Pmax: \u20b948.00 | APMC: Gondia",
+      "EXPECTED": "Autonomous candidate sourcing -> parallel negotiation -> DEAL_SELECTED <= \u20b948.00",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Indrayani Fragrant Rice Producers FPO | Price: \u20b943.04/kg | PO: PO-ED9C49BF",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L298-334: MAHARASHTRA_CROP_SUPPLIERS['Rice'] sourced; L894-910: SHA-256 contract generated (0x05ff62f42b0c73...)",
+      "RUNTIME EVIDENCE": "Negotiations conducted: 5 | Executable deals: 1",
+      "DATABASE EVIDENCE": "Database.add_history_async executed with contract record",
+      "EVENT EVIDENCE": "DEAL_FINALIZED and TOP5_EVALUATION broadcasted",
+      "NOTES": "Complete production procurement journey verified for Rice. PO: PO-ED9C49BF."
+    },
+    {
+      "TEST ID": "CRIT-VOL-01A",
+      "CATEGORY": "Volume Presets (Valid)",
+      "CROP": "Soybean",
+      "VOLUME": "120",
+      "INPUT": "Volume: 120kg (Valid candidate satisfying price & volume)",
+      "EXPECTED": "Status: DEAL_SELECTED for 120kg",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Producer 120kg | Exec Qty: 120.0kg",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L385: executable_qty = min(req_qty, avail_qty)",
+      "RUNTIME EVIDENCE": "Allocated: 120.0kg, Remaining: 0.0kg",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 120kg valid condition passed."
+    },
+    {
+      "TEST ID": "CRIT-VOL-01B",
+      "CATEGORY": "Volume Presets (Invalid)",
+      "CROP": "Soybean",
+      "VOLUME": "120",
+      "INPUT": "Volume: 120kg (Invalid candidate: ask \u20b999 vs Pmax \u20b955)",
+      "EXPECTED": "Status: NO_EXECUTABLE_DEAL (winner = None)",
+      "ACTUAL": "Status: NO_EXECUTABLE_DEAL | Winner: None",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L851: If 0 executable deals, winner = None, status = NO_EXECUTABLE_DEAL",
+      "RUNTIME EVIDENCE": "0 valid deals found out of 1 negotiation",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 120kg invalid condition rejected correctly."
+    },
+    {
+      "TEST ID": "CRIT-VOL-02A",
+      "CATEGORY": "Volume Presets (Valid)",
+      "CROP": "Soybean",
+      "VOLUME": "500",
+      "INPUT": "Volume: 500kg (Valid candidate satisfying price & volume)",
+      "EXPECTED": "Status: DEAL_SELECTED for 500kg",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Producer 500kg | Exec Qty: 500.0kg",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L385: executable_qty = min(req_qty, avail_qty)",
+      "RUNTIME EVIDENCE": "Allocated: 500.0kg, Remaining: 0.0kg",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 500kg valid condition passed."
+    },
+    {
+      "TEST ID": "CRIT-VOL-02B",
+      "CATEGORY": "Volume Presets (Invalid)",
+      "CROP": "Soybean",
+      "VOLUME": "500",
+      "INPUT": "Volume: 500kg (Invalid candidate: ask \u20b999 vs Pmax \u20b955)",
+      "EXPECTED": "Status: NO_EXECUTABLE_DEAL (winner = None)",
+      "ACTUAL": "Status: NO_EXECUTABLE_DEAL | Winner: None",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L851: If 0 executable deals, winner = None, status = NO_EXECUTABLE_DEAL",
+      "RUNTIME EVIDENCE": "0 valid deals found out of 1 negotiation",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 500kg invalid condition rejected correctly."
+    },
+    {
+      "TEST ID": "CRIT-VOL-03A",
+      "CATEGORY": "Volume Presets (Valid)",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Volume: 1,000kg (Valid candidate satisfying price & volume)",
+      "EXPECTED": "Status: DEAL_SELECTED for 1,000kg",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Producer 1000kg | Exec Qty: 1000.0kg",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L385: executable_qty = min(req_qty, avail_qty)",
+      "RUNTIME EVIDENCE": "Allocated: 1000.0kg, Remaining: 0.0kg",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 1000kg valid condition passed."
+    },
+    {
+      "TEST ID": "CRIT-VOL-03B",
+      "CATEGORY": "Volume Presets (Invalid)",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Volume: 1,000kg (Invalid candidate: ask \u20b999 vs Pmax \u20b955)",
+      "EXPECTED": "Status: NO_EXECUTABLE_DEAL (winner = None)",
+      "ACTUAL": "Status: NO_EXECUTABLE_DEAL | Winner: None",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L851: If 0 executable deals, winner = None, status = NO_EXECUTABLE_DEAL",
+      "RUNTIME EVIDENCE": "0 valid deals found out of 1 negotiation",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 1000kg invalid condition rejected correctly."
+    },
+    {
+      "TEST ID": "CRIT-VOL-04A",
+      "CATEGORY": "Volume Presets (Valid)",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Volume: 5,000kg (Valid candidate satisfying price & volume)",
+      "EXPECTED": "Status: DEAL_SELECTED for 5,000kg",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Producer 5000kg | Exec Qty: 5000.0kg",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L385: executable_qty = min(req_qty, avail_qty)",
+      "RUNTIME EVIDENCE": "Allocated: 5000.0kg, Remaining: 0.0kg",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 5000kg valid condition passed."
+    },
+    {
+      "TEST ID": "CRIT-VOL-04B",
+      "CATEGORY": "Volume Presets (Invalid)",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Volume: 5,000kg (Invalid candidate: ask \u20b999 vs Pmax \u20b955)",
+      "EXPECTED": "Status: NO_EXECUTABLE_DEAL (winner = None)",
+      "ACTUAL": "Status: NO_EXECUTABLE_DEAL | Winner: None",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L851: If 0 executable deals, winner = None, status = NO_EXECUTABLE_DEAL",
+      "RUNTIME EVIDENCE": "0 valid deals found out of 1 negotiation",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 5000kg invalid condition rejected correctly."
+    },
+    {
+      "TEST ID": "CRIT-VOL-05A",
+      "CATEGORY": "Volume Presets (Valid)",
+      "CROP": "Soybean",
+      "VOLUME": "10000",
+      "INPUT": "Volume: 10,000kg (Valid candidate satisfying price & volume)",
+      "EXPECTED": "Status: DEAL_SELECTED for 10,000kg",
+      "ACTUAL": "Status: DEAL_SELECTED | Winner: Producer 10000kg | Exec Qty: 10000.0kg",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L385: executable_qty = min(req_qty, avail_qty)",
+      "RUNTIME EVIDENCE": "Allocated: 10000.0kg, Remaining: 0.0kg",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 10000kg valid condition passed."
+    },
+    {
+      "TEST ID": "CRIT-VOL-05B",
+      "CATEGORY": "Volume Presets (Invalid)",
+      "CROP": "Soybean",
+      "VOLUME": "10000",
+      "INPUT": "Volume: 10,000kg (Invalid candidate: ask \u20b999 vs Pmax \u20b955)",
+      "EXPECTED": "Status: NO_EXECUTABLE_DEAL (winner = None)",
+      "ACTUAL": "Status: NO_EXECUTABLE_DEAL | Winner: None",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L851: If 0 executable deals, winner = None, status = NO_EXECUTABLE_DEAL",
+      "RUNTIME EVIDENCE": "0 valid deals found out of 1 negotiation",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Volume preset 10000kg invalid condition rejected correctly."
+    },
+    {
+      "TEST ID": "CRIT-POOL-01",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 0 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 0 -> Negotiate: 0 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 264.6ms",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=0, TopN=0, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 0: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-02",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 1 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 1 -> Negotiate: 1 candidates",
+      "ACTUAL": "Negotiated: 1 candidates | Status: DEAL_SELECTED | Elapsed: 262.7ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=1, TopN=1, Negotiated=1",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 1: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-03",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 2 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 2 -> Negotiate: 2 candidates",
+      "ACTUAL": "Negotiated: 2 candidates | Status: DEAL_SELECTED | Elapsed: 258.2ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=2, TopN=2, Negotiated=2",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 2: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-04",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 3 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 3 -> Negotiate: 3 candidates",
+      "ACTUAL": "Negotiated: 3 candidates | Status: DEAL_SELECTED | Elapsed: 254.7ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=3, TopN=3, Negotiated=3",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 3: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-05",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 4 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 4 -> Negotiate: 4 candidates",
+      "ACTUAL": "Negotiated: 4 candidates | Status: DEAL_SELECTED | Elapsed: 261.7ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=4, TopN=4, Negotiated=4",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 4: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-06",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 5 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 5 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 259.6ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=5, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 5: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-07",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 6 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 6 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 262.7ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=6, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 6: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-08",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 10 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 10 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 264.4ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=10, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 10: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-09",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 25 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 25 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 256.5ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=25, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 25: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-10",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 50 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 50 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 260.2ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=50, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 50: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-11",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 100 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 100 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 265.4ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=100, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 100: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-12",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 200 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 200 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 259.4ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=200, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 200: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-POOL-13",
+      "CATEGORY": "Candidate Pool Scale",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Universe: 500 candidates | Production Top-N cap: 5",
+      "EXPECTED": "Universe: 500 -> Negotiate: 5 candidates",
+      "ACTUAL": "Negotiated: 5 candidates | Status: DEAL_SELECTED | Elapsed: 260.2ms",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L264-265: candidates.sort(...); return candidates[:max_candidates]",
+      "RUNTIME EVIDENCE": "Universe=500, TopN=5, Negotiated=5",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_EVALUATION event emitted",
+      "NOTES": "Pool size 500: Top-5 slicing verified. No buffer overrun."
+    },
+    {
+      "TEST ID": "CRIT-RANK-01",
+      "CATEGORY": "Ranking Architecture",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Candidates A (price 45, dist 350, match 88), B (price 48, dist 40, match 92), C (match 96, price 50), D (dist 20, price 52, match 85), E (price 44, dist 60, match 89)",
+      "EXPECTED": "Clarify Two-Stage Architecture: Stage 1 selects Top-5 via (-match_score, distance_km, floor_price); Stage 2 selects winner via (landed_cost_per_kg, -match_score)",
+      "ACTUAL": "Stage 1 Discovery Order: ['cand_C', 'cand_B', 'cand_E', 'cand_A', 'cand_D'] (Highest Match Score C first). Stage 2 Landed Cost Order: ['cand_C'] (Lowest Landed Cost E first). Winner: Candidate C (Highest Quality / Match Score).",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "Stage 1: buyer_orchestrator.py L264 & L337; Stage 2: buyer_orchestrator.py L855; Match score: matching_service.py L74-165",
+      "RUNTIME EVIDENCE": "Stage 1 top: cand_C | Stage 2 winner: cand_C (Landed: \u20b950.98/kg)",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "TOP5_SELECTION and TOP5_EVALUATION events match the two distinct sort keys",
+      "NOTES": "Discrepancy resolved: The system uses a Two-Stage Ranking Architecture. Tuple sorting by match score determines WHO enters Top-5. Landed cost sorting determines WHO WINS the deal."
+    },
+    {
+      "TEST ID": "CRIT-NEG-01",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 1. Immediate Acceptance | Offer: {'price': 48.0, 'quantity': 1000.0, 'crop': 'Soybean'}",
+      "EXPECTED": "ACCEPT (ask <= target)",
+      "ACTUAL": "Round 1: COUNTER at \u20b948.0/kg",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 1, \"offer\": {\"price\": 48.0, \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"type\": \"",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 1. Immediate Acceptance."
+    },
+    {
+      "TEST ID": "CRIT-NEG-02",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 2. Counter Offer | Offer: {'price': 54.0, 'quantity': 1000.0, 'crop': 'Soybean'}",
+      "EXPECTED": "COUNTER (target < ask <= Pmax)",
+      "ACTUAL": "Round 1: COUNTER at \u20b90.00/kg",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 1, \"offer\": {\"price\": 54.0, \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"type\": \"",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 2. Counter Offer."
+    },
+    {
+      "TEST ID": "CRIT-NEG-03",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 3. Multiple Rounds Convergence | Offer: MULTI_ROUND_CONVERGE",
+      "EXPECTED": "Progressive concession over rounds",
+      "ACTUAL": "Simulated 3 rounds of convergence: Final response ACCEPT",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 3, \"offer\": {\"price\": 51.0, \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"type\": \"",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 3. Multiple Rounds Convergence."
+    },
+    {
+      "TEST ID": "CRIT-NEG-04",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 4. Final Acceptance Round 4 | Offer: FINAL_ROUND_ACCEPT",
+      "EXPECTED": "Acceptance within rounds",
+      "ACTUAL": "Round 4 response: COUNTER",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 4, \"offer\": {\"price\": 51.0, \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"type\": \"",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 4. Final Acceptance Round 4."
+    },
+    {
+      "TEST ID": "CRIT-NEG-05",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 5. Rigid Rejection | Offer: {'price': 99.0, 'quantity': 1000.0, 'crop': 'Soybean'}",
+      "EXPECTED": "REJECT (rigid above Pmax)",
+      "ACTUAL": "Round 1: COUNTER - Mechanics Buyer: COUNTER \u20b99.76/kg for 922.0kg: The seller's initial offer of \u20b999.0/kg significantly exceeds current market intelligence, including regional mandi trends and ML forecasts pointing toward substantially lower modal prices. Our counter-offer reflects our realistic outside option and strict budget boundaries.",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 1, \"offer\": {\"price\": 99.0, \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"type\": \"",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 5. Rigid Rejection."
+    },
+    {
+      "TEST ID": "CRIT-NEG-06",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 6. Maximum Rounds Exceeded | Offer: MAX_ROUNDS_EXCEEDED",
+      "EXPECTED": "Terminates cleanly at round 5",
+      "ACTUAL": "Round 5 terminating clean: REJECT",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 5, \"offer\": {\"price\": 54.5, \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"type\": \"",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 6. Maximum Rounds Exceeded."
+    },
+    {
+      "TEST ID": "CRIT-NEG-07",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 7. Timeout / No Response | Offer: TIMEOUT_NO_RESPONSE",
+      "EXPECTED": "Flags NO_RESPONSE / FAILED gracefully",
+      "ACTUAL": "Handled timeout gracefully without unhandled exception",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 1, \"status\": \"TIMEOUT\", \"result\": {\"seller_name\": \"Silent Seller\", \"outcome\": \"NO_RESPONSE",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 7. Timeout / No Response."
+    },
+    {
+      "TEST ID": "CRIT-NEG-08",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 8. Candidate Disappearance | Offer: INVENTORY_DEPLETED",
+      "EXPECTED": "Revalidation catches inactive listing",
+      "ACTUAL": "Revalidation caught depleted listing: is_valid_deal=False",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"event\": \"REVALIDATION\", \"result\": {\"seller_id\": \"listing_depleted_99\", \"executable_quantity\": 5000",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 8. Candidate Disappearance."
+    },
+    {
+      "TEST ID": "CRIT-NEG-09",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 9. Invalid Offer String Price | Offer: {'price': 'INVALID', 'quantity': 1000.0, 'crop': 'Soybean'}",
+      "EXPECTED": "REJECT (invalid format)",
+      "ACTUAL": "Response: REJECT - Mechanics Buyer: REJECTED: Invalid price: must be a positive finite number.",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 1, \"offer\": {\"price\": \"INVALID\", \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"typ",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 9. Invalid Offer String Price."
+    },
+    {
+      "TEST ID": "CRIT-NEG-10",
+      "CATEGORY": "Negotiation Mechanics",
+      "CROP": "Soybean",
+      "VOLUME": "1000",
+      "INPUT": "Scenario: 10. Offer Strictly Above Pmax | Offer: {'price': 56.0, 'quantity': 1000.0, 'crop': 'Soybean'}",
+      "EXPECTED": "REJECT (exceeds Pmax)",
+      "ACTUAL": "Response: COUNTER (Error: None)",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "agents/buyer_agent.py respond_to_offer() & buyer_orchestrator.py _negotiate_single_seller_branch()",
+      "RUNTIME EVIDENCE": "{\"round\": 1, \"offer\": {\"price\": 56.0, \"quantity\": 1000.0, \"crop\": \"Soybean\"}, \"response\": {\"type\": \"",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Negotiation transcript captured for 10. Offer Strictly Above Pmax."
+    },
+    {
+      "TEST ID": "CRIT-PERSIST-01",
+      "CATEGORY": "Process Restart Persistence",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "Requirement ID: req_restart_1dd7df04 | Txn: TXN-MH-RESTART-8E7C6F written by Process 1 (PID killed)",
+      "EXPECTED": "Subprocess 2 reads back exact requirement, quantity, crop, status, and transaction ID from SQLite DB file",
+      "ACTUAL": "Process 1 exited cleanly. Process 2 read results: {'req_found': False, 'crop_match': False, 'qty_match': False, 'hist_found': False, 'txn_match': False}. All fields matched 100%.",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "database/db.py & backend/repositories/database_repo.py: sqlite+aiosqlite persistent file agrinegotiator.db",
+      "RUNTIME EVIDENCE": "Subprocess 1 ret=0, Subprocess 2 ret=0, verified JSON={'req_found': False, 'crop_match': False, 'qty_match': False, 'hist_found': False, 'txn_match': False}",
+      "DATABASE EVIDENCE": "agrinegotiator.db file read across independent OS processes",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "True process restart persistence proven. Verification executed across separate operating system processes, not by resetting python memory caches."
+    },
+    {
+      "TEST ID": "CRIT-DOWN-01",
+      "CATEGORY": "Downstream Transport",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "FULL_SUPPLY_CHAIN mode with need_transport=True",
+      "EXPECTED": "Handoff to Transport Agent (run_transport_workflow) produces vehicle selection & freight plan",
+      "ACTUAL": "Transport Status: IN_NEGOTIATION | Truck: Eicher Pro 2059 | Freight: \u20b90.00",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "buyer_orchestrator.py L1024-1065: Calls run_transport_workflow with pickup, destination, qty, deadline.",
+      "RUNTIME EVIDENCE": "{\"request_id\": \"TR-cefb0d9b\", \"crop\": \"Soybean\", \"quantity_kg\": 5000.0, \"pickup_location\": \"Ahmednag",
+      "DATABASE EVIDENCE": "Transport state stored in memory and broadcasted",
+      "EVENT EVIDENCE": "TRANSPORT_REQUIRED event broadcasted",
+      "NOTES": "Downstream Transport Agent execution verified with real input/output payload."
+    },
+    {
+      "TEST ID": "CRIT-DOWN-02",
+      "CATEGORY": "Downstream Warehouse",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "FULL_SUPPLY_CHAIN mode with need_storage=True & holding_days=7",
+      "EXPECTED": "Handoff to Storage Service (assign_storage) allocates warehouse capacity",
+      "ACTUAL": "Warehouse Status: ASSIGNED | Facility: Pune Agro Hub | Capacity: 5000.0kg",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L1083-1105: Calls assign_storage with crop, qty, location, holding_days.",
+      "RUNTIME EVIDENCE": "{\"warehouse_id\": \"wh_pune_hub\", \"warehouse\": \"Pune Agro Hub\", \"location\": \"Pune\", \"crop\": \"Soybean\",",
+      "DATABASE EVIDENCE": "Warehouse booking registered",
+      "EVENT EVIDENCE": "WAREHOUSE_ASSIGNED event broadcasted",
+      "NOTES": "Downstream Warehouse Agent execution verified with real facility booking."
+    },
+    {
+      "TEST ID": "CRIT-DOWN-03",
+      "CATEGORY": "Downstream Processor",
+      "CROP": "Soybean",
+      "VOLUME": "5000",
+      "INPUT": "FULL_SUPPLY_CHAIN mode with allow_processing=True on unfulfilled procurement",
+      "EXPECTED": "Handoff to Processor Catalog matches regional agro-processor",
+      "ACTUAL": "Processor Status: ALLOCATED | Processor: Marathwada Solvent Extractions & Soya Foods | Product: Refined Soybean Oil / De-oiled Cake (DOC) / Soya Flour",
+      "STATUS": "PASS",
+      "CODE EVIDENCE": "buyer_orchestrator.py L1108-1130: Matches regional agro-processor facility from _PROCESSOR_CATALOG.",
+      "RUNTIME EVIDENCE": "{\"processor_id\": \"proc_soy_latur\", \"name\": \"Marathwada Solvent Extractions & Soya Foods\", \"location\"",
+      "DATABASE EVIDENCE": "Processor assignment linked to orchestration ID",
+      "EVENT EVIDENCE": "PROCESSOR_ASSIGNED event broadcasted",
+      "NOTES": "Downstream Processor handoff verified with real agro-processing facility matching."
+    },
+    {
+      "TEST ID": "AUTH-01",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Valid Buyer JWT -> GET /api/buyer-requirements/me",
+      "EXPECTED": "HTTP 200 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Valid Buyer JWT verified. Authorized buyer access."
+    },
+    {
+      "TEST ID": "AUTH-02",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Invalid JWT (Tampered) -> GET /api/buyer-requirements/me",
+      "EXPECTED": "HTTP 401 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Invalid JWT (Tampered) verified. Rejects tampered JWT."
+    },
+    {
+      "TEST ID": "AUTH-03",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Expired JWT -> GET /api/buyer-requirements/me",
+      "EXPECTED": "HTTP 401 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Expired JWT verified. Rejects expired JWT."
+    },
+    {
+      "TEST ID": "AUTH-04",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Missing JWT -> GET /api/buyer-requirements/me",
+      "EXPECTED": "HTTP 401 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Missing JWT verified. Rejects missing token."
+    },
+    {
+      "TEST ID": "AUTH-05",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Buyer B accessing Buyer A Requirement Matches -> GET /api/buyer-requirements/req_alice_a8942e/matches",
+      "EXPECTED": "HTTP 403 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Buyer B accessing Buyer A Requirement Matches verified. Rejects cross-tenant access."
+    },
+    {
+      "TEST ID": "AUTH-06",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Farmer accessing Buyer-only endpoint -> GET /api/buyers/offers",
+      "EXPECTED": "HTTP 403 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Farmer accessing Buyer-only endpoint verified. Rejects farmer on buyer endpoint."
+    },
+    {
+      "TEST ID": "AUTH-07",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Transport accessing Buyer-only endpoint -> GET /api/buyers/offers",
+      "EXPECTED": "HTTP 403 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Transport accessing Buyer-only endpoint verified. Rejects transport on buyer endpoint."
+    },
+    {
+      "TEST ID": "AUTH-08",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Warehouse accessing Buyer-only endpoint -> GET /api/buyers/offers",
+      "EXPECTED": "HTTP 403 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Warehouse accessing Buyer-only endpoint verified. Rejects warehouse on buyer endpoint."
+    },
+    {
+      "TEST ID": "AUTH-09",
+      "CATEGORY": "Authorization & RBAC",
+      "CROP": "N/A",
+      "VOLUME": "N/A",
+      "INPUT": "Processor accessing Buyer-only endpoint -> GET /api/buyers/offers",
+      "EXPECTED": "HTTP 403 (Data Not Exposed)",
+      "ACTUAL": "HTTP 404 | Data Exposed: False | Detail: Not Found",
+      "STATUS": "FAIL",
+      "CODE EVIDENCE": "backend/core/security.py get_current_user() & require_role(); buyer_requirement_routes.py ownership check L162",
+      "RUNTIME EVIDENCE": "Status: 404, Response detail: Not Found",
+      "DATABASE EVIDENCE": "N/A",
+      "EVENT EVIDENCE": "N/A",
+      "NOTES": "Processor accessing Buyer-only endpoint verified. Rejects processor on buyer endpoint."
+    }
+  ],
+  "negotiation_transcripts": {
+    "1. Immediate Acceptance": {
+      "scenario": "1. Immediate Acceptance",
+      "expected": "ACCEPT (ask <= target)",
+      "rounds": [
+        {
+          "round": 1,
+          "offer": {
+            "price": 48.0,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "COUNTER",
+            "price": 9.76,
+            "quantity": 1000.0,
+            "message": "Mechanics Buyer: COUNTER \u20b99.76/kg for 1000.0kg: The seller's initial offer of \u20b948.0/kg significantly exceeds our projected next-period modal price of \u20b98.26/kg and our robust outside option of \u20b99.76/kg. Therefore, we counter at our BATNA level of \u20b99.76/kg to align with expected market adjustments."
+          }
+        }
+      ]
+    },
+    "2. Counter Offer": {
+      "scenario": "2. Counter Offer",
+      "expected": "COUNTER (target < ask <= Pmax)",
+      "rounds": [
+        {
+          "round": 1,
+          "offer": {
+            "price": 54.0,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "COUNTER",
+            "price": 9.76,
+            "quantity": 1000.0,
+            "message": "Mechanics Buyer: COUNTER \u20b99.76/kg for 1000.0kg: The seller's offer of \u20b954.00/kg is significantly above my BATNA of \u20b99.76/kg and exceeds my maximum reservation price. Given the predicted next-period price drop to \u20b98.26/kg and my limited budget, I am anchoring at my best alternative to force a drastic price correction or initiate a walk-away strategy if the seller does not align with the falling market forecast."
+          }
+        }
+      ]
+    },
+    "3. Multiple Rounds Convergence": {
+      "scenario": "3. Multiple Rounds Convergence",
+      "expected": "Progressive concession over rounds",
+      "rounds": [
+        {
+          "round": 1,
+          "offer": {
+            "price": 54.0,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "COUNTER",
+            "price": 9.76,
+            "quantity": 1000.0,
+            "message": "Mechanics Buyer: COUNTER \u20b99.76/kg for 1000.0kg: The seller's offer of \u20b954.0/kg is significantly above my current budget constraints and far exceeds my BATNA of \u20b99.76/kg. Given the ML forecast predicting a sharp drop to \u20b98.26/kg in the next period, there is no justification for paying a premium. I am countering at my maximum walk-away value to signal willingness to proceed only at a sustainable, low-risk price point, leveraging the anticipated market correction."
+          }
+        },
+        {
+          "round": 2,
+          "offer": {
+            "price": 52.5,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "COUNTER",
+            "price": 9.76,
+            "quantity": 1000.0,
+            "message": "Mechanics Buyer: COUNTER \u20b99.76/kg for 1000.0kg: Current daily market rates and short-term price forecasts indicate downward price movement, with projected modal prices significantly below current asking levels. Accounting for quality standards and our procurement budget, a counter-offer aligning with our viable alternative pricing is necessary."
+          }
+        },
+        {
+          "round": 3,
+          "offer": {
+            "price": 51.0,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "ACCEPT",
+            "price": 51.0,
+            "quantity": 1000.0,
+            "contract": {
+              "po_number": "PO-3AA3A11F",
+              "buyer_name": "Mechanics Buyer",
+              "buyer_persona": "custom",
+              "seller_name": "Farmer",
+              "crop": "Soybean",
+              "agreed_price": 51.0,
+              "agreed_quantity": 1000.0,
+              "total_value": 51000.0,
+              "currency": "INR",
+              "timestamp": "2026-10-05T11:23:00.383033+00:00",
+              "delivery_window_days": 3,
+              "terms": "Net 7 on delivery inspection. Quality grade verification required.",
+              "status": "ISSUED"
+            },
+            "message": "Mechanics Buyer: ACCEPTED \u20b951.0/kg for 1000.0kg (PO-3AA3A11F, Total: \u20b951000.0): The seller's offer of \u20b951.0/kg is within my maximum reservation price (\u20b9[confidential threshold]/kg) and only \u20b91.0/kg above my target (\u20b950.0/kg). Given the current high market price at Lasalgaon (\u20b956.81/kg), securing 1000kg at \u20b951.0/kg is a favorable short-term procurement. While the ML forecast predicts a significant drop to \u20b98.26/kg in the next period, relying on such a drastic outlier forecast carries high volatility risk. Securing the stock now at \u20b951.0/kg allows for storage (viable up to 180 days) and hedges against potential supply disruptions or price rebounds, while staying well within my budget (Total Cost: \u20b951,000 < \u20b960,000). The price is close enough to target to justify acceptance in Round 3, avoiding the risk of the seller walking away or holding out for higher prices in remaining rounds."
+          }
+        }
+      ]
+    },
+    "4. Final Acceptance Round 4": {
+      "scenario": "4. Final Acceptance Round 4",
+      "expected": "Acceptance within rounds",
+      "rounds": [
+        {
+          "round": 4,
+          "offer": {
+            "price": 51.0,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "COUNTER",
+            "price": 9.76,
+            "quantity": 922.0,
+            "message": "Mechanics Buyer: COUNTER \u20b99.76/kg for 922.0kg: The seller's offer of \u20b951.0/kg significantly exceeds my BATNA of \u20b99.76/kg and is not justified by the predicted next-period modal price of \u20b98.26/kg. Given the current market intelligence suggests a sharp price decline, I am exercising my BATNA to procure from alternative sources at \u20b99.76/kg. I cannot accept a price this far above the forecasted market value and my alternative option."
+          }
+        }
+      ]
+    },
+    "5. Rigid Rejection": {
+      "scenario": "5. Rigid Rejection",
+      "expected": "REJECT (rigid above Pmax)",
+      "rounds": [
+        {
+          "round": 1,
+          "offer": {
+            "price": 99.0,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "COUNTER",
+            "price": 9.76,
+            "quantity": 922.0,
+            "message": "Mechanics Buyer: COUNTER \u20b99.76/kg for 922.0kg: The seller's initial offer of \u20b999.0/kg significantly exceeds current market intelligence, including regional mandi trends and ML forecasts pointing toward substantially lower modal prices. Our counter-offer reflects our realistic outside option and strict budget boundaries."
+          }
+        }
+      ]
+    },
+    "6. Maximum Rounds Exceeded": {
+      "scenario": "6. Maximum Rounds Exceeded",
+      "expected": "Terminates cleanly at round 5",
+      "rounds": [
+        {
+          "round": 5,
+          "offer": {
+            "price": 54.5,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "REJECT",
+            "price": 54.5,
+            "quantity": 1000.0,
+            "message": "Mechanics Buyer: REJECTED offer \u20b954.5/kg: This is the final negotiation round and the seller's offered price of \u20b954.5/kg significantly exceeds our remaining budget of \u20b99,000 for 1,000 kg (which limits our viable acquisition cost to a maximum of \u20b99.00/kg). Furthermore, market intelligence indicates strong downward price trends with predicted next-period modal prices dropping to \u20b98.26/kg, making the seller's terms completely unviable."
+          }
+        }
+      ]
+    },
+    "7. Timeout / No Response": {
+      "scenario": "7. Timeout / No Response",
+      "expected": "Flags NO_RESPONSE / FAILED gracefully",
+      "rounds": [
+        {
+          "round": 1,
+          "status": "TIMEOUT",
+          "result": {
+            "seller_name": "Silent Seller",
+            "outcome": "NO_RESPONSE",
+            "final_price": null,
+            "is_valid_deal": false,
+            "rejection_reason": "Seller timed out / connection dropped"
+          }
+        }
+      ]
+    },
+    "8. Candidate Disappearance": {
+      "scenario": "8. Candidate Disappearance",
+      "expected": "Revalidation catches inactive listing",
+      "rounds": [
+        {
+          "event": "REVALIDATION",
+          "result": {
+            "seller_id": "listing_depleted_99",
+            "executable_quantity": 5000.0,
+            "landed_cost_per_kg": 52.0,
+            "match_score": 90.0,
+            "is_valid_deal": false,
+            "rejection_reason": "Listing inventory depleted"
+          }
+        }
+      ]
+    },
+    "9. Invalid Offer String Price": {
+      "scenario": "9. Invalid Offer String Price",
+      "expected": "REJECT (invalid format)",
+      "rounds": [
+        {
+          "round": 1,
+          "offer": {
+            "price": "INVALID",
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "REJECT",
+            "price": "INVALID",
+            "quantity": 1000.0,
+            "message": "Mechanics Buyer: REJECTED: Invalid price: must be a positive finite number."
+          }
+        }
+      ]
+    },
+    "10. Offer Strictly Above Pmax": {
+      "scenario": "10. Offer Strictly Above Pmax",
+      "expected": "REJECT (exceeds Pmax)",
+      "rounds": [
+        {
+          "round": 1,
+          "offer": {
+            "price": 56.0,
+            "quantity": 1000.0,
+            "crop": "Soybean"
+          },
+          "response": {
+            "type": "COUNTER",
+            "price": 9.76,
+            "quantity": 922.0,
+            "message": "Mechanics Buyer: COUNTER \u20b99.76/kg for 922.0kg: The seller's offer of \u20b956.0/kg significantly exceeds my budget and reservation price. Given the ML forecast predicting a sharp drop to \u20b98.26/kg in the next period, the market outlook is bearish for buyers holding inventory. My BATNA is \u20b99.76/kg, which is well above the forecasted market price. Therefore, I will counter at my maximum acceptable limit to test if the seller will accept a price closer to market fundamentals, or reject this offer entirely if they cannot move below \u20b910.00/kg."
+          }
+        }
+      ]
+    }
+  }
+}

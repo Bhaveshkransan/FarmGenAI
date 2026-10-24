@@ -1,0 +1,868 @@
+{
+  "audit_metadata": {
+    "timestamp": "2026-10-20T07:53:27Z",
+    "base_url": "http://127.0.0.1:8000",
+    "database_target": "PostgreSQL (localhost:5433/agrinegotiator)"
+  },
+  "phase_results": {
+    "phase_0_runtime": {
+      "health_status": {
+        "status": "healthy",
+        "database": "up",
+        "redis": "up"
+      },
+      "database_engine_verified": "PostgreSQL 16",
+      "tables_in_db": 31,
+      "tables": [
+        "buyers",
+        "users",
+        "farmers",
+        "produce",
+        "negotiations",
+        "offers",
+        "contracts",
+        "history",
+        "v1_users",
+        "auth_logs",
+        "workflow_plans",
+        "msp_prices",
+        "market_mappings",
+        "crop_quality_references",
+        "alembic_version",
+        "warehouses",
+        "transporters",
+        "transport_bookings",
+        "trust_scores",
+        "seasonal_calendar",
+        "processors",
+        "compost_plants",
+        "transport_providers",
+        "vehicles",
+        "transport_requests",
+        "fuel_prices",
+        "toll_rates",
+        "transport_cost_parameters",
+        "transport_trips",
+        "transport_negotiations",
+        "transport_carrier_bookings"
+      ],
+      "status": "PASS"
+    },
+    "phase_3_authentication": {
+      "tests": [
+        {
+          "id": "AUTH-01-VALID-LOGIN",
+          "status_code": 200,
+          "user_role": "farmer",
+          "result": "PASS"
+        },
+        {
+          "id": "AUTH-02-INVALID-PASSWORD",
+          "status_code": 400,
+          "error_detail": "Invalid email or password",
+          "result": "PASS"
+        },
+        {
+          "id": "AUTH-03-DUPLICATE-REGISTRATION",
+          "status_code": 400,
+          "error_detail": "Email already registered",
+          "result": "PASS"
+        },
+        {
+          "id": "AUTH-04-CROSS-USER-ISOLATION",
+          "buyer_listings_count": 0,
+          "result": "PASS"
+        }
+      ]
+    },
+    "phase_4_listings": {
+      "positive_crops": {
+        "Sugarcane": {
+          "status": "PASS",
+          "api_status_code": 200,
+          "listing_id": "5f4bf3d4-452",
+          "db_persisted": true,
+          "db_record": {
+            "id": "5f4bf3d4-452",
+            "crop": "Sugarcane",
+            "quantity": 50000.0,
+            "min_price": 3.2,
+            "location": "Kolhapur"
+          }
+        },
+        "Soybean": {
+          "status": "PASS",
+          "api_status_code": 200,
+          "listing_id": "67e8df24-386",
+          "db_persisted": true,
+          "db_record": {
+            "id": "67e8df24-386",
+            "crop": "Soybean",
+            "quantity": 4000.0,
+            "min_price": 45.0,
+            "location": "Latur"
+          }
+        },
+        "Cotton": {
+          "status": "PASS",
+          "api_status_code": 200,
+          "listing_id": "5baee341-9c6",
+          "db_persisted": true,
+          "db_record": {
+            "id": "5baee341-9c6",
+            "crop": "Cotton",
+            "quantity": 2500.0,
+            "min_price": 68.0,
+            "location": "Nagpur"
+          }
+        },
+        "Jowar": {
+          "status": "PASS",
+          "api_status_code": 200,
+          "listing_id": "4269450d-a29",
+          "db_persisted": true,
+          "db_record": {
+            "id": "4269450d-a29",
+            "crop": "Jowar",
+            "quantity": 3000.0,
+            "min_price": 32.0,
+            "location": "Solapur"
+          }
+        },
+        "Onion": {
+          "status": "PASS",
+          "api_status_code": 200,
+          "listing_id": "fa8ee7a3-f31",
+          "db_persisted": true,
+          "db_record": {
+            "id": "fa8ee7a3-f31",
+            "crop": "Onion",
+            "quantity": 6000.0,
+            "min_price": 22.0,
+            "location": "Nashik"
+          }
+        },
+        "Bajra": {
+          "status": "PASS",
+          "api_status_code": 200,
+          "listing_id": "a31d3f0e-404",
+          "db_persisted": true,
+          "db_record": {
+            "id": "a31d3f0e-404",
+            "crop": "Bajra",
+            "quantity": 2000.0,
+            "min_price": 24.0,
+            "location": "Dhule"
+          }
+        },
+        "Rice": {
+          "status": "PASS",
+          "api_status_code": 200,
+          "listing_id": "d92347cd-667",
+          "db_persisted": true,
+          "db_record": {
+            "id": "d92347cd-667",
+            "crop": "Rice",
+            "quantity": 3500.0,
+            "min_price": 38.0,
+            "location": "Pune"
+          }
+        }
+      },
+      "negative_boundary_tests": [
+        {
+          "case": "Negative Quantity",
+          "status_code": 422,
+          "expected": [
+            400,
+            422
+          ],
+          "result": "PASS",
+          "detail": "{\"detail\":[{\"type\":\"greater_than\",\"loc\":[\"body\",\"quantity\"],\"msg\":\"Input should be greater than 0\",\"input\":-500.0,\"ctx\":"
+        },
+        {
+          "case": "Zero Quantity",
+          "status_code": 422,
+          "expected": [
+            400,
+            422
+          ],
+          "result": "PASS",
+          "detail": "{\"detail\":[{\"type\":\"greater_than\",\"loc\":[\"body\",\"quantity\"],\"msg\":\"Input should be greater than 0\",\"input\":0.0,\"ctx\":{\"g"
+        },
+        {
+          "case": "Negative Price",
+          "status_code": 422,
+          "expected": [
+            400,
+            422
+          ],
+          "result": "PASS",
+          "detail": "{\"detail\":[{\"type\":\"greater_than\",\"loc\":[\"body\",\"min_price\"],\"msg\":\"Input should be greater than 0\",\"input\":-20.0,\"ctx\":"
+        },
+        {
+          "case": "Min Price Greater Than Expected Price",
+          "status_code": 422,
+          "expected": [
+            400,
+            422
+          ],
+          "result": "PASS",
+          "detail": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"body\"],\"msg\":\"Value error, minimum price cannot be greater than expected price\""
+        },
+        {
+          "case": "Min Sale Quantity Exceeds Total",
+          "status_code": 422,
+          "expected": [
+            400,
+            422
+          ],
+          "result": "PASS",
+          "detail": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"body\"],\"msg\":\"Value error, minimum_sale_quantity cannot be greater than availab"
+        },
+        {
+          "case": "Unsupported Non-Canonical Crop (Wheat)",
+          "status_code": 422,
+          "expected": [
+            400,
+            422
+          ],
+          "result": "PASS",
+          "detail": "{\"detail\":[{\"type\":\"value_error\",\"loc\":[\"body\"],\"msg\":\"Value error, Unsupported crop: 'Wheat'. Supported crops: Sugarcan"
+        },
+        {
+          "case": "Missing Required Crop Name",
+          "status_code": 422,
+          "expected": [
+            400,
+            422
+          ],
+          "result": "PASS",
+          "detail": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"crop\"],\"msg\":\"Field required\",\"input\":{\"variety\":\"Bt\",\"grade\":\"A\",\"quantity\""
+        }
+      ],
+      "deletion_test": {
+        "deleted_listing_id": "d92347cd-667",
+        "api_status_code": 200,
+        "db_record_after": [
+          {
+            "id": "d92347cd-667",
+            "status": "EXPIRED"
+          }
+        ],
+        "result": "PASS"
+      }
+    },
+    "phase_5_market_intelligence": {
+      "mandimitra_crops": {
+        "Sugarcane": {
+          "crop": "Sugarcane",
+          "endpoint": "/api/v1/market-intelligence/compare?crop=Sugarcane",
+          "mandi_count": 14,
+          "best_mandi": "Nashik APMC",
+          "modal_price": 3.75,
+          "distance_km": 1.3,
+          "transport_deduction": null,
+          "net_realization": 1.19,
+          "is_fallback": false,
+          "provenance_verdict": "VERIFIED_APMC_DATA"
+        },
+        "Soybean": {
+          "crop": "Soybean",
+          "endpoint": "/api/v1/market-intelligence/compare?crop=Soybean",
+          "mandi_count": 14,
+          "best_mandi": "Nashik APMC",
+          "modal_price": 57.99,
+          "distance_km": 1.3,
+          "transport_deduction": null,
+          "net_realization": 55.43,
+          "is_fallback": false,
+          "provenance_verdict": "VERIFIED_APMC_DATA"
+        },
+        "Cotton": {
+          "crop": "Cotton",
+          "endpoint": "/api/v1/market-intelligence/compare?crop=Cotton",
+          "mandi_count": 14,
+          "best_mandi": "Nashik APMC",
+          "modal_price": 65.0,
+          "distance_km": 1.3,
+          "transport_deduction": null,
+          "net_realization": 62.44,
+          "is_fallback": false,
+          "provenance_verdict": "VERIFIED_APMC_DATA"
+        },
+        "Jowar": {
+          "crop": "Jowar",
+          "endpoint": "/api/v1/market-intelligence/compare?crop=Jowar",
+          "mandi_count": 2,
+          "best_mandi": "APMC Pune ",
+          "modal_price": 65.5,
+          "distance_km": 0.0,
+          "transport_deduction": null,
+          "net_realization": 63.0,
+          "is_fallback": false,
+          "provenance_verdict": "VERIFIED_APMC_DATA"
+        },
+        "Onion": {
+          "crop": "Onion",
+          "endpoint": "/api/v1/market-intelligence/compare?crop=Onion",
+          "mandi_count": 8,
+          "best_mandi": "APMC Kamthi ",
+          "modal_price": 66.5,
+          "distance_km": 0.0,
+          "transport_deduction": null,
+          "net_realization": 64.0,
+          "is_fallback": false,
+          "provenance_verdict": "VERIFIED_APMC_DATA"
+        },
+        "Bajra": {
+          "crop": "Bajra",
+          "endpoint": "/api/v1/market-intelligence/compare?crop=Bajra",
+          "mandi_count": 1,
+          "best_mandi": "APMC Pune ",
+          "modal_price": 36.5,
+          "distance_km": 0.0,
+          "transport_deduction": null,
+          "net_realization": 34.0,
+          "is_fallback": false,
+          "provenance_verdict": "VERIFIED_APMC_DATA"
+        },
+        "Rice": {
+          "crop": "Rice",
+          "endpoint": "/api/v1/market-intelligence/compare?crop=Rice",
+          "mandi_count": 1,
+          "best_mandi": "APMC Pune ",
+          "modal_price": 65.5,
+          "distance_km": 0.0,
+          "transport_deduction": null,
+          "net_realization": 63.0,
+          "is_fallback": false,
+          "provenance_verdict": "VERIFIED_APMC_DATA"
+        }
+      }
+    },
+    "phase_6_workflow_planning": {
+      "workflow_planning_endpoint": {
+        "status_code": 200,
+        "recommended_path": null,
+        "options_evaluated": [
+          "{'type': 'direct-sale', 'label': 'Direct Sale', 'net_revenue': 192000.0, 'price_per_kg': 48.0, 'viable': True, 'risk': 'Low', 'time_to_cash_days': 1, 'notes': 'Immediate sale at market price.'}",
+          "{'type': 'storage', 'label': 'Cold Storage', 'net_revenue': 151200.0, 'price_per_kg': 50.4, 'storage_cost_total': 50400.0, 'storage_days': 7, 'viable': True, 'risk': 'Medium', 'time_to_cash_days': 8, 'notes': 'Store for 7 days to wait for better prices.'}",
+          "{'type': 'processing', 'label': 'Processing / Value-Added', 'net_revenue': 149760.0, 'price_per_kg': 37.44, 'viable': True, 'risk': 'Low', 'time_to_cash_days': 2, 'notes': 'Sell to food processor for guaranteed purchase.'}",
+          "{'type': 'compost', 'label': 'Composting (Zero-Waste)', 'net_revenue': 32000.0, 'price_per_kg': 8.0, 'viable': True, 'risk': 'None', 'time_to_cash_days': 1, 'notes': 'Eco-friendly fallback recovering some value.'}"
+        ],
+        "result": "PASS"
+      },
+      "workflow_retrieval_endpoint": {
+        "status_code": 200,
+        "response": {
+          "success": true,
+          "data": []
+        },
+        "result": "PASS"
+      }
+    },
+    "phase_7_8_negotiation_e2e": {
+      "negotiation_initialization": {
+        "status_code": 200,
+        "data": {
+          "negotiation_id": "neg_c0b963ab",
+          "status": "ACTIVE",
+          "offers": [
+            {
+              "round": 1,
+              "agent": "Vidarbha Ginning & Spinning Mill",
+              "price": 68.0,
+              "decision": "OFFER"
+            }
+          ],
+          "summary": "Negotiating 2500.0kg Cotton between Ramesh Patil and Vidarbha Ginning & Spinning Mill.",
+          "crop": "Cotton",
+          "quantity": 2500.0,
+          "farmer": "Ramesh Patil"
+        },
+        "result": "PASS"
+      },
+      "floor_price_defense_test": {
+        "submitted_price": 60.0,
+        "floor_price": 68.0,
+        "status_code": 200,
+        "response": {
+          "status": "ACTIVE",
+          "final_price": null,
+          "decision": "COUNTER",
+          "buyer_offer": {
+            "round": 2,
+            "agent": "Buyer (You)",
+            "price": 60.0,
+            "decision": "COUNTER",
+            "quantity": 2500.0,
+            "message": "Offering below floor price"
+          },
+          "farmer_response": {
+            "round": 3,
+            "agent": "Ramesh Patil",
+            "price": 68.0,
+            "decision": "COUNTER",
+            "quantity": 2500.0,
+            "message": "Ramesh Patil: COUNTER \u20b968.0/kg: Offer is below minimum. Standing firm at my floor price."
+          },
+          "offers": [
+            {
+              "id": "offer_56c819ad",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 1,
+              "agent": "Vidarbha Ginning & Spinning Mill",
+              "sender": "Vidarbha Ginning & Spinning Mill",
+              "price": 68.0,
+              "quantity": 2500.0,
+              "message": "Opening procurement offer: \u20b968.0/kg for 2500.0kg"
+            },
+            {
+              "id": "offer_8e29a053",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 2,
+              "agent": "Buyer (You)",
+              "sender": "Buyer (You)",
+              "price": 60.0,
+              "quantity": 2500.0,
+              "message": "Offering below floor price"
+            },
+            {
+              "id": "offer_e753ace2",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 3,
+              "agent": "Ramesh Patil",
+              "sender": "Ramesh Patil",
+              "price": 68.0,
+              "quantity": 2500.0,
+              "message": "Ramesh Patil: COUNTER \u20b968.0/kg: Offer is below minimum. Standing firm at my floor price."
+            }
+          ]
+        },
+        "result": "PASS"
+      },
+      "valid_counter_offer": {
+        "submitted_price": 72.0,
+        "status_code": 200,
+        "response": {
+          "status": "DEAL",
+          "final_price": 72.0,
+          "decision": "ACCEPT",
+          "buyer_offer": {
+            "round": 4,
+            "agent": "Buyer (You)",
+            "price": 72.0,
+            "decision": "COUNTER",
+            "quantity": 2500.0,
+            "message": "Offering fair commercial price"
+          },
+          "farmer_response": {
+            "round": 5,
+            "agent": "Ramesh Patil",
+            "price": 72.0,
+            "decision": "ACCEPT",
+            "quantity": 2500.0,
+            "message": "Ramesh Patil: ACCEPTED \u20b972.0/kg: Price meets our target expectation."
+          },
+          "offers": [
+            {
+              "id": "offer_56c819ad",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 1,
+              "agent": "Vidarbha Ginning & Spinning Mill",
+              "sender": "Vidarbha Ginning & Spinning Mill",
+              "price": 68.0,
+              "quantity": 2500.0,
+              "message": "Opening procurement offer: \u20b968.0/kg for 2500.0kg"
+            },
+            {
+              "id": "offer_8e29a053",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 2,
+              "agent": "Buyer (You)",
+              "sender": "Buyer (You)",
+              "price": 60.0,
+              "quantity": 2500.0,
+              "message": "Offering below floor price"
+            },
+            {
+              "id": "offer_e753ace2",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 3,
+              "agent": "Ramesh Patil",
+              "sender": "Ramesh Patil",
+              "price": 68.0,
+              "quantity": 2500.0,
+              "message": "Ramesh Patil: COUNTER \u20b968.0/kg: Offer is below minimum. Standing firm at my floor price."
+            },
+            {
+              "id": "offer_e254e268",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 4,
+              "agent": "Buyer (You)",
+              "sender": "Buyer (You)",
+              "price": 72.0,
+              "quantity": 2500.0,
+              "message": "Offering fair commercial price"
+            },
+            {
+              "id": "offer_1d5aa73b",
+              "negotiation_id": "neg_c0b963ab",
+              "round": 5,
+              "agent": "Ramesh Patil",
+              "sender": "Ramesh Patil",
+              "price": 72.0,
+              "quantity": 2500.0,
+              "message": "Ramesh Patil: ACCEPTED \u20b972.0/kg: Price meets our target expectation."
+            }
+          ]
+        },
+        "result": "PASS"
+      },
+      "copilot_instruction": {
+        "status_code": 200,
+        "copilot_response": {
+          "success": true,
+          "negotiation_id": "neg_c0b963ab",
+          "crop": "Cotton",
+          "benchmark_price": 71.21,
+          "current_offer": 72.0,
+          "is_competitive": true,
+          "recommended_counter": 75.6,
+          "copilot_advice": "\ud83e\udd16 [AI Copilot Evaluation]: The current offer of \u20b972.00/kg for Cotton is competitive and near/above the statutory APMC benchmark (\u20b971.21/kg). Accepting the deal locks in profit.",
+          "reasoning": "\ud83e\udd16 [AI Copilot Evaluation]: The current offer of \u20b972.00/kg for Cotton is competitive and near/above the statutory APMC benchmark (\u20b971.21/kg). Accepting the deal locks in profit.",
+          "action": "ACCEPT"
+        },
+        "result": "PASS"
+      },
+      "apmc_contract_acceptance": {
+        "status_code": 200,
+        "transaction_id": "TXN-MH-2026-C0B963AB",
+        "contract_hash": "0xb0f24ce9d8457f5b27ffd77777dc96b873e991a8deba235c6e95be684817012d",
+        "db_record": {
+          "negotiation_id": "neg_c0b963ab",
+          "status": "DEAL",
+          "final_price": 72.0
+        },
+        "result": "PASS"
+      },
+      "payment_escrow_settlement": {
+        "status_code": 200,
+        "escrow_account": "ESC-MH-2026-C0B963AB",
+        "payment_status": "ESCROW_SETTLED",
+        "result": "PASS"
+      }
+    },
+    "phase_9_downstream": {
+      "transport_search": {
+        "status_code": 200,
+        "carriers_found": 3,
+        "result": "PASS"
+      },
+      "warehouse_search": {
+        "status_code": 200,
+        "facilities_found": 3,
+        "result": "PASS"
+      },
+      "processor_search": {
+        "status_code": 200,
+        "processors_found": 1,
+        "result": "PASS"
+      }
+    },
+    "phase_11_realtime": {
+      "websocket_connection": {
+        "result": "PASS",
+        "detail": {
+          "connected": true,
+          "ping_response": {
+            "type": "pong"
+          },
+          "sync_response": {
+            "event": "SYNC_STATE",
+            "negotiation_id": "neg_c0b963ab",
+            "data": {
+              "id": "neg_c0b963ab",
+              "negotiation_id": "neg_c0b963ab",
+              "requirement_id": null,
+              "listing_id": "5baee341-9c6",
+              "user_id": null,
+              "status": "ACTIVE",
+              "summary": "Negotiating 2500.0kg Cotton between Ramesh Patil and Vidarbha Ginning & Spinning Mill.",
+              "scenario": "direct-sale",
+              "produce_id": "5baee341-9c6",
+              "farmer_id": "farmer_db05a6dd",
+              "farmer": "Ramesh Patil",
+              "farmer_name": "Ramesh Patil",
+              "buyer": "Vidarbha Ginning & Spinning Mill",
+              "buyer_name": "Vidarbha Ginning & Spinning Mill",
+              "crop": "Cotton",
+              "quantity": 2500.0,
+              "min_price": 68.0,
+              "market_price": 70.0,
+              "target_price": 68.0,
+              "final_price": null,
+              "agents_involved": [
+                "Ramesh Patil",
+                "Vidarbha Ginning & Spinning Mill"
+              ],
+              "next_action": "Autonomous multi-round negotiation active",
+              "market_offers": [
+                {
+                  "buyer_id": "buy_vidarbha_ginning",
+                  "buyer_name": "Vidarbha Ginning & Spinning Mill",
+                  "location": "Amravati",
+                  "strategy": "\ud83d\udc51 Best Profit",
+                  "offered_price": 68.0,
+                  "offered_quantity": 2500.0,
+                  "budget": 210000.0,
+                  "target_price": 70.0,
+                  "status": "VIABLE",
+                  "score": 91.0
+                }
+              ],
+              "active_buyers": [
+                {
+                  "buyer_id": "buy_vidarbha_ginning",
+                  "buyer_name": "Vidarbha Ginning & Spinning Mill",
+                  "location": "Amravati",
+                  "strategy": "\ud83d\udc51 Best Profit",
+                  "offered_price": 68.0,
+                  "offered_quantity": 2500.0,
+                  "budget": 210000.0,
+                  "target_price": 70.0,
+                  "status": "VIABLE",
+                  "score": 91.0
+                }
+              ],
+              "selected_buyer": {
+                "buyer_id": "buy_vidarbha_ginning",
+                "buyer_name": "Vidarbha Ginning & Spinning Mill",
+                "location": "Amravati",
+                "strategy": "\ud83d\udc51 Best Profit",
+                "offered_price": 68.0,
+                "offered_quantity": 2500.0,
+                "budget": 210000.0,
+                "target_price": 70.0,
+                "status": "VIABLE",
+                "score": 91.0
+              },
+              "created_at": "2026-10-20T07:53:45.251130+00:00",
+              "transport_plan": null,
+              "workflow_mode": "FULL_SUPPLY_CHAIN",
+              "permitted_agents": [
+                "planner_agent",
+                "validator_agent",
+                "rank_responses_agent",
+                "farmer_agent",
+                "processor_agent",
+                "transport_agent",
+                "matching_agent",
+                "market_intelligence_agent",
+                "buyer_agent",
+                "warehouse_agent",
+                "dynamic_routing_agent",
+                "reflection_agent"
+              ],
+              "has_transport": false,
+              "has_storage": false,
+              "requires_processing": false,
+              "sell_hold_decision": null,
+              "offers": [
+                {
+                  "id": "offer_56c819ad",
+                  "negotiation_id": "neg_c0b963ab",
+                  "round": 1,
+                  "agent": "Vidarbha Ginning & Spinning Mill",
+                  "sender": "Vidarbha Ginning & Spinning Mill",
+                  "price": 68.0,
+                  "quantity": 2500.0,
+                  "message": "Opening procurement offer: \u20b968.0/kg for 2500.0kg"
+                },
+                {
+                  "id": "offer_8e29a053",
+                  "negotiation_id": "neg_c0b963ab",
+                  "round": 2,
+                  "agent": "Buyer (You)",
+                  "sender": "Buyer (You)",
+                  "price": 60.0,
+                  "quantity": 2500.0,
+                  "message": "Offering below floor price"
+                },
+                {
+                  "id": "offer_e753ace2",
+                  "negotiation_id": "neg_c0b963ab",
+                  "round": 3,
+                  "agent": "Ramesh Patil",
+                  "sender": "Ramesh Patil",
+                  "price": 68.0,
+                  "quantity": 2500.0,
+                  "message": "Ramesh Patil: COUNTER \u20b968.0/kg: Offer is below minimum. Standing firm at my floor price."
+                },
+                {
+                  "id": "offer_e254e268",
+                  "negotiation_id": "neg_c0b963ab",
+                  "round": 4,
+                  "agent": "Buyer (You)",
+                  "sender": "Buyer (You)",
+                  "price": 72.0,
+                  "quantity": 2500.0,
+                  "message": "Offering fair commercial price"
+                },
+                {
+                  "id": "offer_1d5aa73b",
+                  "negotiation_id": "neg_c0b963ab",
+                  "round": 5,
+                  "agent": "Ramesh Patil",
+                  "sender": "Ramesh Patil",
+                  "price": 72.0,
+                  "quantity": 2500.0,
+                  "message": "Ramesh Patil: ACCEPTED \u20b972.0/kg: Price meets our target expectation."
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "phase_12_negative": {
+      "cases": [
+        {
+          "case": "Invalid JWT Token",
+          "status_code": 401,
+          "expected": [
+            401
+          ],
+          "result": "PASS"
+        },
+        {
+          "case": "Non-existent Negotiation ID",
+          "status_code": 404,
+          "expected": [
+            404
+          ],
+          "result": "PASS"
+        },
+        {
+          "case": "Non-existent Listing ID",
+          "status_code": 404,
+          "expected": [
+            404
+          ],
+          "result": "PASS"
+        },
+        {
+          "case": "Invalid Location Coordinates",
+          "status_code": 200,
+          "expected": [
+            200,
+            400,
+            422
+          ],
+          "result": "PASS"
+        }
+      ]
+    }
+  },
+  "defects_observed": [],
+  "provenance_records": [
+    {
+      "crop": "Sugarcane",
+      "endpoint": "/api/v1/market-intelligence/compare?crop=Sugarcane",
+      "mandi_count": 14,
+      "best_mandi": "Nashik APMC",
+      "modal_price": 3.75,
+      "distance_km": 1.3,
+      "transport_deduction": null,
+      "net_realization": 1.19,
+      "is_fallback": false,
+      "provenance_verdict": "VERIFIED_APMC_DATA"
+    },
+    {
+      "crop": "Soybean",
+      "endpoint": "/api/v1/market-intelligence/compare?crop=Soybean",
+      "mandi_count": 14,
+      "best_mandi": "Nashik APMC",
+      "modal_price": 57.99,
+      "distance_km": 1.3,
+      "transport_deduction": null,
+      "net_realization": 55.43,
+      "is_fallback": false,
+      "provenance_verdict": "VERIFIED_APMC_DATA"
+    },
+    {
+      "crop": "Cotton",
+      "endpoint": "/api/v1/market-intelligence/compare?crop=Cotton",
+      "mandi_count": 14,
+      "best_mandi": "Nashik APMC",
+      "modal_price": 65.0,
+      "distance_km": 1.3,
+      "transport_deduction": null,
+      "net_realization": 62.44,
+      "is_fallback": false,
+      "provenance_verdict": "VERIFIED_APMC_DATA"
+    },
+    {
+      "crop": "Jowar",
+      "endpoint": "/api/v1/market-intelligence/compare?crop=Jowar",
+      "mandi_count": 2,
+      "best_mandi": "APMC Pune ",
+      "modal_price": 65.5,
+      "distance_km": 0.0,
+      "transport_deduction": null,
+      "net_realization": 63.0,
+      "is_fallback": false,
+      "provenance_verdict": "VERIFIED_APMC_DATA"
+    },
+    {
+      "crop": "Onion",
+      "endpoint": "/api/v1/market-intelligence/compare?crop=Onion",
+      "mandi_count": 8,
+      "best_mandi": "APMC Kamthi ",
+      "modal_price": 66.5,
+      "distance_km": 0.0,
+      "transport_deduction": null,
+      "net_realization": 64.0,
+      "is_fallback": false,
+      "provenance_verdict": "VERIFIED_APMC_DATA"
+    },
+    {
+      "crop": "Bajra",
+      "endpoint": "/api/v1/market-intelligence/compare?crop=Bajra",
+      "mandi_count": 1,
+      "best_mandi": "APMC Pune ",
+      "modal_price": 36.5,
+      "distance_km": 0.0,
+      "transport_deduction": null,
+      "net_realization": 34.0,
+      "is_fallback": false,
+      "provenance_verdict": "VERIFIED_APMC_DATA"
+    },
+    {
+      "crop": "Rice",
+      "endpoint": "/api/v1/market-intelligence/compare?crop=Rice",
+      "mandi_count": 1,
+      "best_mandi": "APMC Pune ",
+      "modal_price": 65.5,
+      "distance_km": 0.0,
+      "transport_deduction": null,
+      "net_realization": 63.0,
+      "is_fallback": false,
+      "provenance_verdict": "VERIFIED_APMC_DATA"
+    }
+  ],
+  "e2e_journey_traces": [
+    {
+      "journey_name": "Farmer Cotton Complete Deal Journey",
+      "listing_id": "5baee341-9c6",
+      "negotiation_id": "neg_c0b963ab",
+      "agreed_price": 72.0,
+      "quantity": 2500.0,
+      "transaction_id": "TXN-MH-2026-C0B963AB",
+      "contract_hash": "0xb0f24ce9d8457f5b27ffd77777dc96b873e991a8deba235c6e95be684817012d",
+      "payment_status": "ESCROW_SETTLED",
+      "db_status": "DEAL"
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+farmer_id,farmer_name,farmer_type,crop,primary_district,village_city,taluka,state,latitude,longitude,location_id,distance_from_buyer_hub_km,distance_band,supply_profile,supply_ratio_to_request,supply_profile_description,quality_baseline,moisture_baseline_pct,active
+F0001,Aarav Patil,Synthetic Test Farmer,Sugarcane,Raigad,Karjat,Karjat,Maharashtra,18.9106,73.3236,L003,33.8,NEAR_0_50,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0002,Vikram Jadhav,Synthetic Test Farmer,Sugarcane,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0003,Suresh Shinde,Synthetic Test Farmer,Sugarcane,Raigad,Karjat,Karjat,Maharashtra,18.9106,73.3236,L003,33.8,NEAR_0_50,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0004,Mahesh Pawar,Synthetic Test Farmer,Sugarcane,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0005,Ganesh More,Synthetic Test Farmer,Sugarcane,Pune,Talegaon,Maval,Maharashtra,18.735,73.675,L007,75.5,MID_51_100,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0006,Prakash Gaikwad,Synthetic Test Farmer,Sugarcane,Thane,Kalyan,Kalyan,Maharashtra,19.2437,73.1355,L008,25.9,MID_51_100,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0007,Ramesh Deshmukh,Synthetic Test Farmer,Sugarcane,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0008,Nitin Chavan,Synthetic Test Farmer,Sugarcane,Nashik,Igatpuri,Igatpuri,Maharashtra,19.6959,73.5622,L006,92.5,MID_51_100,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0009,Sachin Bhosale,Synthetic Test Farmer,Sugarcane,Satara,Satara,Satara,Maharashtra,17.6805,74.0183,L011,183.0,REGIONAL_101_200,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0010,Rohit Kadam,Synthetic Test Farmer,Sugarcane,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0011,Aarav Patil,Synthetic Test Farmer,Sugarcane,Satara,Satara,Satara,Maharashtra,17.6805,74.0183,L011,183.0,REGIONAL_101_200,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0012,Vikram Jadhav,Synthetic Test Farmer,Sugarcane,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0013,Suresh Shinde,Synthetic Test Farmer,Sugarcane,Sangli,Sangli,Miraj,Maharashtra,16.8524,74.5815,L014,292.8,FAR_201_350,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0014,Mahesh Pawar,Synthetic Test Farmer,Sugarcane,Kolhapur,Kolhapur,Karveer,Maharashtra,16.705,74.2433,L015,289.0,FAR_201_350,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0015,Ganesh More,Synthetic Test Farmer,Sugarcane,Solapur,Solapur,Solapur North,Maharashtra,17.6599,75.9064,L013,339.8,FAR_201_350,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0016,Prakash Gaikwad,Synthetic Test Farmer,Sugarcane,Sangli,Sangli,Miraj,Maharashtra,16.8524,74.5815,L014,292.8,FAR_201_350,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0017,Ramesh Deshmukh,Synthetic Test Farmer,Sugarcane,Yavatmal,Yavatmal,Yavatmal,Maharashtra,20.3888,78.1204,L025,553.8,VERY_FAR_351_PLUS,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0018,Nitin Chavan,Synthetic Test Farmer,Sugarcane,Washim,Washim,Washim,Maharashtra,20.1118,77.131,L026,446.1,VERY_FAR_351_PLUS,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0019,Sachin Bhosale,Synthetic Test Farmer,Sugarcane,Nagpur,Nagpur,Nagpur Rural,Maharashtra,21.1458,79.0882,L027,674.8,VERY_FAR_351_PLUS,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0020,Rohit Kadam,Synthetic Test Farmer,Sugarcane,Latur,Latur,Latur,Maharashtra,18.4088,76.5604,L020,378.2,VERY_FAR_351_PLUS,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0021,Aarav Patil,Synthetic Test Farmer,Soybean,Raigad,Uran,Uran,Maharashtra,18.8781,72.9392,L002,19.7,NEAR_0_50,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0022,Vikram Jadhav,Synthetic Test Farmer,Soybean,Raigad,Karjat,Karjat,Maharashtra,18.9106,73.3236,L003,33.8,NEAR_0_50,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0023,Suresh Shinde,Synthetic Test Farmer,Soybean,Raigad,Alibag,Alibag,Maharashtra,18.6411,72.8722,L004,46.6,NEAR_0_50,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0024,Mahesh Pawar,Synthetic Test Farmer,Soybean,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0025,Ganesh More,Synthetic Test Farmer,Soybean,Pune,Talegaon,Maval,Maharashtra,18.735,73.675,L007,75.5,MID_51_100,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0026,Prakash Gaikwad,Synthetic Test Farmer,Soybean,Thane,Kalyan,Kalyan,Maharashtra,19.2437,73.1355,L008,25.9,MID_51_100,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0027,Ramesh Deshmukh,Synthetic Test Farmer,Soybean,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0028,Nitin Chavan,Synthetic Test Farmer,Soybean,Nashik,Igatpuri,Igatpuri,Maharashtra,19.6959,73.5622,L006,92.5,MID_51_100,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0029,Sachin Bhosale,Synthetic Test Farmer,Soybean,Ahmednagar,Ahmednagar,Ahmednagar,Maharashtra,19.0952,74.7496,L012,180.9,REGIONAL_101_200,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0030,Rohit Kadam,Synthetic Test Farmer,Soybean,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0031,Aarav Patil,Synthetic Test Farmer,Soybean,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0032,Vikram Jadhav,Synthetic Test Farmer,Soybean,Satara,Satara,Satara,Maharashtra,17.6805,74.0183,L011,183.0,REGIONAL_101_200,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0033,Suresh Shinde,Synthetic Test Farmer,Soybean,Sangli,Sangli,Miraj,Maharashtra,16.8524,74.5815,L014,292.8,FAR_201_350,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0034,Mahesh Pawar,Synthetic Test Farmer,Soybean,Kolhapur,Kolhapur,Karveer,Maharashtra,16.705,74.2433,L015,289.0,FAR_201_350,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0035,Ganesh More,Synthetic Test Farmer,Soybean,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0036,Prakash Gaikwad,Synthetic Test Farmer,Soybean,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0037,Ramesh Deshmukh,Synthetic Test Farmer,Soybean,Akola,Akola,Akola,Maharashtra,20.7002,77.0082,L023,455.5,VERY_FAR_351_PLUS,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0038,Nitin Chavan,Synthetic Test Farmer,Soybean,Amravati,Amravati,Amravati,Maharashtra,20.9374,77.7796,L024,539.6,VERY_FAR_351_PLUS,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0039,Sachin Bhosale,Synthetic Test Farmer,Soybean,Yavatmal,Yavatmal,Yavatmal,Maharashtra,20.3888,78.1204,L025,553.8,VERY_FAR_351_PLUS,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0040,Rohit Kadam,Synthetic Test Farmer,Soybean,Washim,Washim,Washim,Maharashtra,20.1118,77.131,L026,446.1,VERY_FAR_351_PLUS,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0041,Aarav Patil,Synthetic Test Farmer,Cotton,Raigad,Uran,Uran,Maharashtra,18.8781,72.9392,L002,19.7,NEAR_0_50,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0042,Vikram Jadhav,Synthetic Test Farmer,Cotton,Raigad,Karjat,Karjat,Maharashtra,18.9106,73.3236,L003,33.8,NEAR_0_50,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0043,Suresh Shinde,Synthetic Test Farmer,Cotton,Raigad,Alibag,Alibag,Maharashtra,18.6411,72.8722,L004,46.6,NEAR_0_50,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0044,Mahesh Pawar,Synthetic Test Farmer,Cotton,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0045,Ganesh More,Synthetic Test Farmer,Cotton,Pune,Talegaon,Maval,Maharashtra,18.735,73.675,L007,75.5,MID_51_100,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0046,Prakash Gaikwad,Synthetic Test Farmer,Cotton,Thane,Kalyan,Kalyan,Maharashtra,19.2437,73.1355,L008,25.9,MID_51_100,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0047,Ramesh Deshmukh,Synthetic Test Farmer,Cotton,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0048,Nitin Chavan,Synthetic Test Farmer,Cotton,Nashik,Igatpuri,Igatpuri,Maharashtra,19.6959,73.5622,L006,92.5,MID_51_100,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0049,Sachin Bhosale,Synthetic Test Farmer,Cotton,Ahmednagar,Ahmednagar,Ahmednagar,Maharashtra,19.0952,74.7496,L012,180.9,REGIONAL_101_200,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0050,Rohit Kadam,Synthetic Test Farmer,Cotton,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0051,Aarav Patil,Synthetic Test Farmer,Cotton,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0052,Vikram Jadhav,Synthetic Test Farmer,Cotton,Satara,Satara,Satara,Maharashtra,17.6805,74.0183,L011,183.0,REGIONAL_101_200,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0053,Suresh Shinde,Synthetic Test Farmer,Cotton,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0054,Mahesh Pawar,Synthetic Test Farmer,Cotton,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0055,Ganesh More,Synthetic Test Farmer,Cotton,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0056,Prakash Gaikwad,Synthetic Test Farmer,Cotton,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0057,Ramesh Deshmukh,Synthetic Test Farmer,Cotton,Amravati,Amravati,Amravati,Maharashtra,20.9374,77.7796,L024,539.6,VERY_FAR_351_PLUS,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0058,Nitin Chavan,Synthetic Test Farmer,Cotton,Yavatmal,Yavatmal,Yavatmal,Maharashtra,20.3888,78.1204,L025,553.8,VERY_FAR_351_PLUS,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0059,Sachin Bhosale,Synthetic Test Farmer,Cotton,Nagpur,Nagpur,Nagpur Rural,Maharashtra,21.1458,79.0882,L027,674.8,VERY_FAR_351_PLUS,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0060,Rohit Kadam,Synthetic Test Farmer,Cotton,Akola,Akola,Akola,Maharashtra,20.7002,77.0082,L023,455.5,VERY_FAR_351_PLUS,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0061,Aarav Patil,Synthetic Test Farmer,Jowar,Raigad,Uran,Uran,Maharashtra,18.8781,72.9392,L002,19.7,NEAR_0_50,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0062,Vikram Jadhav,Synthetic Test Farmer,Jowar,Raigad,Karjat,Karjat,Maharashtra,18.9106,73.3236,L003,33.8,NEAR_0_50,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0063,Suresh Shinde,Synthetic Test Farmer,Jowar,Raigad,Alibag,Alibag,Maharashtra,18.6411,72.8722,L004,46.6,NEAR_0_50,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0064,Mahesh Pawar,Synthetic Test Farmer,Jowar,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0065,Ganesh More,Synthetic Test Farmer,Jowar,Pune,Talegaon,Maval,Maharashtra,18.735,73.675,L007,75.5,MID_51_100,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0066,Prakash Gaikwad,Synthetic Test Farmer,Jowar,Thane,Kalyan,Kalyan,Maharashtra,19.2437,73.1355,L008,25.9,MID_51_100,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0067,Ramesh Deshmukh,Synthetic Test Farmer,Jowar,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0068,Nitin Chavan,Synthetic Test Farmer,Jowar,Nashik,Igatpuri,Igatpuri,Maharashtra,19.6959,73.5622,L006,92.5,MID_51_100,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0069,Sachin Bhosale,Synthetic Test Farmer,Jowar,Ahmednagar,Ahmednagar,Ahmednagar,Maharashtra,19.0952,74.7496,L012,180.9,REGIONAL_101_200,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0070,Rohit Kadam,Synthetic Test Farmer,Jowar,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0071,Aarav Patil,Synthetic Test Farmer,Jowar,Satara,Satara,Satara,Maharashtra,17.6805,74.0183,L011,183.0,REGIONAL_101_200,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0072,Vikram Jadhav,Synthetic Test Farmer,Jowar,Ahmednagar,Ahmednagar,Ahmednagar,Maharashtra,19.0952,74.7496,L012,180.9,REGIONAL_101_200,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0073,Suresh Shinde,Synthetic Test Farmer,Jowar,Solapur,Solapur,Solapur North,Maharashtra,17.6599,75.9064,L013,339.8,FAR_201_350,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0074,Mahesh Pawar,Synthetic Test Farmer,Jowar,Beed,Beed,Beed,Maharashtra,18.9891,75.7601,L018,287.1,FAR_201_350,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0075,Ganesh More,Synthetic Test Farmer,Jowar,Solapur,Solapur,Solapur North,Maharashtra,17.6599,75.9064,L013,339.8,FAR_201_350,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0076,Prakash Gaikwad,Synthetic Test Farmer,Jowar,Beed,Beed,Beed,Maharashtra,18.9891,75.7601,L018,287.1,FAR_201_350,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0077,Ramesh Deshmukh,Synthetic Test Farmer,Jowar,Nanded,Nanded,Nanded,Maharashtra,19.1383,77.321,L021,451.1,VERY_FAR_351_PLUS,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0078,Nitin Chavan,Synthetic Test Farmer,Jowar,Parbhani,Parbhani,Parbhani,Maharashtra,19.2608,76.7767,L022,394.4,VERY_FAR_351_PLUS,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0079,Sachin Bhosale,Synthetic Test Farmer,Jowar,Akola,Akola,Akola,Maharashtra,20.7002,77.0082,L023,455.5,VERY_FAR_351_PLUS,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0080,Rohit Kadam,Synthetic Test Farmer,Jowar,Amravati,Amravati,Amravati,Maharashtra,20.9374,77.7796,L024,539.6,VERY_FAR_351_PLUS,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0081,Aarav Patil,Synthetic Test Farmer,Onion,Raigad,Uran,Uran,Maharashtra,18.8781,72.9392,L002,19.7,NEAR_0_50,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0082,Vikram Jadhav,Synthetic Test Farmer,Onion,Raigad,Karjat,Karjat,Maharashtra,18.9106,73.3236,L003,33.8,NEAR_0_50,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0083,Suresh Shinde,Synthetic Test Farmer,Onion,Raigad,Alibag,Alibag,Maharashtra,18.6411,72.8722,L004,46.6,NEAR_0_50,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0084,Mahesh Pawar,Synthetic Test Farmer,Onion,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0085,Ganesh More,Synthetic Test Farmer,Onion,Pune,Talegaon,Maval,Maharashtra,18.735,73.675,L007,75.5,MID_51_100,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0086,Prakash Gaikwad,Synthetic Test Farmer,Onion,Thane,Kalyan,Kalyan,Maharashtra,19.2437,73.1355,L008,25.9,MID_51_100,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0087,Ramesh Deshmukh,Synthetic Test Farmer,Onion,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0088,Nitin Chavan,Synthetic Test Farmer,Onion,Nashik,Igatpuri,Igatpuri,Maharashtra,19.6959,73.5622,L006,92.5,MID_51_100,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0089,Sachin Bhosale,Synthetic Test Farmer,Onion,Ahmednagar,Ahmednagar,Ahmednagar,Maharashtra,19.0952,74.7496,L012,180.9,REGIONAL_101_200,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0090,Rohit Kadam,Synthetic Test Farmer,Onion,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0091,Aarav Patil,Synthetic Test Farmer,Onion,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0092,Vikram Jadhav,Synthetic Test Farmer,Onion,Satara,Satara,Satara,Maharashtra,17.6805,74.0183,L011,183.0,REGIONAL_101_200,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0093,Suresh Shinde,Synthetic Test Farmer,Onion,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0094,Mahesh Pawar,Synthetic Test Farmer,Onion,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0095,Ganesh More,Synthetic Test Farmer,Onion,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0096,Prakash Gaikwad,Synthetic Test Farmer,Onion,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0097,Ramesh Deshmukh,Synthetic Test Farmer,Onion,Yavatmal,Yavatmal,Yavatmal,Maharashtra,20.3888,78.1204,L025,553.8,VERY_FAR_351_PLUS,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0098,Nitin Chavan,Synthetic Test Farmer,Onion,Washim,Washim,Washim,Maharashtra,20.1118,77.131,L026,446.1,VERY_FAR_351_PLUS,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0099,Sachin Bhosale,Synthetic Test Farmer,Onion,Nagpur,Nagpur,Nagpur Rural,Maharashtra,21.1458,79.0882,L027,674.8,VERY_FAR_351_PLUS,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0100,Rohit Kadam,Synthetic Test Farmer,Onion,Latur,Latur,Latur,Maharashtra,18.4088,76.5604,L020,378.2,VERY_FAR_351_PLUS,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0101,Aarav Patil,Synthetic Test Farmer,Bajra,Raigad,Uran,Uran,Maharashtra,18.8781,72.9392,L002,19.7,NEAR_0_50,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0102,Vikram Jadhav,Synthetic Test Farmer,Bajra,Raigad,Karjat,Karjat,Maharashtra,18.9106,73.3236,L003,33.8,NEAR_0_50,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0103,Suresh Shinde,Synthetic Test Farmer,Bajra,Raigad,Alibag,Alibag,Maharashtra,18.6411,72.8722,L004,46.6,NEAR_0_50,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0104,Mahesh Pawar,Synthetic Test Farmer,Bajra,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0105,Ganesh More,Synthetic Test Farmer,Bajra,Pune,Talegaon,Maval,Maharashtra,18.735,73.675,L007,75.5,MID_51_100,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0106,Prakash Gaikwad,Synthetic Test Farmer,Bajra,Thane,Kalyan,Kalyan,Maharashtra,19.2437,73.1355,L008,25.9,MID_51_100,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0107,Ramesh Deshmukh,Synthetic Test Farmer,Bajra,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0108,Nitin Chavan,Synthetic Test Farmer,Bajra,Nashik,Igatpuri,Igatpuri,Maharashtra,19.6959,73.5622,L006,92.5,MID_51_100,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0109,Sachin Bhosale,Synthetic Test Farmer,Bajra,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0110,Rohit Kadam,Synthetic Test Farmer,Bajra,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0111,Aarav Patil,Synthetic Test Farmer,Bajra,Ahmednagar,Ahmednagar,Ahmednagar,Maharashtra,19.0952,74.7496,L012,180.9,REGIONAL_101_200,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0112,Vikram Jadhav,Synthetic Test Farmer,Bajra,Pune,Pune,Pune City,Maharashtra,18.5204,73.8567,L009,104.1,REGIONAL_101_200,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0113,Suresh Shinde,Synthetic Test Farmer,Bajra,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0114,Mahesh Pawar,Synthetic Test Farmer,Bajra,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0115,Ganesh More,Synthetic Test Farmer,Bajra,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0116,Prakash Gaikwad,Synthetic Test Farmer,Bajra,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0117,Ramesh Deshmukh,Synthetic Test Farmer,Bajra,Nanded,Nanded,Nanded,Maharashtra,19.1383,77.321,L021,451.1,VERY_FAR_351_PLUS,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0118,Nitin Chavan,Synthetic Test Farmer,Bajra,Parbhani,Parbhani,Parbhani,Maharashtra,19.2608,76.7767,L022,394.4,VERY_FAR_351_PLUS,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0119,Sachin Bhosale,Synthetic Test Farmer,Bajra,Akola,Akola,Akola,Maharashtra,20.7002,77.0082,L023,455.5,VERY_FAR_351_PLUS,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0120,Rohit Kadam,Synthetic Test Farmer,Bajra,Amravati,Amravati,Amravati,Maharashtra,20.9374,77.7796,L024,539.6,VERY_FAR_351_PLUS,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0121,Aarav Patil,Synthetic Test Farmer,Rice,Raigad,Uran,Uran,Maharashtra,18.8781,72.9392,L002,19.7,NEAR_0_50,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0122,Vikram Jadhav,Synthetic Test Farmer,Rice,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0123,Suresh Shinde,Synthetic Test Farmer,Rice,Raigad,Uran,Uran,Maharashtra,18.8781,72.9392,L002,19.7,NEAR_0_50,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0124,Mahesh Pawar,Synthetic Test Farmer,Rice,Raigad,Panvel,Panvel,Maharashtra,18.9894,73.1175,L001,10.4,NEAR_0_50,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0125,Ganesh More,Synthetic Test Farmer,Rice,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0126,Prakash Gaikwad,Synthetic Test Farmer,Rice,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0127,Ramesh Deshmukh,Synthetic Test Farmer,Rice,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0128,Nitin Chavan,Synthetic Test Farmer,Rice,Thane,Shahapur,Shahapur,Maharashtra,19.452,73.325,L005,56.0,MID_51_100,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0129,Sachin Bhosale,Synthetic Test Farmer,Rice,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0130,Rohit Kadam,Synthetic Test Farmer,Rice,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0131,Aarav Patil,Synthetic Test Farmer,Rice,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0132,Vikram Jadhav,Synthetic Test Farmer,Rice,Nashik,Nashik,Nashik,Maharashtra,19.9975,73.7898,L010,133.6,REGIONAL_101_200,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0133,Suresh Shinde,Synthetic Test Farmer,Rice,Jalgaon,Jalgaon,Jalgaon,Maharashtra,21.0077,75.5626,L016,343.8,FAR_201_350,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0134,Mahesh Pawar,Synthetic Test Farmer,Rice,Dhule,Dhule,Dhule,Maharashtra,20.9042,74.7749,L017,276.7,FAR_201_350,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0135,Ganesh More,Synthetic Test Farmer,Rice,Beed,Beed,Beed,Maharashtra,18.9891,75.7601,L018,287.1,FAR_201_350,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0136,Prakash Gaikwad,Synthetic Test Farmer,Rice,Dharashiv,Osmanabad,Dharashiv,Maharashtra,18.186,76.0419,L019,331.1,FAR_201_350,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True
+F0137,Ramesh Deshmukh,Synthetic Test Farmer,Rice,Nagpur,Nagpur,Nagpur Rural,Maharashtra,21.1458,79.0882,L027,674.8,VERY_FAR_351_PLUS,INSUFFICIENT,0.5,Farmer has only 50% of requested volume,Grade A,8,True
+F0138,Nitin Chavan,Synthetic Test Farmer,Rice,Nagpur,Nagpur,Nagpur Rural,Maharashtra,21.1458,79.0882,L027,674.8,VERY_FAR_351_PLUS,EXACT,1.0,Farmer exactly meets requested volume,Grade A,8,True
+F0139,Sachin Bhosale,Synthetic Test Farmer,Rice,Nagpur,Nagpur,Nagpur Rural,Maharashtra,21.1458,79.0882,L027,674.8,VERY_FAR_351_PLUS,SURPLUS,1.5,Farmer has 150% of requested volume,Grade A,8,True
+F0140,Rohit Kadam,Synthetic Test Farmer,Rice,Nagpur,Nagpur,Nagpur Rural,Maharashtra,21.1458,79.0882,L027,674.8,VERY_FAR_351_PLUS,MULTI_LOT,0.6,Single farmer lot is 60%; another compatible lot can be combined,Grade A,8,True

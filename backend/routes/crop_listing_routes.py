@@ -19,14 +19,18 @@ router = APIRouter(tags=["Crop Listings"])
 from typing import Optional, Dict, List, Any
 from pydantic import BaseModel, Field, root_validator
 
+import os
+import shutil
+from fastapi import UploadFile, File
+
 class CropListingCreate(BaseModel):
     crop: str = Field(..., example="Tomato")
     crop_category: Optional[str] = Field(None, example="Vegetables")
-    variety: str = Field(..., example="Nashik Red")
-    grade: str = Field(..., example="A")
+    variety: Optional[str] = Field("Standard", example="Nashik Red")
+    grade: Optional[str] = Field("A", example="A")
     quantity: float = Field(..., gt=0, example=500.0)
     unit: str = Field("kg", example="kg")
-    min_sale_quantity: float = Field(..., gt=0, example=50.0)
+    min_sale_quantity: Optional[float] = Field(None, example=50.0)
     expected_price: float = Field(..., gt=0, example=20.0)
     min_price: float = Field(..., gt=0, example=18.0)
     price_unit: str = Field("per_kg", example="per_kg")
@@ -34,7 +38,7 @@ class CropListingCreate(BaseModel):
     harvest_date: Optional[str] = None
     availability_date: Optional[str] = None
     preferred_selling_date: Optional[str] = None
-    shelf_life: int = Field(..., ge=1, example=7)
+    shelf_life: Optional[int] = Field(30, ge=1, example=7)
     location: str = Field(..., example="Nashik")
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -47,8 +51,19 @@ class CropListingCreate(BaseModel):
 
     @root_validator(pre=False, skip_on_failure=True)
     def validate_logic(cls, values):
+        if not values.get('variety'):
+            values['variety'] = "Standard"
+        if not values.get('grade'):
+            values['grade'] = "A"
+        if values.get('shelf_life') is None or values.get('shelf_life') <= 0:
+            values['shelf_life'] = 30
+            
         qty = values.get('quantity')
         min_qty = values.get('min_sale_quantity')
+        if min_qty is None or min_qty <= 0:
+            values['min_sale_quantity'] = min(50.0, qty) if qty else 10.0
+            min_qty = values['min_sale_quantity']
+            
         if qty is not None and min_qty is not None and min_qty > qty:
             raise ValueError('minimum_sale_quantity cannot be greater than available quantity')
         
@@ -190,4 +205,20 @@ async def delete_crop_listing(
 
     await Database.delete_produce_async(listing_id)
     return {"success": True, "message": "Listing marked as expired."}
+
+
+@router.post("/upload-image")
+async def upload_crop_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Upload produce crop photo and store in node_storage/uploads."""
+    os.makedirs("./node_storage/uploads", exist_ok=True)
+    clean_filename = f"{uuid.uuid4().hex[:8]}_{file.filename}"
+    file_path = os.path.join("./node_storage/uploads", clean_filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    url = f"/static/uploads/{clean_filename}"
+    return {"success": True, "url": url, "filename": clean_filename}
+
 

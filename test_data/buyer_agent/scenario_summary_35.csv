@@ -1,0 +1,36 @@
+crop,volume_preset,required_volume_kg,scenario_count,expected_eligible_scenarios,expected_ineligible_scenarios,farmer_supply_cases,price_cases,quality_cases,distance_cases,delivery_cases
+Sugarcane,Kitchen/Sample,120,5120,840,4280,4,4,4,5,4
+Sugarcane,Micro Lot,500,5120,840,4280,4,4,4,5,4
+Sugarcane,1 Ton,1000,5120,840,4280,4,4,4,5,4
+Sugarcane,5 Tons,5000,5120,840,4280,4,4,4,5,4
+Sugarcane,10 Tons,10000,5120,840,4280,4,4,4,5,4
+Soybean,Kitchen/Sample,120,5120,840,4280,4,4,4,5,4
+Soybean,Micro Lot,500,5120,840,4280,4,4,4,5,4
+Soybean,1 Ton,1000,5120,840,4280,4,4,4,5,4
+Soybean,5 Tons,5000,5120,840,4280,4,4,4,5,4
+Soybean,10 Tons,10000,5120,840,4280,4,4,4,5,4
+Cotton,Kitchen/Sample,120,5120,840,4280,4,4,4,5,4
+Cotton,Micro Lot,500,5120,840,4280,4,4,4,5,4
+Cotton,1 Ton,1000,5120,840,4280,4,4,4,5,4
+Cotton,5 Tons,5000,5120,840,4280,4,4,4,5,4
+Cotton,10 Tons,10000,5120,840,4280,4,4,4,5,4
+Jowar,Kitchen/Sample,120,5120,840,4280,4,4,4,5,4
+Jowar,Micro Lot,500,5120,840,4280,4,4,4,5,4
+Jowar,1 Ton,1000,5120,840,4280,4,4,4,5,4
+Jowar,5 Tons,5000,5120,840,4280,4,4,4,5,4
+Jowar,10 Tons,10000,5120,840,4280,4,4,4,5,4
+Onion,Kitchen/Sample,120,5120,840,4280,4,4,4,5,4
+Onion,Micro Lot,500,5120,840,4280,4,4,4,5,4
+Onion,1 Ton,1000,5120,840,4280,4,4,4,5,4
+Onion,5 Tons,5000,5120,840,4280,4,4,4,5,4
+Onion,10 Tons,10000,5120,840,4280,4,4,4,5,4
+Bajra,Kitchen/Sample,120,5120,840,4280,4,4,4,5,4
+Bajra,Micro Lot,500,5120,840,4280,4,4,4,5,4
+Bajra,1 Ton,1000,5120,840,4280,4,4,4,5,4
+Bajra,5 Tons,5000,5120,840,4280,4,4,4,5,4
+Bajra,10 Tons,10000,5120,840,4280,4,4,4,5,4
+Rice,Kitchen/Sample,120,5120,840,4280,4,4,4,5,4
+Rice,Micro Lot,500,5120,840,4280,4,4,4,5,4
+Rice,1 Ton,1000,5120,840,4280,4,4,4,5,4
+Rice,5 Tons,5000,5120,840,4280,4,4,4,5,4
+Rice,10 Tons,10000,5120,840,4280,4,4,4,5,4

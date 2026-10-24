@@ -286,7 +286,7 @@ export default function TransporterDashboard() {
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-slate-700">{v.vehicle_type}</span>
-                        {v.refrigerated && <ThermometerSnowflake size={14} className="text-blue-500" title="Refrigerated" />}
+                        {v.refrigerated && <span title="Refrigerated"><ThermometerSnowflake size={14} className="text-blue-500" /></span>}
                       </div>
                     </td>
                     <td className="px-5 py-4 font-medium text-amber-600">{v.capacity_kg} kg</td>

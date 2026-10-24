@@ -11,7 +11,10 @@ import pickle
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 
 from backend.core.constants import CROP_MASTER, normalize_crop_id
 
@@ -58,8 +61,8 @@ def predict_price_xgboost(
     
     cur_price = current_modal_price if current_modal_price > 0 else 30.0
 
-    if not model_data or "models" not in model_data:
-        # Fallback if pickle is unavailable
+    if not model_data or "models" not in model_data or pd is None:
+        # Fallback if pickle or pandas is unavailable
         forecast = round(cur_price * 1.04, 2)
         return {
             "crop": canonical_name,

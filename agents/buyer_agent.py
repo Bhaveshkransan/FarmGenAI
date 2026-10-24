@@ -791,7 +791,7 @@ class BuyerAgent(BaseAgent):
                         offer, market_price, current_round, max_rounds, shelf_life, batna, seller_concession
                     )
                     decision = fb["decision"]
-                    counter_price = min(self.reservation_price, fb["counter_price"])
+                    counter_price = min(self.reservation_price, fb["counter_price"]) if fb.get("counter_price") is not None else None
                     reason = fb["reason"]
 
         # 4. Final Execution & State Update

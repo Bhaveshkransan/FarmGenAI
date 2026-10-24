@@ -1,0 +1,396 @@
+{
+  "execution_timestamp": "2026-10-12T05:46:30Z",
+  "os": "Windows-10-10.0.26200-SP0",
+  "python_version": "3.11.5",
+  "project_root": "C:\\PROJECT\\FarmGenAI",
+  "ml_evaluation": [
+    {
+      "Crop": "Bajra",
+      "Model": "XGBoost (Trained XGBRegressor)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 1.503,
+      "RMSE_INR_kg": 1.947,
+      "MAPE_pct": 3.97,
+      "R2_Score": 0.667,
+      "Remarks": "Trained per-crop model with 16 engineered features"
+    },
+    {
+      "Crop": "Bajra",
+      "Model": "Persistence Baseline (Lag-7d)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.307,
+      "RMSE_INR_kg": 3.014,
+      "MAPE_pct": 6.11,
+      "R2_Score": 0.203,
+      "Remarks": "Naive persistence (assumes price = price 7 days ago)"
+    },
+    {
+      "Crop": "Bajra",
+      "Model": "7-Day Moving Average Baseline",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 1.614,
+      "RMSE_INR_kg": 2.094,
+      "MAPE_pct": 4.26,
+      "R2_Score": 0.615,
+      "Remarks": "Rolling 7-day average of historical prices"
+    },
+    {
+      "Crop": "Cotton",
+      "Model": "XGBoost (Trained XGBRegressor)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.129,
+      "RMSE_INR_kg": 2.979,
+      "MAPE_pct": 2.85,
+      "R2_Score": 0.663,
+      "Remarks": "Trained per-crop model with 16 engineered features"
+    },
+    {
+      "Crop": "Cotton",
+      "Model": "Persistence Baseline (Lag-7d)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.941,
+      "RMSE_INR_kg": 4.341,
+      "MAPE_pct": 3.96,
+      "R2_Score": 0.284,
+      "Remarks": "Naive persistence (assumes price = price 7 days ago)"
+    },
+    {
+      "Crop": "Cotton",
+      "Model": "7-Day Moving Average Baseline",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.092,
+      "RMSE_INR_kg": 2.987,
+      "MAPE_pct": 2.82,
+      "R2_Score": 0.661,
+      "Remarks": "Rolling 7-day average of historical prices"
+    },
+    {
+      "Crop": "Jowar",
+      "Model": "XGBoost (Trained XGBRegressor)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.152,
+      "RMSE_INR_kg": 2.672,
+      "MAPE_pct": 3.47,
+      "R2_Score": 0.656,
+      "Remarks": "Trained per-crop model with 16 engineered features"
+    },
+    {
+      "Crop": "Jowar",
+      "Model": "Persistence Baseline (Lag-7d)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 3.429,
+      "RMSE_INR_kg": 4.303,
+      "MAPE_pct": 5.51,
+      "R2_Score": 0.108,
+      "Remarks": "Naive persistence (assumes price = price 7 days ago)"
+    },
+    {
+      "Crop": "Jowar",
+      "Model": "7-Day Moving Average Baseline",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.312,
+      "RMSE_INR_kg": 2.875,
+      "MAPE_pct": 3.72,
+      "R2_Score": 0.602,
+      "Remarks": "Rolling 7-day average of historical prices"
+    },
+    {
+      "Crop": "Onion",
+      "Model": "XGBoost (Trained XGBRegressor)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.643,
+      "RMSE_INR_kg": 3.389,
+      "MAPE_pct": 11.61,
+      "R2_Score": 0.15,
+      "Remarks": "Trained per-crop model with 16 engineered features"
+    },
+    {
+      "Crop": "Onion",
+      "Model": "Persistence Baseline (Lag-7d)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 3.748,
+      "RMSE_INR_kg": 4.71,
+      "MAPE_pct": 16.39,
+      "R2_Score": -0.64,
+      "Remarks": "Naive persistence (assumes price = price 7 days ago)"
+    },
+    {
+      "Crop": "Onion",
+      "Model": "7-Day Moving Average Baseline",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 2.644,
+      "RMSE_INR_kg": 3.349,
+      "MAPE_pct": 11.54,
+      "R2_Score": 0.171,
+      "Remarks": "Rolling 7-day average of historical prices"
+    },
+    {
+      "Crop": "Rice",
+      "Model": "XGBoost (Trained XGBRegressor)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 1.116,
+      "RMSE_INR_kg": 1.429,
+      "MAPE_pct": 2.98,
+      "R2_Score": 0.837,
+      "Remarks": "Trained per-crop model with 16 engineered features"
+    },
+    {
+      "Crop": "Rice",
+      "Model": "Persistence Baseline (Lag-7d)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 1.573,
+      "RMSE_INR_kg": 2.077,
+      "MAPE_pct": 4.22,
+      "R2_Score": 0.656,
+      "Remarks": "Naive persistence (assumes price = price 7 days ago)"
+    },
+    {
+      "Crop": "Rice",
+      "Model": "7-Day Moving Average Baseline",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 1.083,
+      "RMSE_INR_kg": 1.406,
+      "MAPE_pct": 2.91,
+      "R2_Score": 0.842,
+      "Remarks": "Rolling 7-day average of historical prices"
+    },
+    {
+      "Crop": "Soybean",
+      "Model": "XGBoost (Trained XGBRegressor)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 3.538,
+      "RMSE_INR_kg": 4.431,
+      "MAPE_pct": 4.73,
+      "R2_Score": 0.618,
+      "Remarks": "Trained per-crop model with 16 engineered features"
+    },
+    {
+      "Crop": "Soybean",
+      "Model": "Persistence Baseline (Lag-7d)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 5.352,
+      "RMSE_INR_kg": 6.578,
+      "MAPE_pct": 7.22,
+      "R2_Score": 0.158,
+      "Remarks": "Naive persistence (assumes price = price 7 days ago)"
+    },
+    {
+      "Crop": "Soybean",
+      "Model": "7-Day Moving Average Baseline",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 3.661,
+      "RMSE_INR_kg": 4.572,
+      "MAPE_pct": 4.93,
+      "R2_Score": 0.593,
+      "Remarks": "Rolling 7-day average of historical prices"
+    },
+    {
+      "Crop": "Sugarcane",
+      "Model": "XGBoost (Trained XGBRegressor)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 0.084,
+      "RMSE_INR_kg": 0.117,
+      "MAPE_pct": 2.07,
+      "R2_Score": 0.918,
+      "Remarks": "Trained per-crop model with 16 engineered features"
+    },
+    {
+      "Crop": "Sugarcane",
+      "Model": "Persistence Baseline (Lag-7d)",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 0.14,
+      "RMSE_INR_kg": 0.196,
+      "MAPE_pct": 3.44,
+      "R2_Score": 0.771,
+      "Remarks": "Naive persistence (assumes price = price 7 days ago)"
+    },
+    {
+      "Crop": "Sugarcane",
+      "Model": "7-Day Moving Average Baseline",
+      "Test_Samples": 548,
+      "MAE_INR_kg": 0.094,
+      "RMSE_INR_kg": 0.132,
+      "MAPE_pct": 2.3,
+      "R2_Score": 0.897,
+      "Remarks": "Rolling 7-day average of historical prices"
+    }
+  ],
+  "matching_scalability": [
+    {
+      "Candidate_Pool_Size": 10,
+      "Eligible_Found": 2,
+      "Filtering_Latency_ms": 0.005,
+      "Ranking_Latency_ms": 0.091,
+      "Total_Latency_ms": 0.096,
+      "Shortlist_Size": 2,
+      "Monotonic_Rank_Consistency": "PASS",
+      "Constraint_Satisfaction_Rate_pct": 100.0
+    },
+    {
+      "Candidate_Pool_Size": 50,
+      "Eligible_Found": 8,
+      "Filtering_Latency_ms": 0.009,
+      "Ranking_Latency_ms": 0.137,
+      "Total_Latency_ms": 0.146,
+      "Shortlist_Size": 5,
+      "Monotonic_Rank_Consistency": "PASS",
+      "Constraint_Satisfaction_Rate_pct": 100.0
+    },
+    {
+      "Candidate_Pool_Size": 100,
+      "Eligible_Found": 15,
+      "Filtering_Latency_ms": 0.011,
+      "Ranking_Latency_ms": 0.17,
+      "Total_Latency_ms": 0.181,
+      "Shortlist_Size": 5,
+      "Monotonic_Rank_Consistency": "PASS",
+      "Constraint_Satisfaction_Rate_pct": 100.0
+    },
+    {
+      "Candidate_Pool_Size": 200,
+      "Eligible_Found": 29,
+      "Filtering_Latency_ms": 0.026,
+      "Ranking_Latency_ms": 0.256,
+      "Total_Latency_ms": 0.281,
+      "Shortlist_Size": 5,
+      "Monotonic_Rank_Consistency": "PASS",
+      "Constraint_Satisfaction_Rate_pct": 100.0
+    },
+    {
+      "Candidate_Pool_Size": 500,
+      "Eligible_Found": 72,
+      "Filtering_Latency_ms": 0.028,
+      "Ranking_Latency_ms": 0.685,
+      "Total_Latency_ms": 0.713,
+      "Shortlist_Size": 5,
+      "Monotonic_Rank_Consistency": "PASS",
+      "Constraint_Satisfaction_Rate_pct": 100.0
+    },
+    {
+      "Candidate_Pool_Size": 1000,
+      "Eligible_Found": 143,
+      "Filtering_Latency_ms": 0.076,
+      "Ranking_Latency_ms": 1.513,
+      "Total_Latency_ms": 1.588,
+      "Shortlist_Size": 5,
+      "Monotonic_Rank_Consistency": "PASS",
+      "Constraint_Satisfaction_Rate_pct": 100.0
+    }
+  ],
+  "negotiation_performance": {
+    "Negotiations_Attempted": 7,
+    "Successful_Agreements": 7,
+    "Failed_Negotiations": 0,
+    "Negotiation_Success_Rate_pct": 100.0,
+    "Average_Rounds": 3,
+    "Median_Rounds": 3,
+    "Farmer_Floor_Violations": 0,
+    "Farmer_Price_Floor_Violation_Rate_pct": 0.0,
+    "Constraint_Satisfaction_Rate_pct": 100.0,
+    "LLM_Status": "Deterministic Concession Curve Executed (Real LLM Offline / Not Tested)"
+  },
+  "economic_performance": [
+    {
+      "Scenario": "Onion Nashik Lot (1,000 kg)",
+      "FarmGenAI_Selected": "Buyer B (Moderate Freight)",
+      "FarmGenAI_Net_INR": 26664.2,
+      "Highest_Nominal_Pick": "Buyer C (Max Nominal Distant)",
+      "Highest_Nominal_Net_INR": 23142.4,
+      "Improvement_vs_Nominal_pct": 15.22,
+      "Nearest_Pick": "Buyer D (Local Direct)",
+      "Nearest_Net_INR": 26344.8,
+      "Improvement_vs_Nearest_pct": 1.21
+    },
+    {
+      "Scenario": "Soybean Latur Lot (2,000 kg)",
+      "FarmGenAI_Selected": "Buyer 1 (Latur Mandi)",
+      "FarmGenAI_Net_INR": 105842.4,
+      "Highest_Nominal_Pick": "Buyer 3 (Pune Exporter)",
+      "Highest_Nominal_Net_INR": 105384.0,
+      "Improvement_vs_Nominal_pct": 0.43,
+      "Nearest_Pick": "Buyer 1 (Latur Mandi)",
+      "Nearest_Net_INR": 105842.4,
+      "Improvement_vs_Nearest_pct": 0.0
+    },
+    {
+      "Scenario": "Cotton Amravati Lot (1,500 kg)",
+      "FarmGenAI_Selected": "Buyer C (Nagpur Mill)",
+      "FarmGenAI_Net_INR": 105015.0,
+      "Highest_Nominal_Pick": "Buyer C (Nagpur Mill)",
+      "Highest_Nominal_Net_INR": 105015.0,
+      "Improvement_vs_Nominal_pct": 0.0,
+      "Nearest_Pick": "Buyer B (Local Amravati)",
+      "Nearest_Net_INR": 102474.75,
+      "Improvement_vs_Nearest_pct": 2.48
+    }
+  ],
+  "transport_engine": {
+    "Total_Route_Calculations": 50,
+    "Mean_Latency_ms": 190.779,
+    "P50_Latency_ms": 0.008,
+    "P95_Latency_ms": 1330.269,
+    "P99_Latency_ms": 1594.805,
+    "Vehicle_Capacity_Satisfaction_Rate_pct": 100.0,
+    "Delivery_Feasibility_Pass_Rate_pct": 100.0
+  },
+  "rag_performance": {
+    "RAG_Status": "Implemented & Local ChromaDB Active",
+    "Embedding_Model": "SentenceTransformer(all-MiniLM-L6-v2, 384 dimensions)",
+    "Collections_Inspected": [
+      "transport_knowledge",
+      "agri_knowledge",
+      "market_history"
+    ],
+    "Sample_Queries_Tested": 5,
+    "Retrieval_Latency_Mean_ms": 1699.67,
+    "Retrieval_Latency_P50_ms": 19.96,
+    "Retrieval_Latency_P95_ms": 6742.0,
+    "IR_Metrics_Status": "Not Tested (Ground-truth labeled IR query-document pairs not available in repo)"
+  },
+  "api_performance": [
+    {
+      "Method": "GET",
+      "Endpoint": "/health",
+      "Sample_Count": 30,
+      "Status_Code": 200,
+      "Mean_Latency_ms": 10.63,
+      "P50_Latency_ms": 10.3,
+      "P95_Latency_ms": 13.34,
+      "P99_Latency_ms": 19.37,
+      "Error_Rate_pct": 0.0
+    },
+    {
+      "Method": "GET",
+      "Endpoint": "/docs",
+      "Sample_Count": 30,
+      "Status_Code": 200,
+      "Mean_Latency_ms": 4.91,
+      "P50_Latency_ms": 4.86,
+      "P95_Latency_ms": 5.67,
+      "P99_Latency_ms": 5.79,
+      "Error_Rate_pct": 0.0
+    },
+    {
+      "Method": "GET",
+      "Endpoint": "/api/v1/market-intelligence/model-metadata",
+      "Sample_Count": 30,
+      "Status_Code": 200,
+      "Mean_Latency_ms": 93.51,
+      "P50_Latency_ms": 95.1,
+      "P95_Latency_ms": 110.69,
+      "P99_Latency_ms": 143.61,
+      "Error_Rate_pct": 0.0
+    },
+    {
+      "Method": "GET",
+      "Endpoint": "/api/v1/listings",
+      "Sample_Count": 30,
+      "Status_Code": 200,
+      "Mean_Latency_ms": 21.03,
+      "P50_Latency_ms": 11.87,
+      "P95_Latency_ms": 17.78,
+      "P99_Latency_ms": 198.49,
+      "Error_Rate_pct": 0.0
+    }
+  ]
+}

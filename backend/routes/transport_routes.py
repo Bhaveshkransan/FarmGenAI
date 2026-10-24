@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 from database.db import Database
 
 @router.get("/fleet")
+@router.get("/carriers")
+@router.get("")
+@router.get("/")
 async def get_fleet(current_user: dict = Depends(get_current_user)):
     """List all available transport vehicles."""
     fleet = await list_fleet()
@@ -149,9 +152,12 @@ async def track_booking(booking_id: str, current_user: dict = Depends(get_curren
 
 @router.get("/bookings")
 async def list_bookings(current_user: dict = Depends(get_current_user)):
-    """List transport bookings for the current user."""
-    uid = current_user["sub"]
+    """List transport bookings for the current user or all transport bookings for operators."""
+    uid = current_user.get("sub")
+    role = current_user.get("role")
     all_bookings = await Database.list_bookings_async()
+    if role in ("transport", "transporter", "admin"):
+        return {"success": True, "data": all_bookings, "count": len(all_bookings)}
     my_bookings = [b for b in all_bookings if b.get("booked_by") == uid]
     return {"success": True, "data": my_bookings, "count": len(my_bookings)}
 
@@ -518,6 +524,11 @@ async def list_my_transport_vehicles(current_user: dict = Depends(get_current_us
         )
         vehicles = [v.__dict__ for v in result.scalars().all()]
         
+        # If user has no custom vehicles assigned under their user id, fallback to active registered fleet
+        if not vehicles:
+            result = await session.execute(select(DBVehicle))
+            vehicles = [v.__dict__ for v in result.scalars().all()]
+
         # Clean up SQLAlchemy state
         for v in vehicles:
             v.pop("_sa_instance_state", None)

@@ -1,7 +1,27 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Check, X, ArrowRightLeft } from 'lucide-react';
 
-export default function ChatBubble({ agent, price, message, reasoning, isFarmer, isSystem, isInteractive, onAction }) {
+interface ChatBubbleProps {
+  agent?: string;
+  price?: number;
+  message?: string;
+  reasoning?: string | string[] | any;
+  isFarmer?: boolean;
+  isSystem?: boolean;
+  isInteractive?: boolean;
+  onAction?: (actionType: string, price: number) => void;
+}
+
+export default function ChatBubble({
+  agent,
+  price,
+  message,
+  reasoning,
+  isFarmer,
+  isSystem = false,
+  isInteractive = false,
+  onAction
+}: ChatBubbleProps) {
   const [showReasoning, setShowReasoning] = useState(false);
 
   if (isSystem) {
@@ -43,7 +63,11 @@ export default function ChatBubble({ agent, price, message, reasoning, isFarmer,
             {showReasoning && (
               <div className={`mt-2 p-3 rounded-lg text-xs border ${isFarmer ? 'bg-emerald-700/50 border-emerald-600 text-emerald-50' : 'bg-slate-50 border-slate-200 text-slate-600'}`}>
                 <ul className="space-y-1 list-disc list-inside">
-                  {reasoning.map((r, i) => <li key={i}>{r}</li>)}
+                  {Array.isArray(reasoning) ? (
+                    reasoning.map((r, i) => <li key={i}>{r}</li>)
+                  ) : (
+                    <li>{reasoning}</li>
+                  )}
                 </ul>
               </div>
             )}

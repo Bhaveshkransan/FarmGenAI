@@ -1,0 +1,22 @@
+Crop,Model,Test_Samples,MAE_INR_kg,RMSE_INR_kg,MAPE_pct,R2_Score,Remarks
+Bajra,XGBoost (Trained XGBRegressor),548,1.503,1.947,3.97,0.667,Trained per-crop model with 16 engineered features
+Bajra,Persistence Baseline (Lag-7d),548,2.307,3.014,6.11,0.203,Naive persistence (assumes price = price 7 days ago)
+Bajra,7-Day Moving Average Baseline,548,1.614,2.094,4.26,0.615,Rolling 7-day average of historical prices
+Cotton,XGBoost (Trained XGBRegressor),548,2.129,2.979,2.85,0.663,Trained per-crop model with 16 engineered features
+Cotton,Persistence Baseline (Lag-7d),548,2.941,4.341,3.96,0.284,Naive persistence (assumes price = price 7 days ago)
+Cotton,7-Day Moving Average Baseline,548,2.092,2.987,2.82,0.661,Rolling 7-day average of historical prices
+Jowar,XGBoost (Trained XGBRegressor),548,2.152,2.672,3.47,0.656,Trained per-crop model with 16 engineered features
+Jowar,Persistence Baseline (Lag-7d),548,3.429,4.303,5.51,0.108,Naive persistence (assumes price = price 7 days ago)
+Jowar,7-Day Moving Average Baseline,548,2.312,2.875,3.72,0.602,Rolling 7-day average of historical prices
+Onion,XGBoost (Trained XGBRegressor),548,2.643,3.389,11.61,0.15,Trained per-crop model with 16 engineered features
+Onion,Persistence Baseline (Lag-7d),548,3.748,4.71,16.39,-0.64,Naive persistence (assumes price = price 7 days ago)
+Onion,7-Day Moving Average Baseline,548,2.644,3.349,11.54,0.171,Rolling 7-day average of historical prices
+Rice,XGBoost (Trained XGBRegressor),548,1.116,1.429,2.98,0.837,Trained per-crop model with 16 engineered features
+Rice,Persistence Baseline (Lag-7d),548,1.573,2.077,4.22,0.656,Naive persistence (assumes price = price 7 days ago)
+Rice,7-Day Moving Average Baseline,548,1.083,1.406,2.91,0.842,Rolling 7-day average of historical prices
+Soybean,XGBoost (Trained XGBRegressor),548,3.538,4.431,4.73,0.618,Trained per-crop model with 16 engineered features
+Soybean,Persistence Baseline (Lag-7d),548,5.352,6.578,7.22,0.158,Naive persistence (assumes price = price 7 days ago)
+Soybean,7-Day Moving Average Baseline,548,3.661,4.572,4.93,0.593,Rolling 7-day average of historical prices
+Sugarcane,XGBoost (Trained XGBRegressor),548,0.084,0.117,2.07,0.918,Trained per-crop model with 16 engineered features
+Sugarcane,Persistence Baseline (Lag-7d),548,0.14,0.196,3.44,0.771,Naive persistence (assumes price = price 7 days ago)
+Sugarcane,7-Day Moving Average Baseline,548,0.094,0.132,2.3,0.897,Rolling 7-day average of historical prices
