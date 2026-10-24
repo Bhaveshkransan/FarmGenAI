@@ -107,3 +107,7 @@ yarn-error.log*
 *.zip
 scratch/
 
+
+# Large media & artifacts
+artifacts/
+*.mp4

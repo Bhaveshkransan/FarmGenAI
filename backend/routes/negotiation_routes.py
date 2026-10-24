@@ -101,7 +101,7 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
     try:
         status_data = await controller.get_negotiation_status(negotiation_id) or {}
         p_price = (payload.get("price") or payload.get("final_price") or payload.get("agreed_price") or payload.get("counter_price")) if isinstance(payload, dict) else None
-        final_p_raw = p_price or status_data.get("final_price") or status_data.get("price") or status_data.get("min_price") or 50.0
+        final_p_raw = p_price or status_data.get("final_price") or status_data.get("target_price") or status_data.get("price") or status_data.get("min_price") or 50.0
         p_qty = (payload.get("quantity") or payload.get("procurement_volume")) if isinstance(payload, dict) else None
         qty_raw = p_qty or status_data.get("quantity") or 3000.0
         p_farmer = payload.get("farmer") if isinstance(payload, dict) else None
@@ -235,7 +235,7 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
         except Exception:
             pass
 
-        # Also update status in negotiations table
+        # Also update status in negotiations table and memory controller
         try:
             update_data = {
                 "status": "DEAL",
@@ -250,7 +250,18 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
             }
             if transport_plan:
                 update_data["transport_plan"] = transport_plan
+            if isinstance(payload, dict):
+                if "transport_plan" in payload:
+                    update_data["transport_plan"] = payload["transport_plan"]
+                if "warehouse_plan" in payload:
+                    update_data["warehouse_plan"] = payload["warehouse_plan"]
+                if "processor_plan" in payload:
+                    update_data["processor_plan"] = payload["processor_plan"]
             await Database.update_negotiation_async(negotiation_id, update_data)
+
+            for nid in (negotiation_id, f"neg_{negotiation_id}", negotiation_id.replace("neg_", "")):
+                if nid in controller.active_negotiations:
+                    controller.active_negotiations[nid].update(update_data)
 
             # Hook into Buyer Workflow Memory (Phase 1 Orchestration)
             req_id = (payload.get("requirement_id") if isinstance(payload, dict) else None) or status_data.get("requirement_id")
@@ -265,8 +276,8 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
                     )
                 except Exception:
                     pass
-        except Exception:
-            pass
+        except Exception as update_err:
+            print("Error updating negotiation record:", update_err)
 
         # Broadcast via WebSocket hub if available
         try:
@@ -451,6 +462,16 @@ async def autonomous_step_route(negotiation_id: str):
 async def feedback_deal(negotiation_id: str, payload: dict = None):
     try:
         return {"status": "success", "message": "Feedback recorded", "negotiation_id": negotiation_id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/{negotiation_id}/parallel-branches")
+async def get_parallel_branches_route(negotiation_id: str):
+    try:
+        branches = await controller.get_parallel_branches(negotiation_id)
+        return {"status": "SUCCESS", "negotiation_id": negotiation_id, "branches": branches}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

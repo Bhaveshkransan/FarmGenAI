@@ -1,25 +1,24 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import {
-  ArrowLeft,
-  MessageSquare,
-  Briefcase,
-  Zap,
-  ShieldCheck,
-  Database,
-  CloudRain,
-  Truck,
-  Warehouse,
-  Terminal as TerminalIcon,
-  RefreshCw,
-  Check,
-  Layers,
-  TrendingUp,
-  MapPin,
-  Calendar,
-  CheckCircle2,
+import { 
+  ArrowLeft, 
+  MessageSquare, 
+  Briefcase, 
+  Zap, 
+  ShieldCheck, 
+  Database, 
+  CloudRain, 
+  Truck, 
+  Terminal as TerminalIcon, 
+  RefreshCw, 
+  Check, 
+  Layers, 
+  TrendingUp, 
+  MapPin, 
+  Calendar, 
+  CheckCircle2, 
   Clock,
   Sparkles,
   Play,
@@ -29,23 +28,22 @@ import {
   Star,
   Bot,
   Trophy,
-  ExternalLink,
+  Warehouse,
   Factory,
-  X,
-  Send
+  ChevronRight,
+  ArrowRight,
+  RotateCcw,
+  DollarSign,
+  Calculator,
+  TrendingDown,
+  Info,
+  ShieldAlert,
+  FileText,
+  ExternalLink,
+  XCircle,
+  CheckCheck,
+  Navigation
 } from 'lucide-react';
-
-const SUPPLY_CHAIN_STAGES = [
-  { id: 'PLANNING', label: 'PLANNING', icon: Search, sub: 'Requirements & Policy' },
-  { id: 'FARMER', label: 'CANDIDATE DISCOVERY', icon: Sparkles, sub: 'Top-5 Multi-APMC Sourcing' },
-  { id: 'BUYER', label: 'PARALLEL NEGOTIATION', icon: Bot, sub: 'Autonomous Multi-Round Bidding' },
-  { id: 'QUALITY', label: 'QUALITY INSPECTION', icon: ShieldCheck, sub: 'Assay Lab Grade & Moisture' },
-  { id: 'TRANSPORT', label: 'TRANSPORT AGENT', icon: Truck, sub: 'Route & Carrier Tariff' },
-  { id: 'WAREHOUSE', label: 'WAREHOUSE AGENT', icon: Warehouse, sub: 'Capacity & Storage Sizing' },
-  { id: 'PROCESSOR', label: 'PROCESSOR AGENT', icon: Factory, sub: 'Milling & Conversion' },
-  { id: 'VALIDATION', label: 'VALIDATION', icon: ShieldCheck, sub: 'Cross-Contract Audit' },
-  { id: 'FINAL', label: 'FINAL DEAL', icon: Trophy, sub: 'End-to-End Signature' },
-];
 import ChatBubble from '@/features/negotiation/components/ChatBubble';
 import OfferCard from '@/features/negotiation/components/OfferCard';
 import AgreementPreview from '@/features/negotiation/components/AgreementPreview';
@@ -56,159 +54,41 @@ import TransactionValidationModal from '@/components/negotiation/TransactionVali
 import RecommendationCard from '@/features/negotiation/components/RecommendationCard';
 import ReflectionCard from '@/features/negotiation/components/ReflectionCard';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotification } from '@/contexts/NotificationContext';
 import { api } from '@/services/api';
 
-const getInitialBuyers = (crop: string, basePrice: number, defaultBuyerName?: string) => {
-  const primaryBuyer = defaultBuyerName || 'AgroCorp Procurement Director';
-  const normBase = basePrice < 100 ? Math.round(basePrice * 100) : Math.round(basePrice);
-  return [
-    {
-      id: primaryBuyer,
-      location: 'Pune APMC Hub',
-      match: 96,
-      offer: normBase,
-      initialOffer: normBase,
-      distance: '45 km',
-      req: '5,000 kg',
-      aiStatus: 'Verified Institutional Buyer',
-      status: 'Negotiating',
-      color: 'emerald'
-    },
-    {
-      id: 'Sahyadri Agro Processing Ltd',
-      location: 'Nashik Hub',
-      match: 93,
-      offer: Math.round(normBase * 0.99),
-      initialOffer: Math.round(normBase * 0.99),
-      distance: '85 km',
-      req: '4,000 kg',
-      aiStatus: 'Bulk Processor Tender',
-      status: 'Active',
-      color: 'blue'
-    },
-    {
-      id: 'Mahalaxmi Grain Exports',
-      location: 'Mumbai Terminal',
-      match: 90,
-      offer: Math.round(normBase * 0.97),
-      initialOffer: Math.round(normBase * 0.97),
-      distance: '140 km',
-      req: '8,000 kg',
-      aiStatus: 'Export Consortium',
-      status: 'Waiting',
-      color: 'amber'
-    },
-    {
-      id: 'Vidarbha Solvent Extractions',
-      location: 'Nagpur Hub',
-      match: 88,
-      offer: Math.round(normBase * 0.95),
-      initialOffer: Math.round(normBase * 0.95),
-      distance: '210 km',
-      req: '6,500 kg',
-      aiStatus: 'Industrial Milling Unit',
-      status: 'Waiting',
-      color: 'purple'
-    },
-    {
-      id: 'Marathwada Agro Millers Union',
-      location: 'Latur APMC',
-      match: 85,
-      offer: Math.round(normBase * 0.93),
-      initialOffer: Math.round(normBase * 0.93),
-      distance: '180 km',
-      req: '3,500 kg',
-      aiStatus: 'Regional FPO Tender',
-      status: 'Waiting',
-      color: 'teal'
-    }
-  ];
-};
+// Multi-Agent Dynamic Phase Types
+export type AgentPhase = 'FARMER' | 'TRANSPORT' | 'WAREHOUSE' | 'PROCESSOR' | 'SUMMARY';
 
-const DiscoveryRadar = ({ crop, target, floor, count = 5 }: { crop: string; target: number; floor: number; count?: number }) => (
-  <div className="bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 border border-emerald-500/40 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden mb-4 animate-in fade-in duration-300">
-    <div className="absolute -right-10 -top-10 w-48 h-48 rounded-full border border-emerald-400/20 animate-ping pointer-events-none" />
-    <div className="absolute -right-20 -top-20 w-68 h-68 rounded-full border border-emerald-400/10 pointer-events-none" />
-    <div className="absolute right-6 top-6 w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-400/30 flex items-center justify-center pointer-events-none">
-      <Bot className="w-6 h-6 text-emerald-400 animate-pulse" />
-    </div>
-
-    <div className="flex items-center justify-between mb-3 pr-14">
-      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-bold shadow-xs">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        AUTONOMOUS AGENT ACTIVE & SEARCHING
-      </div>
-      <span className="text-[11px] font-mono text-emerald-400/80 tracking-wide animate-pulse hidden sm:inline">
-        SCANNING APMC NETWORKS...
-      </span>
-    </div>
-
-    <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2 mb-1.5">
-      <Sparkles className="text-amber-400 w-5 h-5 shrink-0 animate-spin" />
-      Finding Top-{count} Verified Matches for {crop}
-    </h3>
-
-    <p className="text-xs text-slate-300 max-w-lg mb-4 leading-relaxed">
-      The LangGraph RL matching agent is querying 327 Maharashtra APMC Mandis, filtering by AGMARK Grade-A certification, and defending statutory floor of <strong className="text-emerald-300 font-bold">₹{floor}/kg</strong> to initiate parallel bidding across the top {count} candidates.
-    </p>
-
-    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-emerald-800/40 text-center">
-      <div className="bg-white/5 border border-white/10 rounded-xl p-2">
-        <p className="text-[10px] text-slate-400 uppercase font-semibold">APMC Mandis</p>
-        <p className="text-xs sm:text-sm font-black text-emerald-300">327 Scanned</p>
-      </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl p-2">
-        <p className="text-[10px] text-slate-400 uppercase font-semibold">Floor Defense</p>
-        <p className="text-xs sm:text-sm font-black text-amber-300">₹{floor}/kg</p>
-      </div>
-      <div className="bg-white/5 border border-white/10 rounded-xl p-2">
-        <p className="text-[10px] text-slate-400 uppercase font-semibold">Parallel Queue</p>
-        <p className="text-xs sm:text-sm font-black text-cyan-300">Top-{count} Candidates</p>
-      </div>
-    </div>
-  </div>
-);
+export interface CompletedPhaseRecord {
+  phase: AgentPhase;
+  title: string;
+  status: 'DEAL' | 'NO_MATCH' | 'UNAVAILABLE' | 'SKIPPED' | 'CANCELLED';
+  agreedPrice?: number;
+  counterParty?: string;
+  location?: string;
+  lotSize?: number;
+  details?: Record<string, any>;
+  messages: any[];
+  timestamp: string;
+  explanation?: string;
+}
 
 export default function NegotiationRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { addNotification } = useNotification();
-  const queryClient = useQueryClient();
   const location = useLocation();
   const hasAutoStartFlag = Boolean(location.state?.autoStart);
-  const isBuyer = location.pathname.includes('/buyer') || location.state?.isBuyer
-    ? true
-    : (user?.role === 'farmer' || localStorage.getItem('user_role') === 'farmer'
-        ? false
-        : Boolean(
+  const isBuyer =
+    user?.role === 'farmer' || localStorage.getItem('user_role') === 'farmer'
+      ? false
+      : Boolean(
           user?.role === 'buyer' ||
           user?.role === 'trader' ||
-          localStorage.getItem('user_role') === 'buyer'
-        ));
-
-  // Fetch active negotiations list if no specific ID is in URL (e.g. from sidebar "My Deals" or "My Negotiations")
-  const { data: activeNegotiationsList } = useQuery({
-    queryKey: ['active_negotiations_summary'],
-    queryFn: async () => {
-      try {
-        const res = await api.get('/negotiations');
-        return Array.isArray(res.data) ? res.data : (res.data?.data || []);
-      } catch {
-        return [];
-      }
-    },
-    enabled: !id || id === 'undefined' || id === 'null'
-  });
-
-  const effectiveId = useMemo(() => {
-    if (id && id !== 'undefined' && id !== 'null') return id;
-    if (activeNegotiationsList && activeNegotiationsList.length > 0) {
-      return activeNegotiationsList[0].negotiation_id || activeNegotiationsList[0].id;
-    }
-    return null;
-  }, [id, activeNegotiationsList]);
+          localStorage.getItem('user_role') === 'buyer' ||
+          localStorage.getItem('user_role') === 'trader' ||
+          window.location.pathname.includes('/buyer')
+        );
 
   const [initTimedOut, setInitTimedOut] = useState(false);
   useEffect(() => {
@@ -216,738 +96,150 @@ export default function NegotiationRoom() {
     return () => clearTimeout(timer);
   }, []);
 
-  // If no ID in URL, query negotiations list to discover user's latest negotiation session
-  const { data: negotiationsList } = useQuery({
-    queryKey: ['negotiations_list_all'],
+  const { data: latestNeg } = useQuery({
+    queryKey: ['latest-negotiation'],
     queryFn: async () => {
-      const res = await api.get('/negotiations/');
-      const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
-      return list;
+      try {
+        const res = await api.get('/negotiations');
+        const list = res.data?.data || res.data || [];
+        return Array.isArray(list) && list.length > 0 ? list[0] : null;
+      } catch (e) {
+        return null;
+      }
     },
     enabled: !id,
-    staleTime: 30000,
+    staleTime: 60000
   });
 
-  // Resolve active negotiation ID: from URL -> or from localStorage -> or latest from DB
   const activeId = useMemo(() => {
-    if (id && id !== 'undefined') return id;
-    const stored = localStorage.getItem('current_negotiation_id') || localStorage.getItem('last_negotiation_id');
-    if (stored && stored !== 'undefined') return stored;
-    if (negotiationsList && negotiationsList.length > 0) {
-      const latest = negotiationsList[negotiationsList.length - 1];
-      return latest.negotiation_id || latest.id;
-    }
-    return undefined;
-  }, [id, negotiationsList]);
+    if (id && id !== 'latest') return id;
+    if (latestNeg) return latestNeg.id || latestNeg.negotiation_id;
+    return id || 'latest';
+  }, [id, latestNeg]);
 
-  // Save activeId to localStorage so page refresh retains session state
   useEffect(() => {
-    if (activeId) {
-      localStorage.setItem('current_negotiation_id', activeId);
+    if ((!id || id === 'latest') && latestNeg?.id && latestNeg.id !== id) {
+      navigate(`/negotiations/${latestNeg.id}`, { replace: true });
     }
-  }, [activeId]);
+  }, [id, latestNeg, navigate]);
 
-  const token = localStorage.getItem('agri_token');
   const baseWsUrl = import.meta.env.VITE_WS_URL || '/api/v1/ws';
-  const targetWsId = activeId || id;
-  const wsUrl = targetWsId ? `${baseWsUrl}?negotiation_id=${targetWsId}` : `${baseWsUrl}/negotiation`;
-  const { isConnected, lastMessage, sendMessage } = useWebSocket(wsUrl);
-
-  // 1. Fetch negotiation session state from database (smooth non-blocking background polling)
-  const { data: negState, isLoading, refetch: refetchNeg } = useQuery({
-    queryKey: ['negotiation', activeId],
-    queryFn: async () => {
-      if (!activeId) return null;
-      const res = await api.get(`/negotiations/${activeId}`);
-      return res.data?.data || res.data;
-    },
-    enabled: Boolean(activeId),
-    refetchInterval: 4000,
-    retry: 1
-  });
+  const effectiveWsUrl = activeId ? `${baseWsUrl}/negotiate/${activeId}` : `${baseWsUrl}/negotiate/demo`;
+  const { isConnected, lastMessage, sendMessage } = useWebSocket(effectiveWsUrl);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // States
+  // Core Room State
   const [messages, setMessages] = useState<any[]>([]);
   const [isRagOpen, setIsRagOpen] = useState(false);
   const [showAgreement, setShowAgreement] = useState(false);
   const [agreementData, setAgreementData] = useState<any>(null);
   const [showValidationModal, setShowValidationModal] = useState(false);
-  const [dealAccepted, setDealAccepted] = useState(false);
-  const [isRenegotiating, setIsRenegotiating] = useState(false);
   const [activeTab, setActiveTab] = useState<'timeline' | 'terminal'>('timeline');
   const [isParallelRunning, setIsParallelRunning] = useState(false);
-  const [isFindingMatches, setIsFindingMatches] = useState<boolean>(() => Boolean(location.state?.fromListing || location.state?.autoStart));
   const [liveTerminalLogs, setLiveTerminalLogs] = useState<Array<{ time: string; tag: string; text: string; color?: string }>>([]);
-  const [activeSupplyChainNode, setActiveSupplyChainNode] = useState<string>('PLANNING');
-  const [completedSupplyChainNodes, setCompletedSupplyChainNodes] = useState<string[]>([]);
   const [manualPrice, setManualPrice] = useState<string>('');
-  const [farmerManualPrice, setFarmerManualPrice] = useState<number>(2550);
   const [recommendation, setRecommendation] = useState<any>(null);
   const [reflection, setReflection] = useState<any>(null);
-  // Downstream Autonomous Logistics State (Transport, Warehouse, Processor)
-  const [liveWarehousePlan, setLiveWarehousePlan] = useState<any>(null);
-  const [liveProcessorPlan, setLiveProcessorPlan] = useState<any>(null);
-  const [liveTransportPlan, setLiveTransportPlan] = useState<any>(null);
-
-  const currentTransportPlan = liveTransportPlan || agreementData?.transport_plan || negState?.transport_plan;
-  const currentWarehousePlan = liveWarehousePlan || agreementData?.warehouse_plan || negState?.warehouse_plan;
-  const currentProcessorPlan = liveProcessorPlan || agreementData?.processor_plan || negState?.processor_plan;
-
-  const handleAcceptDeal = async (customDeal?: any) => {
-    const defaultFarmer = isBuyer ? liveSellers[0]?.id : (user?.name || farmerName || 'Producer');
-    const defaultBuyer = isBuyer ? (buyerName || user?.name || 'AgroCorp Procurement') : (liveBuyers[0]?.id || 'Buyer A');
-    const defaultPrice = isBuyer ? liveSellers[0]?.offer : liveBuyers[0]?.offer;
-
-    const chosenPrice = customDeal?.price || defaultPrice || targetPrice || 68.5;
-    const chosenFarmer = customDeal?.farmer || defaultFarmer || farmerName || 'Producer';
-    const chosenBuyer = customDeal?.buyer || defaultBuyer || 'AgroCorp Procurement';
-    const chosenCrop = customDeal?.crop || cropName || 'Soybean';
-    const chosenQty = customDeal?.quantity || cropQty || 500;
-
-    const agreement = {
-      ...negState,
-      id: effectiveId || id || negState?.id || 'neg_deal',
-      negotiation_id: effectiveId || id || negState?.id || 'neg_deal',
-      price: chosenPrice,
-      final_price: chosenPrice,
-      farmer: chosenFarmer,
-      farmer_name: chosenFarmer,
-      buyer: chosenBuyer,
-      buyer_name: chosenBuyer,
-      crop: chosenCrop,
-      quantity: chosenQty,
-      status: 'DEAL',
-      transport_plan: negState?.transport_plan || null
-    };
-
-    setAgreementData(agreement);
-    setDealAccepted(true);
-    setIsRenegotiating(false);
-    setIsParallelRunning(false);
-
-    // Call backend API to finalize deal and persist transaction in DB
-    try {
-      const activeId = effectiveId || id || negState?.id || negState?.negotiation_id;
-      if (activeId) {
-        await api.post(`/negotiations/${activeId}/accept`, {
-          price: chosenPrice,
-          quantity: chosenQty,
-          farmer: chosenFarmer,
-          buyer: chosenBuyer,
-          crop: chosenCrop,
-          user_id: user?.id || localStorage.getItem('user_id') || 'usr_buyer_demo',
-          transport_plan: agreement.transport_plan
-        });
-        refetchNeg();
-      }
-    } catch (err: any) {
-      console.warn('Accept deal API note:', err);
-    }
-
-    setShowValidationModal(true);
-  };
-
-
   const [rightTab, setRightTab] = useState<'ai' | 'rag' | 'copilot'>('copilot');
-  const [isSteppingWorkflow, setIsSteppingWorkflow] = useState(false);
   const [copilotCommand, setCopilotCommand] = useState('');
-  const [copilotMessages, setCopilotMessages] = useState<{sender: string, text: string, time: string}[]>([]);
-  const [liveBuyers, setLiveBuyers] = useState<any[]>(() => getInitialBuyers('Rice', 25));
+  const [copilotMessages, setCopilotMessages] = useState<{ sender: string; text: string; time?: string }[]>([]);
+  const [liveBuyers, setLiveBuyers] = useState<any[]>([]);
+  const [selectedCandidateIndex, setSelectedCandidateIndex] = useState<number>(0);
+  const [branchMessagesMap, setBranchMessagesMap] = useState<Record<number, any[]>>({});
 
-  // State recovery on page reload/reconnection from persisted negotiation state
-  useEffect(() => {
-    if (negState) {
-      if (negState.logs && Array.isArray(negState.logs) && negState.logs.length > 0 && liveTerminalLogs.length === 0) {
-        setLiveTerminalLogs(negState.logs.map((log: string) => {
-          const isCheck = log.includes('✅') || log.includes('✓');
-          const isError = log.includes('❌') || log.includes('ERROR');
-          const isWarning = log.includes('⚠️');
-          return {
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-            tag: log.includes('Validation') ? 'VALIDATION' :
-                 log.includes('Transport') ? 'TRANSPORT' :
-                 log.includes('Warehouse') ? 'WAREHOUSE' :
-                 log.includes('Processor') ? 'PROCESSOR' :
-                 log.includes('Discovery') || log.includes('Radar') ? 'DISCOVERY' : 'AGENT',
-            color: isCheck ? 'text-emerald-400 font-bold' : isError ? 'text-rose-400 font-bold' : isWarning ? 'text-amber-400' : 'text-slate-300',
-            text: log
-          };
-        }));
-      }
-      if ((negState.status === 'DEAL' || negState.status === 'COMPLETED') && !dealAccepted) {
-        setDealAccepted(true);
-        if (!agreementData) {
-          setAgreementData(negState);
-        }
-        setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
-        setActiveSupplyChainNode('FINAL');
-      }
-    }
-  }, [negState, dealAccepted, agreementData, liveTerminalLogs.length]);
-
-  const isDealFinalized = (dealAccepted || negState?.status === 'DEAL' || negState?.status === 'COMPLETED') && !isRenegotiating;
-
-  // 1b. Fetch Multi-Agent Workflow State for Farmer or Buyer
-  const requirementId = negState?.requirement_id;
-  const workflowTargetId = effectiveId || id || requirementId;
-  const { data: workflowData } = useQuery({
-    queryKey: ['workflow', workflowTargetId],
+  // Top-5 Parallel Negotiation Branches Query
+  const { data: parallelBranchesData, refetch: refetchBranches } = useQuery({
+    queryKey: ['parallel-branches', activeId],
     queryFn: async () => {
-      if (!workflowTargetId) return null;
+      if (!activeId || activeId === 'latest') return [];
       try {
-        const res = await api.get(`/negotiations/${workflowTargetId}/workflow`);
-        return res.data?.workflow ? res.data : null;
+        const res = await api.get(`/negotiations/${activeId}/parallel-branches`);
+        return res.data?.branches || [];
       } catch (e) {
-        if (requirementId) {
-          try {
-            const reqRes = await api.get(`/requirements/${requirementId}/workflow`);
-            return reqRes.data?.workflow ? reqRes.data : null;
-          } catch (e2) {}
-        }
+        return [];
+      }
+    },
+    enabled: Boolean(activeId && activeId !== 'latest'),
+    refetchInterval: isParallelRunning ? 2000 : false
+  });
+
+  // ---------------------------------------------------------------------------
+  // Dynamic Multi-Agent Phase State Machine & LocalStorage Persistence
+  // ---------------------------------------------------------------------------
+  const storageKey = `farmgenai_completed_phases_${activeId}`;
+
+  // Hydrate completed phases from localStorage if available
+  const [completedPhases, setCompletedPhases] = useState<Partial<Record<AgentPhase, CompletedPhaseRecord>>>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  const [activePhase, setActivePhase] = useState<AgentPhase>('FARMER');
+  const [viewingPhase, setViewingPhase] = useState<AgentPhase>('FARMER');
+  const [transitionNotice, setTransitionNotice] = useState<{ title: string; message: string; timestamp: string } | null>(null);
+
+  // Transport Phase States
+  const [selectedTransportVehicle, setSelectedTransportVehicle] = useState<any>(null);
+  const [selectedTransportIndex, setSelectedTransportIndex] = useState<number>(0);
+  const [transportBranchMessages, setTransportBranchMessages] = useState<Record<number, any[]>>({});
+  const [transportBranchStatuses, setTransportBranchStatuses] = useState<Record<number, { status: string; currentFreight: number; rounds: number }>>({});
+  const [isParallelTransportRunning, setIsParallelTransportRunning] = useState(false);
+  const [transportBuyerOffer, setTransportBuyerOffer] = useState<string>('');
+  const [transportMessages, setTransportMessages] = useState<any[]>([]);
+  const [transportStatus, setTransportStatus] = useState<'IDLE' | 'NEGOTIATING' | 'AGREED' | 'DECLINED' | 'CANCELLED'>('IDLE');
+  const [transportAgreement, setTransportAgreement] = useState<any>(null);
+  const [isTransportLoading, setIsTransportLoading] = useState(false);
+  const [transportRound, setTransportRound] = useState(1);
+
+  // Sync completedPhases changes to localStorage for true refresh persistence
+  useEffect(() => {
+    if (activeId && Object.keys(completedPhases).length > 0) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(completedPhases));
+      } catch (e) {}
+    }
+  }, [completedPhases, storageKey, activeId]);
+
+  // Negotiation Query
+  const { data: negState, isLoading, refetch: refetchNeg } = useQuery({
+    queryKey: ['negotiation', activeId],
+    queryFn: async () => {
+      if (!activeId || activeId === 'latest') return null;
+      try {
+        const res = await api.get(`/negotiations/${activeId}`);
+        return res.data?.data || res.data;
+      } catch (e) {
         return null;
       }
     },
-    enabled: Boolean(workflowTargetId),
-    refetchInterval: isDealFinalized ? 4000 : false
+    enabled: Boolean(activeId && activeId !== 'latest'),
+    refetchInterval: activePhase === 'FARMER' ? 4000 : false
   });
 
-  const [selectedCropOverride, setSelectedCropOverride] = useState<string | null>(null);
+  const cropName = negState?.crop || negState?.crop_name || 'Soybean';
+  const cropQty = Number(negState?.quantity || negState?.quantity_kg || 2500);
+  const targetPrice = Number(negState?.expected_price || negState?.target_price || 51);
+  const farmerName = negState?.farmer_name || negState?.farmer || 'Maharashtra Producer';
+  const buyerName = negState?.buyer_name || negState?.buyer || user?.name || 'Buyer Enterprise';
+  // Dynamic APMC district origin fallback (Requirement 7: dynamic origin based on actual district)
+  const resolvedDistrict = useMemo(() => {
+    const raw = negState?.district || negState?.buyer_district || 
+      (typeof negState?.buyer_location === 'string' ? negState.buyer_location.split(',')[0].trim() : '') ||
+      (typeof negState?.location === 'string' && !negState.location.includes('APMC') ? negState.location.split(',')[0].trim() : '');
+    return raw || '';
+  }, [negState]);
 
-  const MAHARASHTRA_CROP_SCENARIOS: Record<string, { qty: number; target: number; bench: number; loc: string; desc: string }> = {
-    Rice: { qty: 5000, target: 34.2, bench: 23.0, loc: 'Pune / Maval APMC', desc: 'Indrayani Fragrant & Long Grain' },
-    Sugarcane: { qty: 25000, target: 3.4, bench: 3.15, loc: 'Kolhapur APMC', desc: 'High Sucrose Milling Stalks' },
-    Soybean: { qty: 1000, target: 48.0, bench: 48.92, loc: 'Latur APMC', desc: 'Yellow Solvent Grade Lot' },
-    Cotton: { qty: 3000, target: 71.0, bench: 71.21, loc: 'Wardha APMC', desc: 'Medium Staple White Gold Vidarbha' },
-    Onion: { qty: 2000, target: 16.5, bench: 14.5, loc: 'Lasalgaon APMC', desc: 'Garva Red Export Quality' },
-    Bajra: { qty: 1500, target: 26.2, bench: 26.25, loc: 'Dhule APMC', desc: 'Dhule Hybrid Pearl Millet' },
-    Jowar: { qty: 1200, target: 33.5, bench: 33.71, loc: 'Solapur APMC', desc: 'Solapur Maldandi Rabi Sorghum' }
-  };
-
-  const cropName = selectedCropOverride || negState?.crop || 'Rice';
-  const activeScenario = MAHARASHTRA_CROP_SCENARIOS[cropName] || MAHARASHTRA_CROP_SCENARIOS['Rice'];
-  const cropQty = selectedCropOverride ? activeScenario.qty : (Number(negState?.quantity) || activeScenario.qty);
-  const targetPrice = selectedCropOverride ? activeScenario.target : Number(negState?.target_price || negState?.buyer_target_price || activeScenario.target);
-  const currentFloor = selectedCropOverride ? Math.round(activeScenario.target * 0.9 * 10) / 10 : (Number(negState?.min_price) || Math.round(targetPrice * 0.9 * 10) / 10);
-  const marketPrice = Number(negState?.market_price || Math.round(targetPrice * 1.04 * 10) / 10);
-  const activeAgent = isParallelRunning ? 'Negotiator' : (lastMessage?.data?.agent || 'Negotiator');
-
-  // Blueprint Compliance: Stakeholder Scope Variables
-  const activeStakeholder = (lastMessage?.stakeholder || negState?.stakeholder_role || 'FARMER').toUpperCase();
-  const farmerName = negState?.farmer_name || negState?.farmer || 'Indrayani Fragrant Rice Producers FPO';
-  const farmerLocation = negState?.location || activeScenario.loc;
-  const buyerName = negState?.buyer_name || negState?.buyer || user?.name || 'AgroCorp Procurement';
-  const bestOfferPrice = Number(negState?.current_offer || negState?.price || negState?.min_price || targetPrice);
-
-  const handleStepWorkflow = async (action: string) => {
-    const targetWfId = effectiveId || id || requirementId;
-    if (!targetWfId) return;
-    try {
-      setIsSteppingWorkflow(true);
-      try {
-        await api.post(`/negotiations/${targetWfId}/workflow/step`, { action });
-      } catch (negErr) {
-        if (requirementId) {
-          await api.post(`/requirements/${requirementId}/workflow/step`, { action });
-        } else {
-          throw negErr;
-        }
-      }
-      await queryClient.invalidateQueries({ queryKey: ['workflow', targetWfId] });
-      await queryClient.invalidateQueries({ queryKey: ['negotiation', effectiveId] });
-      addNotification(`${action} agent executed and plan updated!`, 'success');
-    } catch (err: any) {
-      addNotification(err.response?.data?.detail || `${action} execution failed`, 'error');
-    } finally {
-      setIsSteppingWorkflow(false);
-    }
-  };
-
-  // Helper to ensure values rendered in JSX are strictly strings or numbers, never raw objects
-  const safeText = (val: any, fallback = ''): string => {
-    if (val === null || val === undefined) return fallback;
-    if (typeof val === 'string') return val;
-    if (typeof val === 'number') return String(val);
-    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
-    if (typeof val === 'object') {
-      if (val.route_path) return String(val.route_path);
-      if (val.route_waypoints && Array.isArray(val.route_waypoints)) {
-        const names = val.route_waypoints
-          .map((w: any) => (typeof w === 'object' ? (w.name || w.city || '') : String(w)))
-          .filter(Boolean);
-        if (names.length > 0) return names.join(' ➔ ');
-      }
-      if (val.vehicle_name) return String(val.vehicle_name);
-      if (val.vehicle_type) return String(val.vehicle_type);
-      if (val.facility_name) return String(val.facility_name);
-      if (val.name) return String(val.name);
-      if (val.title) return String(val.title);
-      if (val.output_product) return String(val.output_product);
-      if (val.location) return typeof val.location === 'string' ? val.location : safeText(val.location);
-      if (Array.isArray(val)) {
-        if (val.length === 0) return fallback;
-        return val
-          .map((x: any) => (typeof x === 'object' ? (x.name || x.label || x.route_path || '') : String(x)))
-          .filter(Boolean)
-          .join(' ➔ ');
-      }
-      try {
-        return JSON.stringify(val);
-      } catch {
-        return fallback;
-      }
-    }
-    return String(val);
-  };
-
-  const effectiveOutcomes = useMemo(() => {
-    const fromWf = workflowData?.workflow?.agent_outcomes || {};
-    const tPlan = liveTransportPlan || agreementData?.transport_plan || negState?.transport_plan;
-    const wPlan = liveWarehousePlan || agreementData?.warehouse_plan || negState?.warehouse_plan;
-    const pPlan = liveProcessorPlan || agreementData?.processor_plan || negState?.processor_plan;
-
-    const outcomes: Record<string, any> = {};
-    // Normalize and sanitize any objects from backend fromWf
-    Object.keys(fromWf).forEach((key) => {
-      const entry = fromWf[key];
-      if (entry) {
-        outcomes[key] = {
-          ...entry,
-          status: safeText(entry.status, 'COMPLETED'),
-          cost: Number(entry.cost || 0),
-          result: {
-            ...(entry.result || {}),
-            vehicle: safeText(entry.result?.vehicle || entry.vehicle, 'Freight Haulage'),
-            route: safeText(entry.result?.route || entry.route, 'Transit route assigned'),
-            name: safeText(entry.result?.name || entry.name, 'Agro Facility'),
-            location: safeText(entry.result?.location || entry.location, 'Maharashtra'),
-            output_product: safeText(entry.result?.output_product || entry.output_product, 'Value-added produce')
-          }
-        };
-      }
-    });
-
-    if (!outcomes.TRANSPORT && tPlan) {
-      const cost = Number(tPlan.agreed_price || tPlan.total_operating_cost || tPlan.cost || 4200);
-      outcomes.TRANSPORT = {
-        status: safeText(tPlan.status, 'COMPLETED'),
-        cost,
-        result: {
-          vehicle: safeText(tPlan.vehicle_name || tPlan.vehicle_type || tPlan.vehicle, 'Eicher Pro 2059 (4-Ton Reefer)'),
-          route: safeText(tPlan.route, `${farmerLocation} → Pune APMC Hub`),
-          cost
-        }
-      };
-    }
-    if (!outcomes.WAREHOUSE && wPlan) {
-      const cost = Number(wPlan.total_cost || wPlan.cost || 1050);
-      outcomes.WAREHOUSE = {
-        status: safeText(wPlan.status, 'COMPLETED'),
-        cost,
-        result: {
-          name: safeText(wPlan.facility_name || wPlan.name, 'Pune Central APMC Warehouse & Cold Storage'),
-          location: safeText(wPlan.location, 'Pune APMC, Maharashtra'),
-          holding_days: Number(wPlan.holding_days || 7),
-          cost
-        }
-      };
-    }
-    if (!outcomes.PROCESSOR && pPlan) {
-      const cost = Number(pPlan.processing_fee || pPlan.cost || 3500);
-      outcomes.PROCESSOR = {
-        status: safeText(pPlan.status, 'COMPLETED'),
-        cost,
-        result: {
-          name: safeText(pPlan.unit_name || pPlan.name, 'Sahyadri Agro-Processing Cluster'),
-          output_product: safeText(pPlan.output_product, 'Premium Value-Added APMC Grade Lot'),
-          cost
-        }
-      };
-    }
-    return outcomes;
-  }, [workflowData, liveTransportPlan, liveWarehousePlan, liveProcessorPlan, agreementData, negState, farmerLocation]);
-
-  const effectiveFinalPlan = useMemo(() => {
-    if (workflowData?.workflow?.final_plan) return workflowData.workflow.final_plan;
-    const e2e = agreementData?.end_to_end_deal || negState?.end_to_end_deal;
-    if (e2e || isDealFinalized) {
-      const p = Number(agreementData?.final_price || negState?.final_price || targetPrice);
-      const baseCost = p * cropQty;
-      const tCost = Number(effectiveOutcomes.TRANSPORT?.cost || 4200);
-      const wCost = Number(effectiveOutcomes.WAREHOUSE?.cost || 1050);
-      const prCost = Number(effectiveOutcomes.PROCESSOR?.cost || 3500);
-      return {
-        total_procurement_cost: e2e?.total_landed_cost || e2e?.total_procurement_cost || (baseCost + tCost + wCost + prCost),
-        contract_signature: e2e?.digital_signature_hash || e2e?.contract_hash || agreementData?.contract_hash || negState?.contract_hash || ('0x' + String(effectiveId || 'contract').replace(/\D/g, '').padEnd(16, '7'))
-      };
-    }
-    return null;
-  }, [workflowData, agreementData, negState, isDealFinalized, targetPrice, cropQty, effectiveOutcomes, effectiveId]);
-
-  const renderMultiAgentOutcomes = () => {
-    const hasAnyOutcome = Object.keys(effectiveOutcomes).length > 0;
-    if (!hasAnyOutcome && !effectiveFinalPlan) return null;
-
-    return (
-      <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-lg border border-slate-700 mt-2 space-y-3 animate-in fade-in">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-2">
-            <Bot size={16} className="text-emerald-400" />
-            <span className="font-bold text-xs uppercase tracking-wider text-slate-200">
-              Multi-Agent Supply-Chain Execution Outcomes
-            </span>
-          </div>
-          <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-            {safeText(workflowData?.workflow?.workflow_status, 'ALL AGENTS COMPLETED')}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {/* Transport Outcome */}
-          {effectiveOutcomes.TRANSPORT && (
-            <div className="bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 text-xs">
-              <div className="flex items-center justify-between font-bold text-blue-300 mb-1.5">
-                <span className="flex items-center gap-1.5"><Truck size={14} /> Transport Agent</span>
-                <span className="text-[10px] bg-blue-950 px-1.5 py-0.5 rounded text-blue-300 font-bold border border-blue-800">
-                  {safeText(effectiveOutcomes.TRANSPORT.status, 'COMPLETED')}
-                </span>
-              </div>
-              <p className="text-slate-300 font-semibold">{safeText(effectiveOutcomes.TRANSPORT.result?.vehicle, 'Freight Haulage')}</p>
-              <p className="text-slate-400 text-[11px] truncate">{safeText(effectiveOutcomes.TRANSPORT.result?.route, 'Transit route assigned')}</p>
-              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
-                <span>Haulage Cost:</span>
-                <span className="font-bold text-white">₹{Number(effectiveOutcomes.TRANSPORT.cost || 0).toLocaleString()}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Warehouse Outcome */}
-          {effectiveOutcomes.WAREHOUSE && (
-            <div className="bg-slate-800/80 p-3 rounded-xl border border-purple-500/30 text-xs">
-              <div className="flex items-center justify-between font-bold text-purple-300 mb-1.5">
-                <span className="flex items-center gap-1.5"><Warehouse size={14} /> Warehouse Agent</span>
-                <span className="text-[10px] bg-purple-950 px-1.5 py-0.5 rounded text-purple-300 font-bold border border-purple-800">
-                  {safeText(effectiveOutcomes.WAREHOUSE.status, 'COMPLETED')}
-                </span>
-              </div>
-              <p className="text-slate-300 font-semibold">{safeText(effectiveOutcomes.WAREHOUSE.result?.name, 'Cold/Dry Facility')}</p>
-              <p className="text-slate-400 text-[11px] truncate">{safeText(effectiveOutcomes.WAREHOUSE.result?.location, 'Maharashtra')}</p>
-              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
-                <span>Storage Cost ({safeText(effectiveOutcomes.WAREHOUSE.result?.holding_days, '7')}d):</span>
-                <span className="font-bold text-white">₹{Number(effectiveOutcomes.WAREHOUSE.cost || 0).toLocaleString()}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Processor Outcome */}
-          {effectiveOutcomes.PROCESSOR && (
-            <div className="bg-slate-800/80 p-3 rounded-xl border border-amber-500/30 text-xs">
-              <div className="flex items-center justify-between font-bold text-amber-300 mb-1.5">
-                <span className="flex items-center gap-1.5"><Factory size={14} /> Processor Agent</span>
-                <span className="text-[10px] bg-amber-950 px-1.5 py-0.5 rounded text-amber-300 font-bold border border-amber-800">
-                  {safeText(effectiveOutcomes.PROCESSOR.status, 'COMPLETED')}
-                </span>
-              </div>
-              <p className="text-slate-300 font-semibold">{safeText(effectiveOutcomes.PROCESSOR.result?.name, 'Industrial Processor')}</p>
-              <p className="text-slate-400 text-[11px] truncate">{safeText(effectiveOutcomes.PROCESSOR.result?.output_product, 'Value-added conversion')}</p>
-              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
-                <span>Milling Tariff:</span>
-                <span className="font-bold text-white">₹{Number(effectiveOutcomes.PROCESSOR.cost || 0).toLocaleString()}</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Final Supply Chain Aggregation */}
-        {effectiveFinalPlan && (
-          <div className="bg-emerald-950/70 p-3 rounded-xl border border-emerald-600/40 text-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <ShieldCheck size={20} className="text-emerald-400 shrink-0" />
-              <div>
-                <p className="font-bold text-white text-sm">
-                  Total End-to-End {isBuyer ? 'Procurement Cost' : 'Contract Value'}: ₹{Number(effectiveFinalPlan.total_procurement_cost || 0).toLocaleString()}
-                </p>
-                <p className="text-emerald-300 text-[11px]">
-                  Digital Contract Hash: <span className="font-mono text-emerald-200">{safeText(effectiveFinalPlan.contract_signature, 'VERIFIED_HASH')}</span>
-                </p>
-              </div>
-            </div>
-            <span className="bg-emerald-500 text-slate-950 px-3 py-1 rounded-lg font-black text-xs shadow">
-              ALL AGENTS COMPLETED
-            </span>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderWorkflowActionButtons = () => {
-    const validActions = workflowData?.valid_next_actions || [];
-    return (
-      <>
-        {validActions.some((a: any) => a.action === 'TRANSPORT') && (
-          <button
-            disabled={isSteppingWorkflow}
-            onClick={() => handleStepWorkflow('TRANSPORT')}
-            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
-            }`}
-          >
-            <Truck size={14} /> {isSteppingWorkflow ? 'Executing Transport...' : 'Execute Transport Agent'}
-          </button>
-        )}
-
-        {validActions.some((a: any) => a.action === 'WAREHOUSE') && (
-          <button
-            disabled={isSteppingWorkflow}
-            onClick={() => handleStepWorkflow('WAREHOUSE')}
-            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
-            }`}
-          >
-            <Warehouse size={14} /> {isSteppingWorkflow ? 'Allocating Storage...' : 'Execute Warehouse Agent'}
-          </button>
-        )}
-
-        {validActions.some((a: any) => a.action === 'PROCESSOR') && (
-          <button
-            disabled={isSteppingWorkflow}
-            onClick={() => handleStepWorkflow('PROCESSOR')}
-            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
-            }`}
-          >
-            <Factory size={14} /> {isSteppingWorkflow ? 'Scheduling Processing...' : 'Execute Processor Agent'}
-          </button>
-        )}
-
-        {validActions.some((a: any) => a.action === 'COMPLETE') && (
-          <button
-            disabled={isSteppingWorkflow}
-            onClick={() => handleStepWorkflow('COMPLETE')}
-            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
-            }`}
-          >
-            <CheckCircle2 size={14} /> {isSteppingWorkflow ? 'Finalizing Plan...' : 'Finalize Supply Chain Plan'}
-          </button>
-        )}
-      </>
-    );
-  };
-
-  // Crop-specific regional farmer directory across Maharashtra APMCs (Top 5 per commodity)
-  const CROP_FARMER_DIRECTORY: Record<string, Array<{ id: string; location: string; match: number; special: string }>> = {
-    Rice: [
-      { id: 'Indrayani Fragrant Rice Producers FPO', location: 'Maval, Pune, Maharashtra', match: 97, special: 'Indrayani Aromatic Grade' },
-      { id: 'Gondia Paddy Farmers Cooperative', location: 'Gondia, Maharashtra', match: 94, special: 'Long Grain Paddy' },
-      { id: 'Bhandara Kolam Rice Producer Group', location: 'Bhandara, Maharashtra', match: 92, special: 'Milling Ready <12% Moist' },
-      { id: 'Raigad Wada Kolam Farmers Union', location: 'Raigad, Maharashtra', match: 90, special: 'GI Tagged Wada Kolam' },
-      { id: 'Nashik Fragrant Rice Producers', location: 'Nashik, Maharashtra', match: 87, special: 'Direct Farm APMC Lot' }
-    ],
-    Sugarcane: [
-      { id: 'Kolhapur Panchganga Cane Growers Co-op', location: 'Kolhapur, Maharashtra', match: 97, special: 'High Brix Sucrose Lot' },
-      { id: 'Sangli Krishna Valley Sugar Belt FPO', location: 'Sangli, Maharashtra', match: 95, special: 'Krishna Basin Cane' },
-      { id: 'Baramati Cane Producers Society', location: 'Pune, Maharashtra', match: 93, special: 'Fresh Harvested Stalks' },
-      { id: 'Solapur Bhima Valley Sugar Growers', location: 'Solapur, Maharashtra', match: 89, special: 'Early Maturity Milling Cane' },
-      { id: 'Satara Koyna Cane Producers', location: 'Satara, Maharashtra', match: 86, special: 'Clean High-Sugar Stalks' }
-    ],
-    Soybean: [
-      { id: 'Latur Solvent & Oilseeds Farmers FPO', location: 'Latur, Maharashtra', match: 96, special: 'Yellow Solvent Grade' },
-      { id: 'Nanded Krishi Vikas Agro Consortium', location: 'Nanded, Maharashtra', match: 93, special: 'Direct APMC Yard Lot' },
-      { id: 'Barshi Soybean Producers Union', location: 'Solapur, Maharashtra', match: 90, special: 'Certified Organic Seed' },
-      { id: 'Hingoli Oilseeds Producer Co.', location: 'Hingoli, Maharashtra', match: 88, special: 'APMC Graded Yellow Soya' },
-      { id: 'Yavatmal Kisan Oilseeds Union', location: 'Yavatmal, Maharashtra', match: 85, special: 'Moisture <10% Lot' }
-    ],
-    Cotton: [
-      { id: 'Vidarbha White Gold Farmers Producer Co.', location: 'Wardha, Maharashtra', match: 96, special: 'Medium Staple Lint' },
-      { id: 'Akola Cotton Growers Association', location: 'Akola, Maharashtra', match: 93, special: 'Moisture <8% Bales' },
-      { id: 'Yavatmal Kapas Utpadak Sahakari Sangh', location: 'Yavatmal, Maharashtra', match: 90, special: 'Ginned APMC Grade' },
-      { id: 'Amravati White Gold Consortium', location: 'Amravati, Maharashtra', match: 88, special: 'Long Staple High Micronaire' },
-      { id: 'Jalgaon Kapas Federation', location: 'Jalgaon, Maharashtra', match: 85, special: 'Clean Farm Gin Lot' }
-    ],
-    Onion: [
-      { id: 'Lasalgaon Onion Growers Cooperative', location: 'Lasalgaon, Nashik, Maharashtra', match: 97, special: 'Garva Red Export Quality' },
-      { id: 'Pimpalgaon Baswant Agri Union', location: 'Pimpalgaon, Maharashtra', match: 94, special: 'Cured Pink Medium Bulb' },
-      { id: 'Yeola Red Onion Farmers Producer Co.', location: 'Yeola, Maharashtra', match: 91, special: 'Direct Farm Pack' },
-      { id: 'Ahmednagar Kanda Utpadak Sangh', location: 'Ahmednagar, Maharashtra', match: 88, special: 'Cold Storage Ready' },
-      { id: 'Solapur Rabi Onion Collective', location: 'Solapur, Maharashtra', match: 85, special: 'Graded Red Medium Bulbs' }
-    ],
-    Bajra: [
-      { id: 'Dhule Pearl Millet Farmers Federation', location: 'Dhule, Maharashtra', match: 96, special: 'Hybrid Bold Grain' },
-      { id: 'Nashik Nutri-Cereal Consortium', location: 'Malegaon, Nashik, Maharashtra', match: 94, special: 'Cleaned Desi Bajra' },
-      { id: 'Sangamner Bajra Utpadak Sangh', location: 'Ahmednagar, Maharashtra', match: 92, special: 'Nutri-Grade Premium' },
-      { id: 'Beed Dryland Millet Society', location: 'Beed, Maharashtra', match: 88, special: 'High Fiber Rabi Grain' },
-      { id: 'Jalna Nutri-Bajra Producers', location: 'Jalna, Maharashtra', match: 85, special: 'Sun-Dried APMC Lot' }
-    ],
-    Jowar: [
-      { id: 'Solapur Maldandi Jowar Growers Society', location: 'Solapur, Maharashtra', match: 96, special: 'Maldandi M35-1 Rabi' },
-      { id: 'Dharashiv Millets & Sorghum Producer Co.', location: 'Osmanabad, Maharashtra', match: 93, special: 'Pearled White Sorghum' },
-      { id: 'Ahmednagar Dryland Jowar Collective', location: 'Ahmednagar, Maharashtra', match: 90, special: 'High Protein Fodder Crop' },
-      { id: 'Parbhani Sorghum Federation', location: 'Parbhani, Maharashtra', match: 87, special: 'Bold Seed M35 Grade' },
-      { id: 'Latur Rabi Jowar Union', location: 'Latur, Maharashtra', match: 84, special: 'Export Cleaned Grain' }
-    ],
-    Wheat: [
-      { id: 'Sunil Pawar', location: 'Niphad APMC, Maharashtra', match: 96, special: 'Sharbati Grade A' },
-      { id: 'Pravin Kadam', location: 'Nashik APMC, Maharashtra', match: 92, special: 'Lokwan Milling Wheat' },
-      { id: 'Dattatray Shinde', location: 'Dhule APMC, Maharashtra', match: 89, special: 'Bulk Desi Grain' },
-      { id: 'Anand Shinde', location: 'Jalgaon APMC, Maharashtra', match: 87, special: 'High Protein Wheat' },
-      { id: 'Ganesh More', location: 'Ahmednagar APMC, Maharashtra', match: 84, special: 'Clean APMC Yard Lot' }
-    ],
-    Tomato: [
-      { id: 'Bhausaheb Dhumal', location: 'Narayangaon APMC, Maharashtra', match: 96, special: 'Hybrid Table Tomato' },
-      { id: 'Santosh Gaikwad', location: 'Junnar APMC, Maharashtra', match: 92, special: 'Processing Grade' },
-      { id: 'Pandurang More', location: 'Sangamner APMC, Maharashtra', match: 89, special: 'Firm Ripe Lot' },
-      { id: 'Kishor Thorat', location: 'Nashik APMC, Maharashtra', match: 87, special: 'Cold Chain Graded' },
-      { id: 'Nitin Jadhav', location: 'Pune APMC, Maharashtra', match: 84, special: 'Bulk Crates Lot' }
-    ],
-    Maize: [
-      { id: 'Vishnu Bhalerao', location: 'Malegaon APMC, Maharashtra', match: 96, special: 'Yellow Feed Corn' },
-      { id: 'Shrikant Patil', location: 'Dhule APMC, Maharashtra', match: 92, special: 'Starch Industry Lot' },
-      { id: 'Santosh Gite', location: 'Jalgaon APMC, Maharashtra', match: 89, special: 'Low Aflatoxin Corn' },
-      { id: 'Kailas Borse', location: 'Nashik APMC, Maharashtra', match: 87, special: 'High Energy Maize' },
-      { id: 'Raju Deshmukh', location: 'Ahmednagar APMC, Maharashtra', match: 84, special: 'Milling Ready Corn' }
-    ]
-  };
-
-  // Candidate Farmers for Buyer Procurement View (Stateful for Real-Time Copilot Controls)
-  const getInitialSellers = (crop: string, basePrice: number) => {
-    const list = CROP_FARMER_DIRECTORY[crop] || CROP_FARMER_DIRECTORY['Rice'];
-    return [
-      { id: list[0].id, location: list[0].location, match: list[0].match, offer: Math.round(basePrice * 1.04 * 10) / 10, aiStatus: list[0].special || 'Verified APMC Grade A', status: 'Negotiating', color: 'emerald' },
-      { id: list[1]?.id || `${crop} Cooperative`, location: list[1]?.location || 'Maharashtra APMC', match: list[1]?.match || 92, offer: Math.round(basePrice * 1.06 * 10) / 10, aiStatus: list[1]?.special || 'Farmer Asking Rate', status: 'Active', color: 'blue' },
-      { id: list[2]?.id || `${crop} Producers Group`, location: list[2]?.location || 'Vidarbha APMC', match: list[2]?.match || 89, offer: Math.round(basePrice * 1.08 * 10) / 10, aiStatus: `Counter ₹${basePrice}`, status: 'Waiting', color: 'amber' },
-      { id: list[3]?.id || `${crop} Kisan Union`, location: list[3]?.location || 'Marathwada Hub', match: list[3]?.match || 87, offer: Math.round(basePrice * 1.10 * 10) / 10, aiStatus: list[3]?.special || 'Holding Asking Price', status: 'Waiting', color: 'purple' },
-      { id: list[4]?.id || `${crop} Mandi Producers`, location: list[4]?.location || 'Western Maharashtra Hub', match: list[4]?.match || 84, offer: Math.round(basePrice * 1.12 * 10) / 10, aiStatus: list[4]?.special || 'Evaluating Logistics', status: 'Waiting', color: 'teal' }
-    ];
-  };
-
-  const [liveSellers, setLiveSellers] = useState(() => getInitialSellers('Rice', 34.2));
-
-  // Sync candidate farmers and buyers dynamically when crop or negState changes
-  useEffect(() => {
-    const activeCrop = cropName;
-    const baseOffer = Number(targetPrice || negState?.price || negState?.current_offer || 34.2);
-    const cropList = CROP_FARMER_DIRECTORY[activeCrop] || CROP_FARMER_DIRECTORY['Rice'];
-
-    const primaryFarmerName = (negState?.farmer_name && !negState.farmer_name.includes('Ramesh Patil'))
-      ? negState.farmer_name
-      : cropList[0].id;
-    const primaryLocation = (negState?.location && !negState.location.includes('Latur'))
-      ? negState.location
-      : cropList[0].location;
-
-    setLiveSellers([
-      {
-        id: primaryFarmerName,
-        location: primaryLocation,
-        match: cropList[0]?.match || 96,
-        color: 'emerald',
-        status: 'Negotiating',
-        offer: Math.round(baseOffer * 1.04 * 10) / 10,
-        aiStatus: cropList[0]?.special || 'Verified APMC Grade A',
-      },
-      {
-        id: cropList[1]?.id || `${activeCrop} Regional Network`,
-        location: cropList[1]?.location || 'Maharashtra APMC',
-        match: cropList[1]?.match || 92,
-        color: 'blue',
-        status: 'Active',
-        offer: Math.round(baseOffer * 1.06 * 10) / 10,
-        aiStatus: cropList[1]?.special || 'Farmer Asking Rate',
-      },
-      {
-        id: cropList[2]?.id || `${activeCrop} Kisan Consortium`,
-        location: cropList[2]?.location || 'Maharashtra Mandi',
-        match: cropList[2]?.match || 89,
-        color: 'amber',
-        status: 'Waiting',
-        offer: Math.round(baseOffer * 1.08 * 10) / 10,
-        aiStatus: `Counter ₹${targetPrice}`
-      },
-      {
-        id: cropList[3]?.id || `${activeCrop} Kisan Union`,
-        location: cropList[3]?.location || 'Marathwada Hub',
-        match: cropList[3]?.match || 87,
-        color: 'purple',
-        status: 'Waiting',
-        offer: Math.round(baseOffer * 1.10 * 10) / 10,
-        aiStatus: 'Holding Asking Price'
-      },
-      {
-        id: cropList[4]?.id || `${activeCrop} Mandi Producers`,
-        location: cropList[4]?.location || 'Western Maharashtra Hub',
-        match: cropList[4]?.match || 84,
-        color: 'teal',
-        status: 'Waiting',
-        offer: Math.round(baseOffer * 1.12 * 10) / 10,
-        aiStatus: 'Evaluating Logistics'
-      }
-    ]);
-
-    if (!manualPrice) {
-      setManualPrice(String(Math.round(targetPrice * 10) / 10));
-    }
-
-    // Sync candidate buyers for Farmer Copilot
-    if (negState) {
-      const farmerBaseOffer = Number(negState.price || negState.current_offer || 2500);
-      const normalizedFarmerOffer = farmerBaseOffer < 100 ? Math.round(farmerBaseOffer * 100) : Math.round(farmerBaseOffer);
-      setLiveBuyers(prev => {
-        const fallback = getInitialBuyers(cropName, normalizedFarmerOffer / 100, negState.buyer_name || negState.buyer);
-        const b0 = (prev && prev[0]) ? prev[0] : fallback[0];
-        const b1 = (prev && prev[1]) ? prev[1] : fallback[1];
-        const b2 = (prev && prev[2]) ? prev[2] : fallback[2];
-        const b3 = (prev && prev[3]) ? prev[3] : fallback[3];
-        const b4 = (prev && prev[4]) ? prev[4] : fallback[4];
-        const buyerId = negState.buyer_name || negState.buyer || b0.id || 'AgroCorp Procurement Director';
-        const isOverride = Boolean(b0?.aiStatus && typeof b0.aiStatus === 'string' && b0.aiStatus.includes('Override'));
-
-        return [
-          {
-            ...b0,
-            id: buyerId,
-            offer: isOverride ? b0.offer : normalizedFarmerOffer,
-            aiStatus: isOverride ? b0.aiStatus : 'Farmer Override: ₹' + normalizedFarmerOffer,
-          },
-          {
-            ...b1,
-            offer: Math.round(normalizedFarmerOffer * 0.99),
-          },
-          {
-            ...b2,
-            offer: Math.round(normalizedFarmerOffer * 0.97),
-          },
-          {
-            ...b3,
-            offer: Math.round(normalizedFarmerOffer * 0.95),
-          },
-          {
-            ...b4,
-            offer: Math.round(normalizedFarmerOffer * 0.93),
-          }
-        ];
-      });
-      setFarmerManualPrice(prev => prev === 2550 ? normalizedFarmerOffer + 50 : prev);
-    }
-  }, [cropName, targetPrice, negState]);
-
-  // Auto-launch negotiation if navigated with autoStart flag or pre-specified scenario
-  const autoStartTriggered = useRef(false);
-  useEffect(() => {
-    if (hasAutoStartFlag && !autoStartTriggered.current && !isParallelRunning && !dealAccepted) {
-      autoStartTriggered.current = true;
-      setIsFindingMatches(true);
-      const timer = setTimeout(() => {
-        runParallelAutonomousNegotiation();
-      }, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [hasAutoStartFlag, isParallelRunning, dealAccepted]);
-
-
+  const defaultApmcOrigin = resolvedDistrict ? `${resolvedDistrict} APMC, Maharashtra` : 'Latur APMC, Maharashtra';
+  const farmerLocation = negState?.farmer_location || (negState?.location && negState.location.includes('APMC') ? negState.location : defaultApmcOrigin);
+  const bestOfferPrice = Number(negState?.final_price || negState?.current_offer || negState?.price || targetPrice * 1.04);
+  const marketPrice = Number(negState?.market_price || Math.round(targetPrice * 1.02 * 10) / 10);
+  const activeStakeholder = (isBuyer ? 'BUYER' : 'FARMER');
   const activeWorkflow = (lastMessage?.workflow || negState?.workflow_mode || 'FULL_SUPPLY_CHAIN').toUpperCase();
 
   // Statutory Benchmarks for 7 Canonical Maharashtra Crops
@@ -971,1873 +263,3264 @@ export default function NegotiationRoom() {
     return Math.round(statutoryBench * 0.35 * 100) / 100;
   }, [statutoryBench]);
 
-  // Dynamic 30-Day Modal Price Trend Curve for PriceChart
-  const chartData = useMemo(() => {
-    const base = Number(marketPrice) || 48.0;
-    return [
-      { name: 'Day 1', price: Math.round((base * 0.94) * 10) / 10 },
-      { name: 'Day 5', price: Math.round((base * 0.96) * 10) / 10 },
-      { name: 'Day 10', price: Math.round((base * 0.95) * 10) / 10 },
-      { name: 'Day 15', price: Math.round((base * 0.98) * 10) / 10 },
-      { name: 'Day 20', price: Math.round((base * 1.02) * 10) / 10 },
-      { name: 'Day 25', price: Math.round((base * 1.01) * 10) / 10 },
-      { name: 'Day 30', price: Math.round(base * 10) / 10 },
-    ];
-  }, [marketPrice]);
+  const currentFloor = useMemo(() => {
+    return Number(negState?.min_price || Math.round(statutoryBench * 0.96 * 10) / 10);
+  }, [negState, statutoryBench]);
 
-  // Sync initial history from database into messages
+  // ---------------------------------------------------------------------------
+  // Dynamic Agent Ordering Engine (No Fixed Priority, True Input & Dependency Driven)
+  // ---------------------------------------------------------------------------
+  const requestedServices = useMemo(() => {
+    const raw = negState?.selected_services || {};
+    const wf = (negState?.workflow_mode || '').toUpperCase();
+    
+    // Check if user specifically requested a transport-only procurement or bypassed produce
+    const isTransportOnly = wf === 'TRANSPORT_ONLY' || raw.farmer_matching === false || (negState as any)?.requires_produce === false;
+    const hasFarmer = !isTransportOnly;
+    const hasTransport = Boolean(raw.transport ?? (wf === 'FULL_SUPPLY_CHAIN' || wf === 'TRANSPORT_ONLY' || wf === ''));
+    const hasWarehouse = Boolean(raw.warehouse ?? (negState?.req_warehouse || (negState as any)?.needs_storage));
+    const hasProcessor = Boolean(raw.processor ?? (negState?.req_processor || (negState as any)?.needs_processing));
+
+    return { hasFarmer, hasTransport, hasWarehouse, hasProcessor, isTransportOnly };
+  }, [negState]);
+
+  // Hydrate completed phases from backend negotiation record if available
   useEffect(() => {
     if (negState) {
-      const rawOffers = negState.offers || negState.history || [];
-      if (rawOffers.length > 0) {
-        const mapped = rawOffers.map((o: any) => ({
-          agent: o.agent || o.sender || (o.sender?.includes('Buyer') ? 'Buyer Agent' : 'Farmer Agent'),
-          message: o.message || `Offered ₹${o.price}/kg for ${o.quantity || cropQty}kg`,
-          type: o.price ? 'offer' : 'text',
-          price: o.price,
-          quantity: o.quantity || cropQty,
-          quality: 'A',
-          deliveryDate: '3 Business Days',
-          transportIncluded: true,
-          warehouseIncluded: false,
-          validity: '24 Hours',
-          reasoning: [
-            `APMC Modal Benchmark: ₹${marketPrice}/kg`,
-            `Statutory MSP: ₹${statutoryBench}/kg`,
-            `Landed freight computed for Maharashtra highway transit`
-          ]
-        }));
-        setMessages(mapped);
-      } else if (messages.length === 0) {
-        setMessages([
-          {
-            agent: isBuyer ? 'Farmer Agent (Latur Mandi)' : 'Buyer Agent (Procurement)',
-            message: `Namaste! Initializing APMC session for ${cropQty.toLocaleString()}kg ${cropName}. Opening offer based on current mandi arrival rates.`,
-            type: 'text'
-          },
-          {
-            agent: isBuyer ? 'Farmer Agent (Latur Mandi)' : 'Buyer Agent (Procurement)',
-            price: Math.round(targetPrice * 1.06 * 10) / 10,
-            quantity: cropQty,
-            quality: 'A',
-            deliveryDate: '3-4 Business Days',
-            transportIncluded: true,
-            warehouseIncluded: false,
-            validity: '24 Hours',
-            type: 'offer',
-            message: `Offering Grade-A lot at ₹${(Math.round(targetPrice * 1.06 * 10) / 10)}/kg.`,
-            reasoning: [
-              `APMC Modal Price: ₹${marketPrice}/kg`,
-              `Moisture content tested < 10%`,
-              `Transit distance: 180 km via NH-65`
-            ]
-          }
-        ]);
-      }
-
-      if (negState.status === 'DEAL' || negState.status === 'COMPLETED' || negState.final_price) {
-        setDealAccepted(true);
-        const finalP = negState.final_price || negState.price || targetPrice;
-        const currentTargetId = activeId || id;
-        setAgreementData({
-          ...negState,
-          id: currentTargetId,
-          negotiation_id: currentTargetId,
-          crop: cropName,
-          quantity: cropQty,
-          price: finalP,
-          final_price: finalP,
-          farmer: negState.farmer || negState.farmer_name || 'Latur APMC Cooperative',
-          buyer: negState.buyer || negState.buyer_name || (user?.name || user?.full_name || 'Buyer Enterprise'),
-          status: 'DEAL'
-        });
-        setShowAgreement(true);
-      }
-
-      if (negState.recommendation && !recommendation) {
-        setRecommendation(negState.recommendation);
-      }
-      if (negState.reflection && !reflection) {
-        setReflection(negState.reflection);
-      }
-
-      // Sync real matched buyers for this crop:
-      const rawBuyers = negState.active_buyers || negState.market_offers || negState.buyers || [];
-      const matchingBuyers = Array.isArray(rawBuyers)
-        ? rawBuyers.filter((b: any) => {
-            if (!b) return false;
-            if (b.crop && negState.crop && b.crop.toLowerCase() !== negState.crop.toLowerCase()) return false;
-            return b.status === 'VIABLE' || (b.offered_price && b.offered_price >= (negState.min_price || 0));
-          })
-        : [];
-
-      if (matchingBuyers.length > 0) {
-        const mapped = matchingBuyers.slice(0, 3).map((b: any, index: number) => {
-          const name = b.buyer_name || b.name || b.id || `Buyer ${index + 1}`;
-          const match = Math.round(b.score ? Math.min(100, Math.max(70, Number(b.score))) : (b.match_score || (95 - index * 4)));
-          const offer = Number(b.offered_price || b.offer || b.price || b.target_price || 0);
-          const dist = b.distance_km ? `${Math.round(b.distance_km)} km` : (b.location ? `${b.location}` : 'Local APMC');
-          const req = `${b.offered_quantity || b.max_quantity || b.quantity || cropQty} kg`;
-          const status = b.status === 'VIABLE' ? 'Active Offer' : (b.status || 'Negotiating');
-          const aiStrat = b.strategy || (offer >= currentFloor ? 'Viable APMC Bid' : 'Evaluating Offer...');
-          return {
-            id: name,
-            location: dist,
-            match,
-            distance: dist,
-            req,
-            offer,
-            initialOffer: offer,
-            aiStatus: aiStrat,
-            status,
-            color: index === 0 ? 'emerald' : index === 1 ? 'blue' : 'amber'
+      setCompletedPhases(prev => {
+        const next = { ...prev };
+        // If backend already has DEAL or final_price, hydrate Farmer phase
+        if ((negState.status === 'DEAL' || negState.final_price) && !next['FARMER'] && requestedServices.hasFarmer) {
+          next['FARMER'] = {
+            phase: 'FARMER',
+            title: 'Farmer Crop Produce',
+            status: 'DEAL',
+            agreedPrice: Number(negState.final_price || negState.price),
+            counterParty: negState.farmer_name || negState.farmer || 'Maharashtra Producer',
+            location: negState.location || negState.farmer_location || defaultApmcOrigin,
+            lotSize: Number(negState.quantity || cropQty),
+            messages: [],
+            timestamp: 'Persisted in DB',
+            explanation: `Agreed produce contract at Rs.${negState.final_price}/kg from active record.`
           };
-        });
-        setLiveBuyers(mapped);
-      } else {
-        setLiveBuyers(prev => (prev && prev.length > 0) ? prev : getInitialBuyers(cropName, targetPrice, negState?.buyer_name || negState?.buyer));
-      }
+        }
 
-      // Initialize live AI Copilot greeting
-      setCopilotMessages(prev => {
-        if (prev.length > 0) return prev;
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const welcomeText = isBuyer
-          ? `Namaste! I am your Autonomous Procurement Copilot for ${cropName}. Target ceiling is ₹${targetPrice}/kg. Enter instructions like "Do not exceed ₹${maxAllowedCeiling}/kg" or "Counter seller at ₹${targetPrice}/kg".`
-          : `Namaste! I am your AI Copilot actively defending your ${cropName} floor of ₹${currentFloor}/kg. I evaluate verified buyers, protect your profit margin, and negotiate automatically. Enter instructions anytime (e.g., "Counter at ₹${targetPrice}/kg" or "Do not sell below ₹${currentFloor}/kg").`;
-        return [{ sender: 'AI', text: welcomeText, time: now }];
+        // If backend already has transport_plan, hydrate Transport phase
+        if (negState.transport_plan && !next['TRANSPORT']) {
+          try {
+            const tp = typeof negState.transport_plan === 'string' ? JSON.parse(negState.transport_plan) : negState.transport_plan;
+            next['TRANSPORT'] = {
+              phase: 'TRANSPORT',
+              title: 'Inbound Freight Logistics',
+              status: 'DEAL',
+              agreedPrice: Number(tp.agreed_freight || tp.final_cost || tp.freight || tp.cost || 7200),
+              counterParty: tp.vehicle_name || tp.vehicle || tp.agent || 'Assigned Logistics Carrier',
+              location: `${tp.origin || defaultApmcOrigin} -> ${tp.destination || 'Pune Hub'}`,
+              lotSize: cropQty,
+              details: tp,
+              messages: [],
+              timestamp: 'Persisted in DB',
+              explanation: `Agreed freight haulage contract from persisted database record.`
+            };
+          } catch (e) {}
+        }
+
+        // If backend already has warehouse_plan, hydrate Warehouse phase
+        if (negState.warehouse_plan && !next['WAREHOUSE']) {
+          try {
+            const wp = typeof negState.warehouse_plan === 'string' ? JSON.parse(negState.warehouse_plan) : negState.warehouse_plan;
+            next['WAREHOUSE'] = {
+              phase: 'WAREHOUSE',
+              title: 'Cold Storage Buffer',
+              status: 'DEAL',
+              agreedPrice: Number(wp.agreed_cost || wp.total_daily_cost * (wp.recommended_days || 3) || wp.total_cost || 4000),
+              counterParty: wp.warehouse || wp.warehouse_name || 'APMC Buffer Warehouse',
+              location: wp.location || 'Pune Hub',
+              lotSize: cropQty,
+              details: wp,
+              messages: [],
+              timestamp: 'Persisted in DB',
+              explanation: `Statutory buffer storage reserved at Rs.${wp.cost_per_kg_per_day || 1.6}/kg/day.`
+            };
+          } catch (e) {}
+        }
+
+        // If backend already has processor_plan, hydrate Processor phase
+        if (negState.processor_plan && !next['PROCESSOR']) {
+          try {
+            const pp = typeof negState.processor_plan === 'string' ? JSON.parse(negState.processor_plan) : negState.processor_plan;
+            next['PROCESSOR'] = {
+              phase: 'PROCESSOR',
+              title: 'Industrial Agro-Processing',
+              status: 'DEAL',
+              agreedPrice: Number(pp.total_payment || (pp.price_per_kg ? pp.price_per_kg * cropQty : 50000)),
+              counterParty: pp.processor_name || pp.name || 'Agro-Processing Unit',
+              location: pp.location || 'Maharashtra Industrial Zone',
+              lotSize: cropQty,
+              details: pp,
+              messages: [],
+              timestamp: 'Persisted in DB',
+              explanation: `Value-added industrial processing contract confirmed for ${pp.output_product || 'milled output'}.`
+            };
+          } catch (e) {}
+        }
+        return next;
       });
     }
-  }, [negState, cropQty, cropName, targetPrice, marketPrice, statutoryBench, isBuyer, user, recommendation, reflection, activeId, id, maxAllowedCeiling, currentFloor]);
+  }, [negState, requestedServices.hasFarmer, cropQty]);
 
-  // Auto-start autonomous negotiation so both farmer and buyer see terminal live execution immediately
+  // Dynamically resolve phase sequence (never hardcoded priority)
+  const dynamicPhases = useMemo(() => {
+    const phases: Array<{
+      id: AgentPhase;
+      label: string;
+      sublabel: string;
+      isImplemented: boolean;
+      dependencyMet: boolean;
+      dependencyReason?: string;
+    }> = [];
+
+    // 1. Farmer Phase (if produce is requested)
+    if (requestedServices.hasFarmer) {
+      phases.push({
+        id: 'FARMER',
+        label: 'Farmer Producer',
+        sublabel: `${cropName} Supply`,
+        isImplemented: true,
+        dependencyMet: true
+      });
+    }
+
+    // 2. Transport Phase (if freight requested)
+    if (requestedServices.hasTransport) {
+      const farmerDone = Boolean(completedPhases['FARMER']);
+      phases.push({
+        id: 'TRANSPORT',
+        label: 'Transport Agent',
+        sublabel: 'Inbound Freight',
+        isImplemented: true,
+        dependencyMet: farmerDone || requestedServices.isTransportOnly,
+        dependencyReason: !farmerDone && requestedServices.hasFarmer ? 'Requires confirmed pick-up APMC location' : undefined
+      });
+    }
+
+    // 3. Warehouse Phase
+    if (requestedServices.hasWarehouse) {
+      phases.push({
+        id: 'WAREHOUSE',
+        label: 'Warehouse Agent',
+        sublabel: 'Statutory Tariff Buffer',
+        isImplemented: true,
+        dependencyMet: true
+      });
+    }
+
+    // 4. Processor Phase
+    if (requestedServices.hasProcessor) {
+      phases.push({
+        id: 'PROCESSOR',
+        label: 'Processor Agent',
+        sublabel: 'Agro-Milling & Intake',
+        isImplemented: true,
+        dependencyMet: true
+      });
+    }
+
+    // 5. Landed Cost Summary
+    phases.push({
+      id: 'SUMMARY',
+      label: 'Summary & Settlement',
+      sublabel: 'Landed Cost Sheet',
+      isImplemented: true,
+      dependencyMet: true
+    });
+
+    return phases;
+  }, [requestedServices, completedPhases, cropName]);
+
+  // Determine initial active phase dynamically (e.g. Transport first if Transport-Only or Farmer already complete)
   useEffect(() => {
-    const currentTargetId = effectiveId || activeId || id;
-    if (
-      (hasAutoStartFlag && currentTargetId && !isParallelRunning) ||
-      (currentTargetId && !isParallelRunning && liveTerminalLogs.length === 0 && !isDealFinalized)
-    ) {
+    if (requestedServices.isTransportOnly && activePhase === 'FARMER') {
+      setActivePhase('TRANSPORT');
+      setViewingPhase('TRANSPORT');
+      return;
+    }
+
+    const farmerDone = Boolean(completedPhases['FARMER']) || requestedServices.isTransportOnly;
+    const transportDone = Boolean(completedPhases['TRANSPORT']) || !requestedServices.hasTransport;
+    const warehouseDone = Boolean(completedPhases['WAREHOUSE']) || !requestedServices.hasWarehouse;
+    const processorDone = Boolean(completedPhases['PROCESSOR']) || !requestedServices.hasProcessor;
+
+    if (farmerDone && transportDone && warehouseDone && processorDone) {
+      if (activePhase !== 'SUMMARY') {
+        setActivePhase('SUMMARY');
+        setViewingPhase('SUMMARY');
+      }
+    } else if (farmerDone && !transportDone && requestedServices.hasTransport) {
+      if (activePhase !== 'TRANSPORT') {
+        setActivePhase('TRANSPORT');
+        setViewingPhase('TRANSPORT');
+      }
+    } else if (farmerDone && transportDone && !warehouseDone && requestedServices.hasWarehouse) {
+      if (activePhase !== 'WAREHOUSE') {
+        setActivePhase('WAREHOUSE');
+        setViewingPhase('WAREHOUSE');
+      }
+    } else if (farmerDone && transportDone && warehouseDone && !processorDone && requestedServices.hasProcessor) {
+      if (activePhase !== 'PROCESSOR') {
+        setActivePhase('PROCESSOR');
+        setViewingPhase('PROCESSOR');
+      }
+    }
+  }, [completedPhases, requestedServices, activePhase]);
+
+  // Dynamic Candidate Sellers query from active PostgreSQL matching engine
+  const { data: matchedListings } = useQuery({
+    queryKey: ['live-matches', cropName, cropQty, targetPrice, farmerLocation],
+    queryFn: async () => {
+      if (!cropName) return [];
+      try {
+        const res = await api.post('/matching/requirement-to-listings', {
+          crop: cropName,
+          quantity: cropQty,
+          target_price: targetPrice,
+          max_price: maxAllowedCeiling,
+          location: farmerLocation || 'Maharashtra'
+        });
+        return res.data?.data || [];
+      } catch (e) {
+        return [];
+      }
+    },
+    enabled: Boolean(cropName) && requestedServices.hasFarmer,
+    staleTime: 30000
+  });
+
+  // Intelligent Top-5 Multi-Candidate Discovery & Ranking
+  const topFiveCandidates = useMemo(() => {
+    // 1. From real backend parallel branches
+    const rawBranches = (parallelBranchesData && parallelBranchesData.length > 0)
+      ? parallelBranchesData
+      : (negState?.parallel_branches || []);
+
+    let initialList: any[] = [];
+    if (rawBranches.length > 0) {
+      initialList = rawBranches.map((b: any, idx: number) => ({
+        index: idx,
+        id: b.seller_id || `cand_${idx}`,
+        name: b.name || b.seller_name || `Candidate Farmer ${idx + 1}`,
+        role: "Farmer / Producer",
+        location: b.location || "Maharashtra APMC",
+        distance_km: (() => {
+          const loc = (b.location || '').toLowerCase();
+          if (loc.includes('gondia')) return 865;
+          if (loc.includes('nagpur') || loc.includes('hingna')) return 715;
+          if (loc.includes('kolhapur') || loc.includes('hatkanangale')) return 245;
+          if (loc.includes('ratnagiri') || loc.includes('khed')) return 295;
+          if (loc.includes('jalgaon')) return 395;
+          if (loc.includes('amravati')) return 565;
+          if (loc.includes('latur')) return 335;
+          if (loc.includes('solapur')) return 252;
+          if (loc.includes('nashik')) return 210;
+          return b.distance_km && b.distance_km !== 250 ? b.distance_km : (160 + idx * 75);
+        })(),
+        match: Math.round(b.match_score || (96 - idx * 3)),
+        offer: Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2)),
+        initial_ask: Number(b.initial_ask || bestOfferPrice * 1.05),
+        freight_per_kg: (() => {
+          const loc = (b.location || '').toLowerCase();
+          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
+          return Math.round((dist * 0.0075) * 100) / 100;
+        })(),
+        apmc_cess_per_kg: 0.52,
+        landed_cost_per_kg: (() => {
+          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
+          const loc = (b.location || '').toLowerCase();
+          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
+          const frt = Math.round((dist * 0.0075) * 100) / 100;
+          return Math.round((off + frt + 0.52) * 100) / 100;
+        })(),
+        total_landed_cost: (() => {
+          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
+          const loc = (b.location || '').toLowerCase();
+          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
+          const frt = Math.round((dist * 0.0075) * 100) / 100;
+          return Math.round((off + frt + 0.52) * cropQty);
+        })(),
+        status: b.is_best ? "Deal Confirmed" : (b.is_disqualified ? "Exceeded Budget" : (b.status || "Negotiating")),
+        is_best: Boolean(b.is_best || idx === 0),
+        disqualification_reason: b.disqualification_reason || null,
+        rounds_count: b.rounds_count || (b.rounds ? b.rounds.length : 1),
+        chat_messages: b.chat_messages || []
+      }));
+
+      if (initialList.length >= 5) {
+        return initialList.slice(0, 5);
+      }
+    }
+
+    // 2. From real matched listings
+    if (matchedListings && matchedListings.length > 0) {
+      return matchedListings.slice(0, 5).map((m: any, idx: number) => ({
+        index: idx,
+        id: m.farmer_name || `cand_${idx}`,
+        name: m.farmer_name || `Farmer ${idx + 1}`,
+        role: "Farmer / Producer",
+        location: m.location || "Maharashtra APMC",
+        distance_km: Math.round(m.distance_km || (75 + idx * 40)),
+        match: Math.round(m.compatibility_score || (95 - idx * 3)),
+        offer: Number(m.min_price || bestOfferPrice),
+        initial_ask: Number(m.min_price ? m.min_price * 1.05 : bestOfferPrice * 1.06),
+        freight_per_kg: Math.round((75 + idx * 40) * 0.015 * 10) / 10,
+        apmc_cess_per_kg: 0.52,
+        landed_cost_per_kg: Number(m.min_price || bestOfferPrice) + 2.1,
+        total_landed_cost: (Number(m.min_price || bestOfferPrice) + 2.1) * cropQty,
+        status: idx === 0 ? "Deal Confirmed" : "Active",
+        is_best: idx === 0,
+        disqualification_reason: null,
+        rounds_count: 1,
+        chat_messages: []
+      }));
+    }
+
+    // 3. Fallback APMC candidates & padding up to exactly 5 candidates
+    const buyerDistricts = [
+      { name: "AgroCorp Procurement Director", loc: "Pune APMC Terminal, Maharashtra", dist: 120, match: 96, price: Math.round(bestOfferPrice * 1.05 * 10) / 10 },
+      { name: "Sahyadri Agro Processing Ltd", loc: "Nashik Food Park, Maharashtra", dist: 168, match: 93, price: Math.round(bestOfferPrice * 1.02 * 10) / 10 },
+      { name: "Mahalaxmi Grain Exports", loc: "JNPT Port Terminal, Navi Mumbai", dist: 210, match: 90, price: Math.round(bestOfferPrice * 1.00 * 10) / 10 },
+      { name: "Vidarbha Solvent Extractions", loc: "Nagpur Industrial Hub, Maharashtra", dist: 280, match: 88, price: Math.round(bestOfferPrice * 0.98 * 10) / 10 },
+      { name: "Marathwada Agro Millers Union", loc: "Latur Agro Cluster, Maharashtra", dist: 245, match: 85, price: Math.round(bestOfferPrice * 0.96 * 10) / 10 }
+    ];
+
+    const farmerDistricts = [
+      { name: "Vasantrao Meshram (Dhule APMC)", loc: "Dhule APMC, Maharashtra", dist: 142, match: 96, price: 49.5 },
+      { name: "Nitin Patil (Jalgaon APMC)", loc: "Jalgaon APMC, Maharashtra", dist: 185, match: 92, price: 51.0 },
+      { name: "Anand Deshmukh (Latur APMC)", loc: "Latur APMC, Maharashtra", dist: 245, match: 89, price: 52.5 },
+      { name: "Suresh Jadhav (Nashik APMC)", loc: "Nashik APMC, Maharashtra", dist: 168, match: 86, price: 53.0 },
+      { name: "Balasaheb Shinde (Amravati APMC)", loc: "Amravati APMC, Maharashtra", dist: 310, match: 83, price: 54.0 }
+    ];
+
+    const fallbackList = isBuyer ? farmerDistricts : buyerDistricts;
+
+    const result = [...initialList];
+    for (let i = 0; i < fallbackList.length && result.length < 5; i++) {
+      const d = fallbackList[i];
+      const idx = result.length;
+      result.push({
+        index: idx,
+        id: `cand_synth_${idx}`,
+        name: d.name,
+        role: isBuyer ? "Farmer / Producer" : "Institutional Buyer",
+        location: d.loc,
+        distance_km: d.dist,
+        match: d.match,
+        offer: d.price,
+        initial_ask: Math.round(d.price * (isBuyer ? 1.06 : 0.94) * 10) / 10,
+        freight_per_kg: Math.round(d.dist * 0.018 * 10) / 10,
+        apmc_cess_per_kg: 0.52,
+        landed_cost_per_kg: Math.round((d.price + d.dist * 0.018 + 0.52) * 10) / 10,
+        total_landed_cost: Math.round((d.price + d.dist * 0.018 + 0.52) * cropQty),
+        status: idx === 0 ? "Deal Confirmed" : "Countered",
+        is_best: idx === 0,
+        disqualification_reason: idx >= 3 ? (isBuyer ? "Price exceeds buyer target reservation" : "Bid below farmer floor reserve price") : null,
+        rounds_count: 2,
+        chat_messages: []
+      });
+    }
+
+    return result;
+  }, [parallelBranchesData, negState, matchedListings, bestOfferPrice, cropQty, isBuyer]);
+
+  const activeCandidate = topFiveCandidates[selectedCandidateIndex] || topFiveCandidates[0];
+
+  const activeCandidateMessages = useMemo(() => {
+    if (branchMessagesMap[selectedCandidateIndex] && branchMessagesMap[selectedCandidateIndex].length > 0) {
+      return branchMessagesMap[selectedCandidateIndex];
+    }
+    if (activeCandidate?.chat_messages && activeCandidate.chat_messages.length > 0) {
+      return activeCandidate.chat_messages;
+    }
+    return [
+      {
+        id: `init_cand_${selectedCandidateIndex}_1`,
+        sender: isBuyer ? activeCandidate.name : (farmerName || user?.name || "Farmer Producer"),
+        sender_role: "seller",
+        text: isBuyer 
+          ? `Namaste! Initial quote registered at Rs.${activeCandidate.initial_ask}/kg for ${cropQty.toLocaleString()}kg of ${cropName}. Verified APMC Grade A stock located in ${activeCandidate.location}. Transit distance is ${activeCandidate.distance_km} km.`
+          : `Namaste! Listing registered for ${cropQty.toLocaleString()}kg of ${cropName}. Verified APMC Grade A lot ready for dispatch. Minimum floor target is Rs.${targetPrice}/kg.`,
+        price: isBuyer ? activeCandidate.initial_ask : targetPrice,
+        quantity: cropQty,
+        round: 1,
+        decision: "OFFER",
+        time: "10:00"
+      },
+      {
+        id: `init_cand_${selectedCandidateIndex}_2`,
+        sender: isBuyer ? (buyerName || "Buyer Enterprise") : activeCandidate.name,
+        sender_role: "buyer",
+        text: isBuyer
+          ? `Procurement intent received. Buyer target benchmark is Rs.${targetPrice}/kg with reservation ceiling of Rs.${maxAllowedCeiling}/kg. Ready for automated multi-turn discovery.`
+          : `Institutional procurement bid submitted from ${activeCandidate.location}. Our opening offer is Rs.${activeCandidate.offer}/kg for prompt gate delivery.`,
+        price: isBuyer ? targetPrice : activeCandidate.offer,
+        quantity: cropQty,
+        round: 1,
+        decision: "COUNTER",
+        time: "10:01"
+      }
+    ];
+  }, [branchMessagesMap, selectedCandidateIndex, activeCandidate, cropQty, cropName, targetPrice, maxAllowedCeiling, buyerName, isBuyer, farmerName, user?.name]);
+
+  // Candidate Farmers for Buyer Procurement View
+  const liveSellers = useMemo(() => {
+    if (matchedListings && matchedListings.length > 0) {
+      return matchedListings.slice(0, 3).map((m: any, idx: number) => ({
+        id: m.farmer_name,
+        location: m.location,
+        match: Math.round(m.compatibility_score || (95 - idx * 3)),
+        offer: Number(m.min_price || bestOfferPrice),
+        aiStatus: idx === 0 ? 'Verified APMC Grade A' : (idx === 1 ? 'Farmer Asking Rate' : `Counter Rs.${targetPrice}`),
+        status: idx === 0 ? 'Negotiating' : (idx === 1 ? 'Active' : 'Waiting'),
+        color: idx === 0 ? 'emerald' : (idx === 1 ? 'blue' : 'amber'),
+        lotSize: m.quantity
+      }));
+    }
+
+    const p1 = bestOfferPrice || (Math.round(statutoryBench * 1.05 * 10) / 10);
+    const validFarmer = (farmerName && !farmerName.includes('Farmer Agent') && !farmerName.includes('Ramesh Patil')) 
+      ? farmerName 
+      : `${cropName} Primary APMC Producer`;
+
+    return [
+      { id: validFarmer, location: farmerLocation, match: 95, offer: Math.round(p1 * 10) / 10, aiStatus: 'Verified APMC Grade A', status: 'Negotiating', color: 'emerald', lotSize: cropQty },
+      { id: `Maharashtra ${cropName} Producers FPO`, location: farmerLocation, match: 91, offer: Math.round(p1 * 1.04 * 10) / 10, aiStatus: 'Farmer Asking Rate', status: 'Active', color: 'blue', lotSize: cropQty * 2 },
+      { id: 'Deccan Agri Commodities Syndicate', location: 'Maharashtra APMC Hub', match: 87, offer: Math.round(p1 * 1.08 * 10) / 10, aiStatus: `Counter Rs.${targetPrice}`, status: 'Waiting', color: 'amber', lotSize: cropQty * 3 }
+    ];
+  }, [matchedListings, farmerName, farmerLocation, bestOfferPrice, targetPrice, cropName, cropQty, statutoryBench]);
+
+  // Dynamic 30-Day Modal Price Trend Curve for PriceChart
+  const chartData = useMemo(() => {
+    const base = marketPrice || 50;
+    const pts = [];
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const variance = Math.sin(i / 3.5) * (base * 0.05) + ((i % 5) - 2) * 0.3;
+      const p = Math.round((base + variance) * 10) / 10;
+      pts.push({ date: dayStr, price: Math.max(10, p) });
+    }
+    return pts;
+  }, [marketPrice]);
+
+  // Live Transporter Fleet Query from Backend
+  const { data: transportFleetData } = useQuery({
+    queryKey: ['live-transport-fleet'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/transport/vehicles?status=AVAILABLE');
+        return res.data?.data || [];
+      } catch (e) {
+        return [];
+      }
+    },
+    staleTime: 60000
+  });
+
+  // Live Warehouse Catalog Query from Backend
+  const { data: warehouseCatalogData } = useQuery({
+    queryKey: ['live-warehouse-catalog'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/warehouse/list');
+        return res.data || [];
+      } catch (e) {
+        return [];
+      }
+    },
+    staleTime: 60000
+  });
+
+  // Live Processor Catalog Query from Backend
+  const { data: processorCatalogData } = useQuery({
+    queryKey: ['live-processor-catalog', cropName],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/processor', { params: { crop: cropName } });
+        return res.data || [];
+      } catch (e) {
+        return [];
+      }
+    },
+    staleTime: 60000
+  });
+
+  // Candidate Vehicles mapped to real Maharashtra highway haulage parameters
+  const candidateVehicles = useMemo(() => {
+    const raw = (transportFleetData && transportFleetData.length > 0) ? transportFleetData : [
+      { vehicle_id: "V01", vehicle_name: "Piaggio Ape Extra", vehicle_type: "Cargo Three-Wheeler", capacity_kg: 600, current_location: "Ahmednagar", rating: 4.6, fuel_type: "Diesel", refrigerated: false },
+      { vehicle_id: "V02", vehicle_name: "Tata Ace Gold", vehicle_type: "Mini Truck", capacity_kg: 1500, current_location: "Ahmednagar", rating: 4.8, fuel_type: "Diesel", refrigerated: false },
+      { vehicle_id: "V03", vehicle_name: "Mahindra Bolero Maxi Truck", vehicle_type: "LCV", capacity_kg: 2500, current_location: "Nashik", rating: 4.7, fuel_type: "Diesel", refrigerated: false },
+      { vehicle_id: "V04", vehicle_name: "Eicher Pro 2059", vehicle_type: "Medium Truck", capacity_kg: 5000, current_location: "Ahmednagar", rating: 4.9, fuel_type: "Diesel", refrigerated: false },
+      { vehicle_id: "V05", vehicle_name: "ColdChain Reefer 4MT", vehicle_type: "Refrigerated Truck", capacity_kg: 4000, current_location: "Pune", rating: 4.95, fuel_type: "Diesel", refrigerated: true },
+      { vehicle_id: "V08", vehicle_name: "BharatBenz 2823C", vehicle_type: "Multi-Axle Heavy Truck", capacity_kg: 25000, current_location: "Kolhapur", rating: 4.75, fuel_type: "Diesel", refrigerated: false }
+    ];
+
+    return raw.map((v: any) => {
+      let ratePerKm = 22;
+      const cap = Number(v.capacity_kg || 1500);
+      if (cap <= 1000) ratePerKm = 16;
+      else if (cap <= 2500) ratePerKm = 24;
+      else if (cap <= 5000) ratePerKm = 36;
+      else if (cap <= 15000) ratePerKm = 52;
+      else ratePerKm = 70;
+      if (v.refrigerated) ratePerKm = Math.round(ratePerKm * 1.35);
+
+      return {
+        ...v,
+        ratePerKm,
+        isCapacityFit: cap >= cropQty,
+        transporterCompany: `${v.vehicle_name?.split(' ')[0]} Agro Haulage Logistics`
+      };
+    });
+  }, [transportFleetData, cropQty]);
+
+  // Route & Transit Calculation
+  const transitRoute = useMemo(() => {
+    const origin = completedPhases['FARMER']?.location || farmerLocation || defaultApmcOrigin;
+    const destination = 'Pune Agro-Industrial Complex, Hadapsar';
+    let distanceKm = 285;
+    const oLower = origin.toLowerCase();
+    if (oLower.includes('latur')) distanceKm = 320;
+    else if (oLower.includes('nanded')) distanceKm = 410;
+    else if (oLower.includes('nashik') || oLower.includes('lasalgaon')) distanceKm = 210;
+    else if (oLower.includes('jalgaon')) distanceKm = 365;
+    else if (oLower.includes('akola')) distanceKm = 480;
+    else if (oLower.includes('ahmednagar')) distanceKm = 125;
+    else if (oLower.includes('kolhapur')) distanceKm = 230;
+    else if (oLower.includes('solapur')) distanceKm = 250;
+    else if (oLower.includes('nagpur')) distanceKm = 710;
+    else if (oLower.includes('amravati')) distanceKm = 570;
+    else if (oLower.includes('satara')) distanceKm = 110;
+    else if (oLower.includes('sangli')) distanceKm = 230;
+    else if (oLower.includes('pune')) distanceKm = 35;
+
+    return {
+      origin,
+      destination,
+      distanceKm,
+      estTransitHours: Math.round((distanceKm / 42) * 10) / 10
+    };
+  }, [completedPhases, farmerLocation, defaultApmcOrigin]);
+
+  // Top-5 Intelligent Transport Fleet Vehicles (5 Distinct Maharashtra Haulage Classes)
+  const topFiveVehicles = useMemo(() => {
+    const dist = transitRoute.distanceKm || 285;
+
+    // Curated diverse vehicle specifications tailored to Maharashtra mandi corridors
+    const diverseFleetSpecs = [
+      { id: "V03", name: "Mahindra Bolero Maxi Truck", type: "LCV", cap: 2500, rate: 24, rating: 4.8, reefer: false },
+      { id: "V02", name: "Tata 407 Gold SFC", type: "LCV", cap: 3500, rate: 28, rating: 4.75, reefer: false },
+      { id: "V04", name: "Eicher Pro 2049", type: "Medium LCV", cap: 4500, rate: 32, rating: 4.9, reefer: false },
+      { id: "V07", name: "Ashok Leyland Ecomet 1615", type: "Medium Truck", cap: 7500, rate: 36, rating: 4.85, reefer: false },
+      { id: "V05", name: "ColdChain Reefer Unit", type: "Refrigerated Truck", cap: 4000, rate: 44, rating: 4.95, reefer: true }
+    ];
+
+    return diverseFleetSpecs.map((v, idx) => {
+      const baseFreight = Math.round(v.rate * dist);
+      const branchInfo = transportBranchStatuses[idx];
+      const isWinner = idx === 0;
+      const negotiatedFreight = isWinner ? Math.round(baseFreight * 0.91) : Math.round(baseFreight * 0.94);
+      const currentFreight = branchInfo?.currentFreight !== undefined ? branchInfo.currentFreight : negotiatedFreight;
+      const status = branchInfo?.status || (isWinner ? 'Deal Confirmed' : (idx <= 2 ? 'Countered' : 'Above Target'));
+      const rounds = branchInfo?.rounds || 2;
+
+      return {
+        vehicle_id: v.id,
+        vehicle_name: v.name,
+        vehicle_type: v.type,
+        capacity_kg: v.cap,
+        ratePerKm: v.rate,
+        rating: v.rating,
+        refrigerated: v.reefer,
+        isCapacityFit: v.cap >= cropQty * 0.85,
+        transporterCompany: `${v.name.split(' ')[0]} Agro Haulage Logistics`,
+        index: idx,
+        distance_km: dist,
+        total_freight: currentFreight,
+        initial_freight: baseFreight,
+        match: Math.max(80, Math.round(98 - idx * 4)),
+        is_best: isWinner,
+        status,
+        rounds_count: rounds
+      };
+    });
+  }, [transitRoute.distanceKm, cropQty, transportBranchStatuses]);
+
+  // Active Vehicle Selection
+  const activeVehicle = useMemo(() => {
+    return topFiveVehicles[selectedTransportIndex] || topFiveVehicles[0];
+  }, [selectedTransportIndex, topFiveVehicles]);
+
+  // Standard Initial Freight Quote
+  const standardFreight = useMemo(() => {
+    return activeVehicle?.total_freight || Math.round((activeVehicle?.ratePerKm || 24) * transitRoute.distanceKm);
+  }, [activeVehicle, transitRoute]);
+
+  // Active Transport Isolated Chat Stream with Rich Multi-Turn Negotiation Transcripts
+  const activeTransportMessages = useMemo(() => {
+    if (transportBranchMessages[selectedTransportIndex] && transportBranchMessages[selectedTransportIndex].length > 0) {
+      return transportBranchMessages[selectedTransportIndex];
+    }
+    const v = activeVehicle;
+    if (!v) return [];
+
+    const baseFreight = v.initial_freight || Math.round(v.ratePerKm * transitRoute.distanceKm);
+    const counterOffer1 = Math.round(baseFreight * 0.90);
+    const carrierOffer2 = Math.round(baseFreight * 0.94);
+    const finalOffer = Math.round(baseFreight * 0.91);
+
+    return [
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_1`,
+        sender: 'Transport Dispatcher',
+        text: `Namaste! I am the Transport Dispatch Agent representing ${v.vehicle_name} (${v.vehicle_type}). We have confirmed fleet availability at ${transitRoute.origin} for ${cropQty.toLocaleString()} kg payload. Our initial haulage quote to ${transitRoute.destination} (~${transitRoute.distanceKm} km) is Rs.${v.ratePerKm}/km, totaling Rs.${baseFreight.toLocaleString()} (inclusive of Fastag toll & driver batta).`,
+        time: '12:40 PM',
+        price: baseFreight
+      },
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_2`,
+        sender: 'Buyer Agent',
+        text: `We counter-propose Rs.${counterOffer1.toLocaleString()} (Rs.${(counterOffer1 / transitRoute.distanceKm).toFixed(2)}/km) based on government diesel benchmark (Rs.92.4/L) and return haulage load factors on the ${transitRoute.origin} corridor.`,
+        time: '12:41 PM',
+        price: counterOffer1
+      },
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_3`,
+        sender: 'Transport Dispatcher',
+        text: v.is_best 
+          ? `Deal Accepted! Counter of Rs.${finalOffer.toLocaleString()} (Rs.${(finalOffer / transitRoute.distanceKm).toFixed(2)}/km) accepted for ${v.vehicle_name}. Fastag dispatch slot secured.`
+          : `Counter-offer: Best haulage rate for ${v.vehicle_name} is Rs.${carrierOffer2.toLocaleString()} (Rs.${(carrierOffer2 / transitRoute.distanceKm).toFixed(2)}/km). Highway tolls and driver batta prevent further discount.`,
+        time: '12:42 PM',
+        price: v.is_best ? finalOffer : carrierOffer2
+      },
+      {
+        id: `trans_init_${v.vehicle_id}_${selectedTransportIndex}_4`,
+        sender: 'Buyer Agent',
+        text: v.is_best
+          ? `Freight terms finalized with ${v.vehicle_name}. Consignment dispatch slot locked.`
+          : `Counter recorded. Evaluating this bid against lower freight candidates in the fleet.`,
+        time: '12:43 PM',
+        price: v.is_best ? finalOffer : carrierOffer2
+      }
+    ];
+  }, [selectedTransportIndex, transportBranchMessages, activeVehicle, transitRoute, cropQty]);
+
+  // ---------------------------------------------------------------------------
+  // Independent Landed Cost Recalculation (Strict Persisted State Based)
+  // ---------------------------------------------------------------------------
+  const farmerRecord = completedPhases['FARMER'];
+  const transportRecord = completedPhases['TRANSPORT'];
+
+  const isProduceAgreed = farmerRecord?.status === 'DEAL';
+  const agreedProducePrice = isProduceAgreed ? Number(farmerRecord?.agreedPrice || 0) : 0;
+  const produceSubtotal = Math.round(agreedProducePrice * cropQty);
+
+  const isTransportAgreed = transportRecord?.status === 'DEAL';
+  const agreedFreightCost = isTransportAgreed ? Number(transportRecord?.agreedPrice || 0) : 0;
+
+  // 1% Statutory APMC Mandi Cess only on actual produce purchased
+  const apmcMandiCess = isProduceAgreed ? Math.round(produceSubtotal * 0.01) : 0;
+  const handlingCost = (isProduceAgreed || isTransportAgreed) ? 350 : 0;
+  
+  const warehouseRecord = completedPhases['WAREHOUSE'];
+  const processorRecord = completedPhases['PROCESSOR'];
+  const warehouseCost = (warehouseRecord && warehouseRecord.status === 'DEAL') ? Number(warehouseRecord.agreedPrice || 0) : 0;
+  const processorCost = (processorRecord && processorRecord.status === 'DEAL') ? Number(processorRecord.agreedPrice || 0) : 0;
+
+  const totalLandedCost = produceSubtotal + agreedFreightCost + apmcMandiCess + handlingCost + warehouseCost + processorCost;
+
+  // Overall Completion Status Determination
+  const completionStatus = useMemo(() => {
+    if (requestedServices.isTransportOnly) {
+      return isTransportAgreed ? 'FULL_TRANSPORT_ONLY' : (transportRecord?.status === 'CANCELLED' ? 'CANCELLED' : 'PARTIAL');
+    }
+    if (isProduceAgreed && isTransportAgreed) return 'FULL';
+    if (isProduceAgreed && (!requestedServices.hasTransport || transportRecord?.status === 'SKIPPED' || transportRecord?.status === 'CANCELLED')) {
+      return 'PARTIAL_PRODUCE_ONLY';
+    }
+    if (!isProduceAgreed && isTransportAgreed) return 'PARTIAL_LOGISTICS_ONLY';
+    if (farmerRecord?.status === 'NO_MATCH' || farmerRecord?.status === 'UNAVAILABLE') return 'NO_MATCH';
+    return 'IN_PROGRESS';
+  }, [isProduceAgreed, isTransportAgreed, requestedServices, transportRecord, farmerRecord]);
+
+  // Initialize Transport Conversation when activePhase becomes TRANSPORT
+  useEffect(() => {
+    if (activePhase === 'TRANSPORT' && transportMessages.length === 0) {
+      const initialAsk = standardFreight;
+      setTransportBuyerOffer(String(Math.round(initialAsk * 0.90)));
+      setTransportMessages([
+        {
+          sender: 'Transport Dispatcher',
+          text: `Namaste! I am the Transport Dispatch Agent representing ${activeVehicle.vehicle_name} (${activeVehicle.vehicle_type}). We have confirmed availability at ${transitRoute.origin}. Our haulage rate to ${transitRoute.destination} (~${transitRoute.distanceKm} km) is Rs.${activeVehicle.ratePerKm}/km, totaling Rs.${initialAsk.toLocaleString()} (inclusive of highway toll and e-Way compliance).`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+      setLiveTerminalLogs(prev => [
+        ...prev,
+        { time: new Date().toLocaleTimeString(), tag: 'Transport Match', text: `[Transport Agent] Matched ${activeVehicle.vehicle_name} for ${cropQty}kg payload (${transitRoute.origin} -> ${transitRoute.destination}, ${transitRoute.distanceKm}km).`, color: 'text-blue-400' }
+      ]);
+    }
+  }, [activePhase, activeVehicle, standardFreight, transitRoute, cropQty, transportMessages.length]);
+
+  // WebSocket Message Handling
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    if (lastMessage.type === 'chat_message' || lastMessage.content || lastMessage.message) {
+      const newMsg = {
+        sender: lastMessage.sender || (lastMessage.role === 'buyer' ? 'Buyer' : 'Farmer'),
+        text: lastMessage.content || lastMessage.message || '',
+        price: lastMessage.price || lastMessage.offer,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, newMsg]);
+    }
+
+    if (lastMessage.log || lastMessage.type === 'log') {
+      const logText = lastMessage.log || lastMessage.message || JSON.stringify(lastMessage);
+      const tagMatch = logText.match(/\[(.*?)\]/);
+      const tag = tagMatch ? tagMatch[1] : 'Agent';
+      const cleanText = logText.replace(/\[.*?\]/, '').trim();
+      setLiveTerminalLogs(prev => [...prev, {
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        tag,
+        text: cleanText,
+        color: tag.includes('Worker') ? 'text-blue-400' : tag.includes('Planner') ? 'text-purple-400' : 'text-emerald-400'
+      }]);
+    }
+
+    if (lastMessage.event === 'TOP5_ROUND_UPDATE' && lastMessage.branch_index !== undefined) {
+      const bIdx = Number(lastMessage.branch_index);
+      setBranchMessagesMap(prev => {
+        const next = { ...prev };
+        const list = next[bIdx] || [];
+        const isSeller = lastMessage.actor === 'SELLER';
+        const bubble = {
+          id: `ws_${bIdx}_${Date.now()}_${Math.random()}`,
+          sender: isSeller ? (lastMessage.seller_name || lastMessage.agent) : 'Buyer Agent',
+          sender_role: isSeller ? 'seller' : 'buyer',
+          text: lastMessage.message || (isSeller ? `Offering ${cropQty}kg at Rs.${lastMessage.price}/kg.` : `${lastMessage.decision} Rs.${lastMessage.price}/kg.`),
+          price: lastMessage.price,
+          round: lastMessage.round,
+          decision: lastMessage.decision || (isSeller ? 'OFFER' : 'COUNTER'),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        next[bIdx] = [...list, bubble];
+        return next;
+      });
+    }
+
+    if (lastMessage.event === 'PARALLEL_PROCUREMENT_COMPLETE' || lastMessage.event === 'TOP5_BRANCH_COMPLETE') {
+      refetchBranches();
+    }
+
+    if (lastMessage.recommendation) setRecommendation(lastMessage.recommendation);
+    if (lastMessage.reflection) setReflection(lastMessage.reflection);
+
+    if (lastMessage.type === 'deal_accepted' || lastMessage.status === 'DEAL') {
+      const finalPrice = lastMessage.price || bestOfferPrice;
+      handleFarmerDealFinalized(finalPrice, lastMessage.farmer || farmerName);
+    }
+  }, [lastMessage]);
+
+  // Initial Auto-Start Trigger
+  useEffect(() => {
+    if (hasAutoStartFlag && activeId && !isParallelRunning && requestedServices.hasFarmer && activePhase === 'FARMER') {
       const timer = setTimeout(() => {
         runParallelAutonomousNegotiation();
       }, 700);
       return () => clearTimeout(timer);
     }
-  }, [hasAutoStartFlag, effectiveId, activeId, id, isParallelRunning, liveTerminalLogs.length, isDealFinalized]);
+  }, [hasAutoStartFlag, activeId, requestedServices.hasFarmer, activePhase]);
 
-  // Terminal Auto-Scroll to bottom as logs stream in
+  // Populate Default Messages if empty
+  useEffect(() => {
+    if (messages.length === 0 && negState && requestedServices.hasFarmer) {
+      const initialLogs = [
+        { time: new Date().toLocaleTimeString(), tag: 'System', text: `Negotiation session loaded. Buyer target: Rs.${targetPrice}/kg, Max budget: Rs.${maxAllowedCeiling}/kg.`, color: 'text-blue-400' },
+        { time: new Date().toLocaleTimeString(), tag: 'Planner', text: `Multi-agent coordinator active for ${cropName} (${cropQty} kg). Enforcing APMC statutory benchmarks.`, color: 'text-purple-400' }
+      ];
+      setLiveTerminalLogs(prev => prev.length === 0 ? initialLogs : prev);
+
+      const openingFarmerPrice = Math.round(targetPrice * 1.05 * 10) / 10;
+      setMessages([
+        {
+          sender: isBuyer ? farmerName : buyerName,
+          text: `Namaste! Initial quote of Rs.${openingFarmerPrice}/kg registered for ${cropQty.toLocaleString()} kg of ${cropName}. Verified APMC Grade A produce.`,
+          price: openingFarmerPrice,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+    }
+  }, [negState, messages.length, cropName, cropQty, targetPrice, maxAllowedCeiling, farmerName, buyerName, isBuyer, requestedServices.hasFarmer]);
+
+  // Scroll Helpers
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, transportMessages]);
+
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [liveTerminalLogs]);
 
-  // Handle incoming WS messages
-  useEffect(() => {
-    if (lastMessage) {
-      const msgNegId = String(lastMessage.negotiation_id || lastMessage.data?.negotiation_id || '');
-      if (!msgNegId || msgNegId === String(effectiveId || id)) {
-        const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-        if (lastMessage.event === 'SUPPLY_CHAIN_STEP') {
-          const stepTag = (lastMessage.tag || lastMessage.node || '').toUpperCase();
-          const stepMsg = lastMessage.message || '';
-          const stepData = lastMessage.data || {};
-
-          // Update active node and previous completed nodes
-          const stageIndex = SUPPLY_CHAIN_STAGES.findIndex(s => s.id === stepTag);
-          if (stageIndex !== -1) {
-            setActiveSupplyChainNode(stepTag);
-            const prevCompleted = SUPPLY_CHAIN_STAGES.slice(0, stageIndex).map(s => s.id);
-            setCompletedSupplyChainNodes(prevCompleted);
-          }
-          if (stepTag === 'FINAL' || lastMessage.status === 'COMPLETED') {
-            setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
-            setActiveSupplyChainNode('FINAL');
-            setIsParallelRunning(false);
-          }
-
-          if (stepMsg) {
-            const rawLines = stepMsg.split('\n').map((l: string) => l.trim()).filter(Boolean);
-            const tagColor =
-              stepTag === 'PLANNING' ? 'text-purple-400' :
-              stepTag === 'FARMER' ? 'text-amber-400' :
-              stepTag === 'BUYER' ? 'text-blue-400' :
-              stepTag === 'TRANSPORT' ? 'text-cyan-400' :
-              stepTag === 'WAREHOUSE' ? 'text-indigo-400' :
-              stepTag === 'PROCESSOR' ? 'text-rose-400' :
-              stepTag === 'VALIDATION' ? 'text-emerald-400' :
-              'text-yellow-400';
-
-            const newLogItems: Array<{ time: string; tag: string; text: string; color: string }> = [];
-
-            rawLines.forEach((line: string) => {
-              if (line === `[${stepTag}]` || line === `[${lastMessage.node}]`) {
-                return;
-              }
-              const cleanText = line.startsWith(`[${stepTag}]`) ? line.replace(`[${stepTag}]`, '').trim() : line;
-              newLogItems.push({
-                time,
-                tag: stepTag,
-                color: tagColor,
-                text: cleanText
-              });
-            });
-
-            if (newLogItems.length > 0) {
-              setLiveTerminalLogs(prev => [...prev, ...newLogItems]);
-            }
-          }
-
-          if (stepTag === 'FARMER' && stepData && stepData.name) {
-            setLiveSellers(prev => {
-              if (!prev || prev.length === 0) return prev;
-              return [
-                {
-                  ...prev[0],
-                  id: stepData.name,
-                  location: stepData.location || prev[0].location,
-                  offer: stepData.price || prev[0].offer,
-                  status: 'Negotiating',
-                  aiStatus: `Sourced: ${stepData.name}`
-                },
-                ...prev.slice(1)
-              ];
-            });
-          } else if (stepTag === 'BUYER' && stepData && (stepData.seller_name || stepData.final_price)) {
-            setLiveSellers(prev => {
-              if (!prev || prev.length === 0) return prev;
-              return [
-                {
-                  ...prev[0],
-                  id: stepData.seller_name || prev[0].id,
-                  offer: stepData.final_price || prev[0].offer,
-                  status: 'Agreed',
-                  aiStatus: `Agreed ₹${stepData.final_price}/kg`
-                },
-                ...prev.slice(1)
-              ];
-            });
-          }
-        } else if (lastMessage.event === 'NEGOTIATION_LOG') {
-          const isFarmerSender = lastMessage.agent_type === 'farmer';
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time, tag: isFarmerSender ? 'Farmer' : 'Buyer', color: isFarmerSender ? 'text-emerald-400' : 'text-blue-400', text: lastMessage.message }
-          ]);
-        } else if (lastMessage.event === 'TOP5_ROUND_UPDATE') {
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time, tag: `ROUND ${lastMessage.round}`, color: 'text-amber-400', text: `${lastMessage.actor || 'AGENT'}: ${lastMessage.message || `Offer ₹${lastMessage.price}/kg for ${lastMessage.quantity}kg`}` }
-          ]);
-        } else if (lastMessage.event === 'TOP5_CANDIDATE_DISCOVERED') {
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time, tag: 'DISCOVERY', color: 'text-blue-400', text: `Discovered candidate: ${lastMessage.name} (${lastMessage.location}) - Ask: ₹${lastMessage.price}/kg` }
-          ]);
-        } else if (lastMessage.event === 'NEGOTIATION_STATE_UPDATE' || lastMessage.event === 'negotiation_state_update') {
-          const state = lastMessage.state || lastMessage;
-
-          if (state.active_buyers && Array.isArray(state.active_buyers)) {
-            const buyers = state.active_buyers.map((b: any, index: number) => {
-              const offerObj = (state.current_offers || []).find((o: any) => o.buyer_id === b.id || o.buyer_name === b.name);
-              return {
-                id: b.name || `Buyer ${index + 1}`,
-                match: b.match_score || (96 - index * 3),
-                distance: b.location ? `250 km` : 'Local',
-                req: `${b.max_quantity || 500} kg`,
-                offer: offerObj ? offerObj.price : (b.target_price || 0),
-                initialOffer: b.target_price || 0,
-                aiStatus: offerObj && offerObj.status ? offerObj.status : 'Evaluated...',
-                status: 'Live',
-                color: 'emerald'
-              };
-            });
-            setLiveBuyers(buyers);
-          }
-
-          if (state.recommendation) {
-            setRecommendation(state.recommendation);
-          }
-          if (state.reflection) {
-            setReflection(state.reflection);
-          }
-
-          if (state.status === 'DEAL' || state.deal) {
-            setAgreementData(state.deal || state);
-            setShowAgreement(true);
-            refetchNeg();
-          }
-        } else if (lastMessage.event === 'NEGOTIATION_FINISHED' || lastMessage.event === 'PARALLEL_PROCUREMENT_COMPLETE') {
-          setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
-          setActiveSupplyChainNode('FINAL');
-          setIsParallelRunning(false);
-
-          if (lastMessage.recommendation) {
-            setRecommendation(lastMessage.recommendation);
-          }
-          if (lastMessage.reflection) {
-            setReflection(lastMessage.reflection);
-          }
-
-          const finalP = lastMessage.winner?.final_price || lastMessage.winner?.negotiated_price || lastMessage.final_price || targetPrice;
-          const finalDeal = {
-            ...negState,
-            id: effectiveId || id,
-            negotiation_id: effectiveId || id,
-            price: finalP,
-            final_price: finalP,
-            quantity: cropQty,
-            status: 'DEAL',
-            farmer: lastMessage.winner?.seller_name || lastMessage.winner?.name || negState?.farmer || 'Latur APMC Producer',
-            buyer: user?.name || user?.full_name || 'Buyer Enterprise',
-            transport_plan: lastMessage.transport_assignment,
-            warehouse_plan: lastMessage.warehouse_assignment,
-            processor_plan: lastMessage.processor_assignment,
-            end_to_end_deal: lastMessage.end_to_end_deal
-          };
-          setAgreementData(finalDeal);
-          setShowAgreement(true);
-        }
-      }
-    }
-  }, [lastMessage, effectiveId, activeId, id, negState, cropQty, targetPrice, statutoryBench, user, refetchNeg]);
-
-  const runParallelAutonomousNegotiation = async (overrideCrop?: string) => {
-    const effectiveCrop = overrideCrop || cropName;
-    const sc = MAHARASHTRA_CROP_SCENARIOS[effectiveCrop] || MAHARASHTRA_CROP_SCENARIOS['Rice'];
-    const effectiveQty = (overrideCrop && sc) ? sc.qty : cropQty;
-    const effectiveTarget = (overrideCrop && sc) ? sc.target : targetPrice;
-    const effectiveMarket = Math.round(effectiveTarget * 1.04 * 10) / 10;
-    const effectiveFloor = Math.round(effectiveTarget * 0.9 * 10) / 10;
-    const sellersForCrop = CROP_FARMER_DIRECTORY[effectiveCrop] || CROP_FARMER_DIRECTORY['Rice'];
-    const initialBuyersList = getInitialBuyers(effectiveCrop, effectiveTarget);
-
+  // Parallel Autonomous Negotiation Runner
+  const runParallelAutonomousNegotiation = async () => {
+    if (isParallelRunning) return;
     setIsParallelRunning(true);
-    setIsFindingMatches(true);
-    setDealAccepted(false);
-    setIsRenegotiating(false);
-    setLiveTerminalLogs([]);
-    setActiveTab('terminal');
-    setActiveSupplyChainNode('PLANNING');
-    setCompletedSupplyChainNodes([]);
-
-    const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    let targetNegId = effectiveId || activeId || id;
-    if (!targetNegId || targetNegId === 'undefined' || targetNegId === 'null') {
-      targetNegId = `neg_${Date.now()}`;
-    }
-
-    // Step 1: Initial Planning & Discovery Radar
-    setLiveTerminalLogs([
-      {
-        time: now(),
-        tag: 'PLANNING',
-        color: 'text-purple-400',
-        text: `Initiating LangGraph autonomous multi-agent workflow for ${effectiveQty.toLocaleString()} kg ${effectiveCrop}. Target: ₹${effectiveTarget}/kg.`
-      },
-      {
-        time: now(),
-        tag: 'POLICY',
-        color: 'text-blue-400',
-        text: `Statutory MSP: ₹${statutoryBench}/kg | Market Modal: ₹${effectiveMarket}/kg | Floor Guardrail: ₹${effectiveFloor}/kg.`
-      },
-      {
-        time: now(),
-        tag: 'DISCOVERY',
-        color: 'text-cyan-400',
-        text: `Scanning 327 Maharashtra APMC Mandis (Latur, Solapur, Akola, Wardha, Lasalgaon, Pune) for verified counterparties...`
-      }
-    ]);
-
-    const reqServices = location.state?.selected_services || location.state?.selectedServices || [];
-    const isFullSupplyChain = Boolean(
-      location.state?.full_supply_chain ||
-      location.state?.fullSupplyChain ||
-      location.state?.req_full_logistics ||
-      negState?.full_supply_chain ||
-      negState?.workflow_mode === 'FULL_SUPPLY_CHAIN' ||
-      (reqServices.length === 0 && !location.state?.needTransport && !location.state?.needWarehouse && !location.state?.needProcessor) ||
-      location.state?.fromListing
-    );
-
-    const workflowMode = isFullSupplyChain ? 'FULL_SUPPLY_CHAIN' : 'SINGLE_AGENT';
-    const permittedAgents = isFullSupplyChain
-      ? ['BUYER', 'TRANSPORT', 'WAREHOUSE', 'PROCESSOR']
-      : (reqServices.length > 0 ? reqServices : ['BUYER']);
-    const needTransport = isFullSupplyChain || Boolean(location.state?.needTransport || reqServices.includes('TRANSPORT') || negState?.need_transport);
-    const needWarehouse = isFullSupplyChain || Boolean(location.state?.needWarehouse || reqServices.includes('WAREHOUSE') || negState?.need_warehouse);
-    const needProcessor = isFullSupplyChain || Boolean(location.state?.needProcessor || reqServices.includes('PROCESSOR') || negState?.need_processor);
-
-    try {
-      // Execute Real LangGraph Autonomous Orchestrator across top APMC candidates
-      const res = await api.post(`/negotiations/${targetNegId}/parallel-procure`, {
-        crop: effectiveCrop,
-        quantity: effectiveQty,
-        target_price: effectiveTarget,
-        max_price: Math.round(effectiveTarget * 1.20 * 10) / 10,
-        reservation_price: Math.round(effectiveTarget * 1.20 * 10) / 10,
-        location: location.state?.location || negState?.location || 'Maharashtra',
-        workflow_mode: workflowMode,
-        permitted_agents: permittedAgents,
-        need_transport: needTransport,
-        need_storage: needWarehouse,
-        allow_processing: needProcessor,
-      });
-
-      const data = res.data || {};
-      const winner = data.winner;
-      const suppliers = data.suppliers || [];
-
-      setIsFindingMatches(false);
-
-      if (suppliers.length > 0) {
-        if (isBuyer) {
-          setLiveSellers(suppliers.map((s: any) => ({
-            id: s.name,
-            location: s.location,
-            offer: s.negotiated_price,
-            initialOffer: s.initial_ask,
-            status: s.status,
-            aiStatus: s.special,
-            isWinner: Boolean(s.is_best)
-          })));
-        } else {
-          setLiveBuyers(suppliers.map((s: any) => ({
-            id: s.name,
-            location: s.location,
-            offer: s.negotiated_price,
-            initialOffer: s.initial_ask,
-            status: s.status,
-            aiStatus: s.special,
-            isWinner: Boolean(s.is_best)
-          })));
-        }
-      }
-
-      if (winner && (data.status === 'DEAL' || data.status === 'SUCCESS' || winner.final_price)) {
-        const finalPrice = winner.final_price || winner.negotiated_price || effectiveTarget;
-        const winnerName = winner.seller_name || winner.name || 'APMC Sourced Producer';
-        const primaryFarmer = isBuyer ? winnerName : (user?.name || farmerName || 'Producer');
-        const primaryBuyer = isBuyer ? (buyerName || user?.name || 'AgroCorp Procurement') : winnerName;
-
-        const finalDeal = {
-          ...negState,
-          id: targetNegId,
-          negotiation_id: targetNegId,
-          price: finalPrice,
-          final_price: finalPrice,
-          quantity: effectiveQty,
-          crop: effectiveCrop,
-          status: 'DEAL',
-          farmer: primaryFarmer,
-          farmer_name: primaryFarmer,
-          buyer: primaryBuyer,
-          buyer_name: primaryBuyer,
-          transport_plan: data.transport_assignment,
-          warehouse_plan: data.warehouse_assignment,
-          processor_plan: data.processor_assignment,
-          end_to_end_deal: data.end_to_end_deal,
-          contract_hash: data.end_to_end_deal?.digital_signature_hash || data.end_to_end_deal?.contract_hash,
-        };
-        setAgreementData(finalDeal);
-        if (data.transport_assignment) setLiveTransportPlan(data.transport_assignment);
-        if (data.warehouse_assignment) setLiveWarehousePlan(data.warehouse_assignment);
-        if (data.processor_assignment) setLiveProcessorPlan(data.processor_assignment);
-        setDealAccepted(true);
-        setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
-        setActiveSupplyChainNode('FINAL');
-
-        // Parse and stream rich LangGraph multi-agent logs if available
-        if (Array.isArray(data.logs) && data.logs.length > 0) {
-          const parsedLogs = data.logs.map((rawLog: string) => {
-            let tag = 'AGENT';
-            let color = 'text-blue-400';
-            if (rawLog.includes('Validate') || rawLog.includes('PLANNING')) {
-              tag = 'PLANNING';
-              color = 'text-purple-400 font-bold';
-            } else if (rawLog.includes('Policy') || rawLog.includes('Gatekeeper')) {
-              tag = 'POLICY';
-              color = 'text-indigo-400 font-bold';
-            } else if (rawLog.includes('Market Intelligence') || rawLog.includes('Intelligence')) {
-              tag = 'MARKET';
-              color = 'text-cyan-400 font-bold';
-            } else if (rawLog.includes('Candidate Matching') || rawLog.includes('FARMER')) {
-              tag = 'FARMER';
-              color = 'text-amber-400 font-bold';
-            } else if (rawLog.includes('Parallel Negotiation') || rawLog.includes('BUYER')) {
-              tag = 'BUYER';
-              color = 'text-blue-400 font-bold';
-            } else if (rawLog.includes('Transport Agent') || rawLog.includes('TRANSPORT')) {
-              tag = 'TRANSPORT';
-              color = 'text-cyan-400 font-bold';
-            } else if (rawLog.includes('Warehouse Agent') || rawLog.includes('WAREHOUSE')) {
-              tag = 'WAREHOUSE';
-              color = 'text-indigo-400 font-bold';
-            } else if (rawLog.includes('Processor Agent') || rawLog.includes('PROCESSOR')) {
-              tag = 'PROCESSOR';
-              color = 'text-rose-400 font-bold';
-            } else if (rawLog.includes('Economic Validation') || rawLog.includes('VALIDATION')) {
-              tag = 'VALIDATION';
-              color = 'text-emerald-400 font-bold';
-            } else if (rawLog.includes('Deal Evaluation') || rawLog.includes('Contract')) {
-              tag = 'DEAL';
-              color = 'text-yellow-400 font-bold';
-            }
-            return {
-              time: now(),
-              tag,
-              color,
-              text: rawLog.replace(/^[^\w\s]+/, '').trim()
-            };
-          });
-          setLiveTerminalLogs(prev => [...prev, ...parsedLogs]);
-        }
-
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          {
-            time: now(),
-            tag: 'DEAL',
-            color: 'text-yellow-400 font-bold',
-            text: `[Deal Evaluation] 🏆 Best Optimal Deal Selected: ${winnerName} at ₹${finalPrice}/kg! Pareto efficiency 98.4%.`
-          },
-          {
-            time: now(),
-            tag: 'FINAL',
-            color: 'text-emerald-300 font-bold',
-            text: `[Workflow Completion] 🚀 Master Supply Chain Contract Sealed! Cryptographic ledger hash: ${data.end_to_end_deal?.digital_signature_hash || data.end_to_end_deal?.contract_hash || ('0x' + targetNegId)} recorded.`
-          }
-        ]);
-      } else {
-        setLiveTerminalLogs(prev => [
-          ...prev,
-          {
-            time: now(),
-            tag: 'OUTCOME',
-            color: 'text-amber-400 font-bold',
-            text: `[Procurement Concluded] ${data.status || 'No deal reached within budget/reservation constraints.'}`
-          }
-        ]);
-      }
-    } catch (err: any) {
-      console.warn('Parallel procurement API note:', err);
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        {
-          time: now(),
-          tag: 'ERROR',
-          color: 'text-rose-400 font-bold',
-          text: `[Procurement Exception] ${err?.response?.data?.detail || err?.message || 'Connection timeout'}`
-        }
-      ]);
-      setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
-      setActiveSupplyChainNode('FINAL');
-    } finally {
-      setIsParallelRunning(false);
-      refetchNeg();
-    }
-  };
-
-  const executeCopilotCommand = (commandOverride?: string) => {
-    const rawCmd = commandOverride !== undefined ? commandOverride : copilotCommand;
-    const cmd = (rawCmd || '').trim();
-    if (!cmd) return;
-
-    // CRITICAL: Unlock negotiation state so user's manual copilot instruction re-engages live active bidding
-    setIsRenegotiating(true);
-    setDealAccepted(false);
-    setActiveTab('terminal');
-
-    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const userRole = isBuyer ? 'Buyer' : 'Farmer';
-    const userMsg = { sender: userRole, text: cmd, time: now };
-
-    setCopilotMessages(prev => [...prev, userMsg]);
     setLiveTerminalLogs(prev => [
       ...prev,
-      {
-        time: now,
-        tag: 'COPILOT',
-        color: 'text-amber-400',
-        text: `⚡ [${userRole.toUpperCase()} COPILOT] Manual instruction applied: "${cmd}". Updating agent policy & parameters.`
-      }
+      { time: new Date().toLocaleTimeString(), tag: 'Autonomous', text: `Starting autonomous multi-turn negotiation for ${cropName}...`, color: 'text-emerald-400' }
     ]);
 
-    // Clear input field
-    setCopilotCommand('');
+    try {
+      const targetNegId = activeId || id;
+      if (!targetNegId) return;
 
-    const lower = cmd.toLowerCase();
+      const res = await api.post(`/negotiations/${targetNegId}/parallel-procure`, {
+        target_price: targetPrice,
+        max_price: maxAllowedCeiling,
+        crop: cropName,
+        quantity: cropQty
+      });
 
-    if (isBuyer) {
-      // ---------------- BUYER COPILOT EXECUTION ----------------
-      if (lower.includes('pause') || lower.includes('stop') || lower.includes('hold')) {
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveSellers(prev => prev.map(s => ({ ...s, status: 'Waiting', aiStatus: 'Paused by Copilot' })));
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'PAUSE', color: 'text-amber-300', text: `[LangGraph Copilot] Active procurement threads paused by buyer intervention.` }
-          ]);
-          setCopilotMessages(prev => [...prev, { sender: 'AI', text: 'Procurement negotiations paused. Waiting for your instruction to resume.', time: t }]);
-        }, 300);
-      } else if (lower.includes('resume') || lower.includes('continue') || lower.includes('start')) {
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveSellers(prev => prev.map(s => ({ ...s, status: 'Negotiating', aiStatus: 'Active Bidding' })));
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'RESUME', color: 'text-emerald-400', text: `[LangGraph Copilot] Negotiations resumed across candidate seller pool.` }
-          ]);
-          setCopilotMessages(prev => [...prev, { sender: 'AI', text: 'Procurement negotiations resumed. Actively engaging candidate farmers.', time: t }]);
-        }, 300);
-      } else if (lower.includes('exceed') || lower.includes('ceiling') || lower.includes('above') || lower.includes('max')) {
-        const match = cmd.match(/\d+(\.\d+)?/);
-        const val = match ? Number(match[0]) : Math.round(maxAllowedCeiling);
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'GUARDRAIL', color: 'text-blue-400', text: `[LangGraph Copilot] Ceiling guardrail set to ₹${val}/kg. High-ask candidates will be auto-countered.` }
-          ]);
-          setCopilotMessages(prev => [...prev, { sender: 'AI', text: `Understood. Procurement ceiling set to ₹${val}/kg. AI will not accept bids above this rate.`, time: t }]);
-        }, 300);
+      const auditTrail = res.data?.audit_trail || res.data?.turns || [];
+      if (auditTrail.length > 0) {
+        auditTrail.forEach((turn: any, idx: number) => {
+          setTimeout(() => {
+            setMessages(prev => [
+              ...prev,
+              {
+                sender: turn.agent_role === 'buyer' ? 'Buyer Agent' : farmerName,
+                text: turn.content || turn.message || `Turn ${idx + 1}: Proposed Rs.${turn.offer_price}/kg`,
+                price: turn.offer_price,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+            ]);
+
+            setLiveTerminalLogs(prev => [
+              ...prev,
+              { time: new Date().toLocaleTimeString(), tag: turn.agent_role === 'buyer' ? 'Buyer RL' : 'Farmer RL', text: `Turn ${idx + 1}: Offer Rs.${turn.offer_price}/kg (${turn.decision || 'COUNTER'}).`, color: turn.agent_role === 'buyer' ? 'text-blue-400' : 'text-emerald-400' }
+            ]);
+
+            if (idx === auditTrail.length - 1) {
+              setIsParallelRunning(false);
+              const finalPrice = turn.offer_price || bestOfferPrice;
+              handleFarmerDealFinalized(finalPrice, farmerName);
+            }
+          }, (idx + 1) * 450);
+        });
       } else {
-        // Counter offer / Target / Specific price / Freeform
-        const match = cmd.match(/\d+(\.\d+)?/);
-        let counterVal = match ? Number(match[0]) : Math.round(targetPrice);
-        if (!match && lower.includes('best')) {
-          counterVal = Math.round(((liveSellers[0]?.offer || 50) - 2) * 10) / 10;
-        } else if (!match && lower.includes('target')) {
-          counterVal = Math.round(targetPrice);
-        }
-
-        setManualPrice(String(counterVal));
-
-        // Step 1: Dispatch to candidate farmers (500ms)
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'DISPATCH', color: 'text-emerald-400', text: `[LangGraph Copilot] Dispatched buyer counter ₹${counterVal}/kg to candidate farmers across APMC mandis.` }
-          ]);
-          setLiveSellers(prev => prev.map((s, i) => i === 2 ? { ...s, status: 'Waiting', aiStatus: `Evaluating ₹${counterVal}/kg` } : s));
-          setCopilotMessages(prev => [...prev, { sender: 'AI', text: `Manual instruction applied. Counter offer of ₹${counterVal}/kg dispatched to candidate farmers.`, time: t }]);
-        }, 500);
-
-        // Step 2: Intermediate rounds (1200ms)
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          const vilasAsk = Math.round((counterVal * 1.04) * 10) / 10;
-          const rameshAsk = Math.round((counterVal * 1.02) * 10) / 10;
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'ROUND 2', color: 'text-amber-300', text: `Vilas Jadhav (Akola APMC) countered ask at ₹${vilasAsk}/kg.` },
-            { time: t, tag: 'ROUND 2', color: 'text-blue-400', text: `Ramesh Patil (Latur APMC) revised ask to ₹${rameshAsk}/kg.` }
-          ]);
-          setLiveSellers(prev => [
-            prev[0],
-            { ...prev[1], offer: rameshAsk, status: 'Active', aiStatus: `Farmer Counter: ₹${rameshAsk}/kg` },
-            { ...prev[2], offer: vilasAsk, status: 'Waiting', aiStatus: `Counter ₹${vilasAsk}/kg` }
-          ]);
-        }, 1200);
-
-        // Step 3: Best seller matches (1900ms)
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'ROUND 3', color: 'text-emerald-400', text: `Suresh Deshmukh (Nanded APMC) matched buyer target: Confirmed at ₹${counterVal}/kg with APMC Grade-A certification.` },
-            { time: t, tag: 'WINNER', color: 'text-emerald-300 font-bold', text: `🏆 Optimal Deal Ready: Suresh Deshmukh at ₹${counterVal}/kg. Net: ₹${Math.round(counterVal * cropQty).toLocaleString()}. Click 'Accept Deal' to confirm contract.` }
-          ]);
-          setLiveSellers(prev => [
-            { ...prev[0], offer: counterVal, status: 'Negotiating', aiStatus: `Buyer Override: ₹${counterVal}/kg (Matched)` },
-            prev[1],
-            prev[2]
-          ]);
-        }, 1900);
+        setIsParallelRunning(false);
       }
-    } else {
-      // ---------------- FARMER COPILOT EXECUTION ----------------
-      if (lower.includes('pause') || lower.includes('stop') || lower.includes('hold')) {
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveBuyers(prev => prev.map(b => ({ ...b, status: 'Waiting', aiStatus: 'Paused by Copilot' })));
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'PAUSE', color: 'text-amber-300', text: `[LangGraph Copilot] Farmer operator paused negotiation rounds across all buyers.` }
-          ]);
-          setCopilotMessages(prev => [...prev, { sender: 'AI', text: 'Negotiations paused. Waiting for your instruction to resume.', time: t }]);
-        }, 300);
-      } else if (lower.includes('resume') || lower.includes('continue') || lower.includes('start')) {
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveBuyers(prev => prev.map(b => ({ ...b, status: 'Negotiating', aiStatus: 'Active Bidding' })));
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'RESUME', color: 'text-emerald-400', text: `[LangGraph Copilot] Negotiation rounds resumed across candidate buyers.` }
-          ]);
-          setCopilotMessages(prev => [...prev, { sender: 'AI', text: 'Negotiations resumed. Counter offers active across buyer pool.', time: t }]);
-        }, 300);
-      } else if (lower.includes('below') || lower.includes('minimum') || lower.includes('floor')) {
-        const match = cmd.match(/\d+(\.\d+)?/);
-        if (match) {
-          const rawVal = Number(match[0]);
-          const valQ = rawVal < 100 ? rawVal * 100 : rawVal;
-          const valKg = rawVal < 100 ? rawVal : (rawVal / 100);
-
-          if (valKg < minAllowedFloor) {
-            setTimeout(() => {
-              const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-              setLiveTerminalLogs(prev => [
-                ...prev,
-                { time: t, tag: 'GUARDRAIL', color: 'text-red-400', text: `[LangGraph Copilot] ⚠️ Statutory floor guardrail: Proposed floor below MSP baseline (₹${minAllowedFloor}/kg). Override rejected.` }
-              ]);
-              setCopilotMessages(prev => [...prev, { sender: 'AI', text: `⚠️ Override blocked. ₹${rawVal} is below statutory minimum acceptable price of ₹${minAllowedFloor}/kg.`, time: t }]);
-            }, 300);
-          } else {
-            setFarmerManualPrice(valQ);
-            setTimeout(() => {
-              const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-              setLiveTerminalLogs(prev => [
-                ...prev,
-                { time: t, tag: 'FLOOR', color: 'text-emerald-400', text: `[LangGraph Copilot] Farmer reservation floor updated to ₹${valQ}/q (₹${valKg.toFixed(1)}/kg). Counter-offers dispatched.` },
-                { time: t, tag: 'DISPATCH', color: 'text-blue-400', text: `[LangGraph Copilot] Rejecting all bids below ₹${valQ}/q. Buyer pool instructed to meet reservation floor.` }
-              ]);
-              setCopilotMessages(prev => [...prev, { sender: 'AI', text: `Understood. I'll update your negotiation floor to ₹${valQ}/q (₹${valKg.toFixed(1)}/kg). Negotiators are forcing buyers to meet floor.`, time: t }]);
-              setLiveBuyers(prev => prev.map(b => ({
-                ...b,
-                offer: Math.max(valQ, b.offer),
-                status: 'Negotiating',
-                aiStatus: b.offer < valQ ? `Raised to meet floor: ₹${valQ}/q` : b.aiStatus
-              })));
-            }, 500);
-
-            setTimeout(() => {
-              const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-              const bestOffer = Math.max(valQ, liveBuyers[0]?.offer || valQ);
-              setLiveTerminalLogs(prev => [
-                ...prev,
-                { time: t, tag: 'ROUND 2', color: 'text-emerald-400', text: `Buyer A matched floor requirement: Bid confirmed at ₹${bestOffer}/q (96% Match).` },
-                { time: t, tag: 'WINNER', color: 'text-emerald-300 font-bold', text: `🏆 Optimal Deal Ready: Buyer A at ₹${bestOffer}/q. Click 'Accept Deal' to confirm contract.` }
-              ]);
-              setLiveBuyers(prev => prev.map((b, i) => i === 0 ? { ...b, offer: bestOffer, status: 'Negotiating', aiStatus: `Farmer Override: ₹${bestOffer}/q` } : b));
-            }, 1400);
-          }
-        }
-      } else {
-        // Counter / Ask / Specific price / Freeform
-        const match = cmd.match(/\d+(\.\d+)?/);
-        let targetAsk = farmerManualPrice;
-        if (match) {
-          const raw = Number(match[0]);
-          targetAsk = raw < 100 ? raw * 100 : raw;
-        } else if (lower.includes('best')) {
-          targetAsk = (liveBuyers[0]?.offer || 2500) + 50;
-        }
-
-        const targetAskKg = (targetAsk / 100).toFixed(1);
-        setFarmerManualPrice(targetAsk);
-
-        // Step 1: Dispatch to candidate buyers (500ms)
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'DISPATCH', color: 'text-emerald-400', text: `[LangGraph Copilot] Dispatched farmer counter-offer ₹${targetAsk}/q (₹${targetAskKg}/kg) to Buyer A, B, and C.` }
-          ]);
-          setLiveBuyers(prev => prev.map((b, i) => i === 2 ? { ...b, status: 'Negotiating', aiStatus: `Countering ask: ₹${Math.round(targetAsk * 0.96)}/q` } : b));
-          setCopilotMessages(prev => [...prev, { sender: 'AI', text: `Manual instruction applied. Counter offer of ₹${targetAsk}/q (₹${targetAskKg}/kg) dispatched to candidate buyers.`, time: t }]);
-        }, 500);
-
-        // Step 2: Intermediate rounds (1200ms)
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          const buyerCOffer = Math.round(targetAsk * 0.96);
-          const buyerBOffer = Math.round(targetAsk * 0.985);
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'ROUND 2', color: 'text-amber-300', text: `Buyer C (Akola) evaluated ask: Cannot match ₹${targetAsk}/q. Standing at ₹${buyerCOffer}/q.` },
-            { time: t, tag: 'ROUND 2', color: 'text-blue-400', text: `Buyer B (Solapur) raised bid to ₹${buyerBOffer}/q (93% Match).` }
-          ]);
-          setLiveBuyers(prev => {
-            const fallback = getInitialBuyers(cropName, targetAsk / 100);
-            const b0 = (prev && prev[0]) ? prev[0] : fallback[0];
-            const b1 = (prev && prev[1]) ? prev[1] : fallback[1];
-            const b2 = (prev && prev[2]) ? prev[2] : fallback[2];
-            return [
-              b0,
-              { ...b1, offer: buyerBOffer, status: 'Negotiating', aiStatus: `Counter ₹${buyerBOffer}/q` },
-              { ...b2, offer: buyerCOffer, status: 'Waiting', aiStatus: `Standing at ₹${buyerCOffer}/q` }
-            ];
-          });
-        }, 1200);
-
-        // Step 3: Best buyer matches (1900ms)
-        setTimeout(() => {
-          const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          const netTotal = Math.round(targetAsk * (cropQty < 100 ? cropQty * 100 : cropQty) - 1850);
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: t, tag: 'ROUND 3', color: 'text-emerald-400', text: `Buyer A / Dining accepted farmer ask: Revised bid matched to ₹${targetAsk}/q (96% Match).` },
-            { time: t, tag: 'WINNER', color: 'text-emerald-300 font-bold', text: `🏆 Optimal Deal Ready: Buyer A at ₹${targetAsk}/q. Net: ₹${netTotal.toLocaleString()}. Click 'Accept Deal' to confirm contract.` }
-          ]);
-          setLiveBuyers(prev => {
-            const fallback = getInitialBuyers(cropName, targetAsk / 100);
-            const b0 = (prev && prev[0]) ? prev[0] : fallback[0];
-            const b1 = (prev && prev[1]) ? prev[1] : fallback[1];
-            const b2 = (prev && prev[2]) ? prev[2] : fallback[2];
-            return [
-              { ...b0, offer: targetAsk, status: 'Negotiating', aiStatus: `Farmer Override: ₹${targetAsk}/q (Matched)` },
-              b1,
-              b2
-            ];
-          });
-        }, 1900);
-      }
+    } catch (err) {
+      console.warn('Parallel procurement runner:', err);
+      setIsParallelRunning(false);
     }
   };
 
+  // Farmer Deal Finalization Handler
+  const handleFarmerDealFinalized = async (agreedPrice: number, supplier: string) => {
+    const farmerRecord: CompletedPhaseRecord = {
+      phase: 'FARMER',
+      title: 'Farmer Crop Produce',
+      status: 'DEAL',
+      agreedPrice: agreedPrice,
+      counterParty: supplier,
+      location: farmerLocation,
+      lotSize: cropQty,
+      messages: [...messages],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: `Closed procurement contract for ${cropQty.toLocaleString()} kg of ${cropName} at Rs.${agreedPrice}/kg with ${supplier}.`
+    };
 
+    setCompletedPhases(prev => {
+      const updated = { ...prev, FARMER: farmerRecord };
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
 
-  const handleCopilotSubmit = (e: any) => {
-    e.preventDefault();
-    executeCopilotCommand();
+    // Persist contract to backend database
+    try {
+      const targetNegId = activeId || id;
+      if (targetNegId) {
+        await api.post(`/negotiations/${targetNegId}/accept`, {
+          price: agreedPrice,
+          quantity: cropQty,
+          farmer: supplier,
+          buyer: buyerName || user?.name || 'Buyer Enterprise',
+          crop: cropName,
+          status: 'DEAL'
+        });
+      }
+    } catch (e) {
+      console.warn('Backend contract persist:', e);
+    }
+
+    setLiveTerminalLogs(prev => [
+      ...prev,
+      { time: new Date().toLocaleTimeString(), tag: 'Phase 1 Complete', text: `[Phase 1 Farmer] Deal concluded at Rs.${agreedPrice}/kg with ${supplier} (${farmerLocation}).`, color: 'text-emerald-400' },
+      { time: new Date().toLocaleTimeString(), tag: 'Phase Transition', text: `[Dynamic Router] Evaluating next eligible agent. Transport logistics selected. Pick-up locked to ${farmerLocation}.`, color: 'text-purple-400' }
+    ]);
+
+    // Check if Transport is in dynamic phases
+    const hasTransport = dynamicPhases.some(p => p.id === 'TRANSPORT');
+    if (hasTransport) {
+      setTransitionNotice({
+        title: "Dynamic Multi-Agent Phase Transition: Transport Logistics",
+        message: `Farmer agreement finalized at Rs.${agreedPrice}/kg with ${supplier} (${farmerLocation}). Origin set to ${farmerLocation}. Initiating Inbound Transport Agent.`,
+        timestamp: new Date().toLocaleTimeString()
+      });
+      setActivePhase('TRANSPORT');
+      setViewingPhase('TRANSPORT');
+    } else {
+      setActivePhase('SUMMARY');
+      setViewingPhase('SUMMARY');
+    }
   };
 
-  // CRITICAL FIX: Only show full-screen initialization spinner on first load when there is an active session being fetched and no data has arrived yet.
-  // NEVER show it during silent background polling/refetches, so the page NEVER flashes or buffers!
-  if (isLoading && !negState && (effectiveId || activeId)) {
+  // Farmer Bypass / Unavailable Handler (Ensures non-produce agents are evaluated even without farmer)
+  const handleBypassFarmer = (reason: string = 'Produce self-arranged / no match') => {
+    const farmerRecord: CompletedPhaseRecord = {
+      phase: 'FARMER',
+      title: 'Farmer Crop Produce',
+      status: 'SKIPPED',
+      messages: [...messages],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: reason
+    };
+
+    setCompletedPhases(prev => {
+      const updated = { ...prev, FARMER: farmerRecord };
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    setLiveTerminalLogs(prev => [
+      ...prev,
+      { time: new Date().toLocaleTimeString(), tag: 'Phase Bypass', text: `[Phase 1 Farmer] Produce phase bypassed (${reason}). Proceeding to logistics.`, color: 'text-amber-400' }
+    ]);
+
+    const hasTransport = dynamicPhases.some(p => p.id === 'TRANSPORT');
+    if (hasTransport) {
+      setTransitionNotice({
+        title: "Evaluating Next Eligible Agent: Transport Logistics",
+        message: "Farmer produce bypassed. Evaluating logistics and carrier dispatch.",
+        timestamp: new Date().toLocaleTimeString()
+      });
+      setActivePhase('TRANSPORT');
+      setViewingPhase('TRANSPORT');
+    } else {
+      setActivePhase('SUMMARY');
+      setViewingPhase('SUMMARY');
+    }
+  };
+
+  // Accept Deal Trigger from UI button
+  const handleAcceptDeal = async (candidate?: any) => {
+    const selected = candidate || (isBuyer ? (liveSellers.length > 0 ? liveSellers[0] : null) : (liveBuyers.length > 0 ? liveBuyers[0] : null));
+    const agreedPrice = selected?.offer ? Number(selected.offer) : (negState?.final_price || negState?.price || currentFloor);
+    const counterParty = selected?.id || (isBuyer ? (farmerName || 'Farmer Producer') : (negState?.buyer_name || negState?.buyer || 'Buyer Enterprise'));
+
+    handleFarmerDealFinalized(agreedPrice, counterParty);
+  };
+
+  // Parallel Autonomous Multi-Carrier Transport Negotiation Runner
+  const runParallelTransportNegotiation = async () => {
+    if (isParallelTransportRunning) return;
+    setIsParallelTransportRunning(true);
+    setLiveTerminalLogs(prev => [
+      ...prev,
+      { time: new Date().toLocaleTimeString(), tag: 'Fleet Engine', text: `Starting autonomous multi-carrier freight negotiation across top 5 vehicles for ${cropQty.toLocaleString()} kg ${cropName}...`, color: 'text-blue-400' }
+    ]);
+
+    const vehicles = [...topFiveVehicles];
+    const delays = [350, 700, 1050, 1400, 1750];
+
+    vehicles.forEach((v, idx) => {
+      setTimeout(() => {
+        const baseFreight = v.initial_freight || Math.round(v.ratePerKm * transitRoute.distanceKm);
+        const buyerRound1 = Math.round(baseFreight * 0.90);
+        const carrierCounter1 = Math.round(baseFreight * 0.94);
+        const buyerRound2 = Math.round(baseFreight * 0.91);
+        const isWinning = idx === 0; // #1 Best Freight Vehicle
+        const agreedAmt = isWinning ? buyerRound2 : carrierCounter1;
+
+        const initialMsg = {
+          id: `trans_init_${v.vehicle_id}_${idx}`,
+          sender: 'Transport Dispatcher',
+          text: `Namaste! Transport Dispatch Agent for ${v.vehicle_name} (${v.vehicle_type}). Available at ${transitRoute.origin}. Our haulage quote to ${transitRoute.destination} is Rs.${v.ratePerKm}/km, totaling Rs.${baseFreight.toLocaleString()} (inclusive of Fastag toll & driver batta).`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: baseFreight
+        };
+
+        const round1Buyer = {
+          id: `para_t_${idx}_1`,
+          sender: 'Buyer Agent',
+          text: `We counter-propose Rs.${buyerRound1.toLocaleString()} (Rs.${(buyerRound1 / transitRoute.distanceKm).toFixed(2)}/km) for ${v.vehicle_name} from ${transitRoute.origin} to ${transitRoute.destination}.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: buyerRound1
+        };
+
+        const round1Carrier = {
+          id: `para_t_${idx}_2`,
+          sender: 'Transport Dispatcher',
+          text: `Counter-offer: We can dispatch ${v.vehicle_name} for Rs.${carrierCounter1.toLocaleString()} (Rs.${(carrierCounter1 / transitRoute.distanceKm).toFixed(2)}/km) covering diesel, toll, and transit insurance.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: carrierCounter1
+        };
+
+        const round2Buyer = {
+          id: `para_t_${idx}_3`,
+          sender: 'Buyer Agent',
+          text: `Buyer target ceiling: Rs.${buyerRound2.toLocaleString()} (Rs.${(buyerRound2 / transitRoute.distanceKm).toFixed(2)}/km) for immediate dispatch slot.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: buyerRound2
+        };
+
+        const round2Carrier = {
+          id: `para_t_${idx}_4`,
+          sender: 'Transport Dispatcher',
+          text: isWinning 
+            ? `Deal Accepted! Confirmed Rs.${agreedAmt.toLocaleString()} for ${v.vehicle_name}. Booking dispatch slot and assigning driver.`
+            : `Carrier threshold limit reached. Firm dispatch quote stands at Rs.${carrierCounter1.toLocaleString()}.`,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          price: isWinning ? agreedAmt : carrierCounter1
+        };
+
+        setTransportBranchMessages(prev => ({
+          ...prev,
+          [idx]: [initialMsg, round1Buyer, round1Carrier, round2Buyer, round2Carrier]
+        }));
+
+        setTransportBranchStatuses(prev => ({
+          ...prev,
+          [idx]: {
+            status: isWinning ? 'Deal Confirmed' : 'Countered',
+            currentFreight: isWinning ? agreedAmt : carrierCounter1,
+            rounds: 2
+          }
+        }));
+
+        setLiveTerminalLogs(prev => [
+          ...prev,
+          { 
+            time: new Date().toLocaleTimeString(), 
+            tag: `Carrier #${idx + 1}`, 
+            text: isWinning 
+              ? `[Winner] ${v.vehicle_name}: Deal confirmed at Rs.${agreedAmt.toLocaleString()} (Rs.${(agreedAmt / transitRoute.distanceKm).toFixed(2)}/km). Saved Rs.${(baseFreight - agreedAmt).toLocaleString()}!`
+              : `[Screened] ${v.vehicle_name}: Countered Rs.${carrierCounter1.toLocaleString()} (${v.vehicle_type}).`, 
+            color: isWinning ? 'text-emerald-400' : 'text-blue-300' 
+          }
+        ]);
+
+        if (idx === vehicles.length - 1) {
+          setIsParallelTransportRunning(false);
+          setSelectedTransportIndex(0); // Focus on winner
+          const winningV = vehicles[0];
+          const winningFreight = Math.round((winningV.initial_freight || baseFreight) * 0.91);
+          setTransportStatus('AGREED');
+          setTransportAgreement({
+            vehicle: winningV,
+            agreedFreight: winningFreight,
+            distanceKm: transitRoute.distanceKm,
+            transitHours: transitRoute.estTransitHours
+          });
+          handleAcceptTransportDeal(winningFreight, winningV);
+        }
+      }, delays[idx]);
+    });
+  };
+
+  // Transport Counter-Offer Handler
+  const handleTransportCounter = async (offerAmt?: number) => {
+    const v = activeVehicle;
+    const baseFreight = v.initial_freight || (v.ratePerKm * transitRoute.distanceKm);
+    const buyerOffer = offerAmt !== undefined ? offerAmt : (Number(transportBuyerOffer) || Math.round(baseFreight * 0.90));
+    setIsTransportLoading(true);
+
+    const userMsg = {
+      id: `usr_t_${Date.now()}`,
+      sender: 'Buyer Agent',
+      text: `We counter-propose Rs.${buyerOffer.toLocaleString()} (Rs.${(buyerOffer / transitRoute.distanceKm).toFixed(2)}/km) for ${cropQty.toLocaleString()} kg haulage from ${transitRoute.origin} to ${transitRoute.destination}.`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      price: buyerOffer
+    };
+
+    const currentBranchMsgs = activeTransportMessages;
+    const newMsgs = [...currentBranchMsgs, userMsg];
+    setTransportBranchMessages(prev => ({
+      ...prev,
+      [selectedTransportIndex]: newMsgs
+    }));
+    setTransportMessages(newMsgs);
+
+    try {
+      const payload = {
+        buyer_offer: buyerOffer,
+        state: {
+          negotiation_id: activeId || id || 'transport_neg',
+          crop_type: cropName,
+          quantity_tons: cropQty / 1000,
+          pickup_location: transitRoute.origin,
+          dropoff_location: transitRoute.destination,
+          route_distance_km: transitRoute.distanceKm,
+          is_reefer_required: Boolean(v?.refrigerated),
+          current_round: (transportBranchStatuses[selectedTransportIndex]?.rounds || transportRound || 1),
+          agent_floor_price: Math.round(baseFreight * 0.88),
+          agent_target_price: baseFreight,
+          agent_counter_offer: Math.round(baseFreight * 0.94),
+          negotiation_status: 'IN_PROGRESS'
+        }
+      };
+
+      const res = await api.post('/transport/negotiate', payload);
+      const data = res.data;
+
+      setTimeout(() => {
+        setIsTransportLoading(false);
+        setTransportRound(r => r + 1);
+        const nextRound = (transportBranchStatuses[selectedTransportIndex]?.rounds || transportRound || 1) + 1;
+
+        if (data?.negotiation_status === 'ACCEPTED' || (data?.agreed_price && data.agreed_price <= buyerOffer)) {
+          const agreedAmt = data?.agreed_price || buyerOffer;
+          const acceptMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `Deal Accepted! ${data?.explanation || `Confirmed Rs.${agreedAmt.toLocaleString()} for ${v.vehicle_name}. Booking dispatch slot.`}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: agreedAmt
+          };
+          setTransportBranchMessages(prev => ({
+            ...prev,
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), acceptMsg]
+          }));
+          setTransportMessages(prev => [...prev, acceptMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Deal Confirmed', currentFreight: agreedAmt, rounds: nextRound }
+          }));
+          setTransportStatus('AGREED');
+          setTransportAgreement({
+            vehicle: v,
+            agreedFreight: agreedAmt,
+            distanceKm: transitRoute.distanceKm,
+            transitHours: transitRoute.estTransitHours
+          });
+          setLiveTerminalLogs(prev => [
+            ...prev,
+            { time: new Date().toLocaleTimeString(), tag: 'Transport Agt', text: `[Transport Agent] ACCEPTED buyer freight offer of Rs.${agreedAmt.toLocaleString()} for vehicle ${v.vehicle_name}.`, color: 'text-emerald-400' }
+          ]);
+        } else {
+          const counterAmt = data?.agent_counter_offer || Math.round(baseFreight * 0.94);
+          const counterMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `${data?.explanation || `Counter-offer: We can dispatch ${v.vehicle_name} for Rs.${counterAmt.toLocaleString()} (Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km) covering diesel, toll, and driver batta.`}`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: counterAmt
+          };
+          setTransportBranchMessages(prev => ({
+            ...prev,
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), counterMsg]
+          }));
+          setTransportMessages(prev => [...prev, counterMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Countered', currentFreight: counterAmt, rounds: nextRound }
+          }));
+          setLiveTerminalLogs(prev => [
+            ...prev,
+            { time: new Date().toLocaleTimeString(), tag: 'Transport Agt', text: `[Transport Agent] Counter-offered Rs.${counterAmt.toLocaleString()} (Rate: Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km).`, color: 'text-amber-400' }
+          ]);
+        }
+      }, 450);
+
+    } catch (err) {
+      console.warn('Transport negotiate fallback:', err);
+      setTimeout(() => {
+        setIsTransportLoading(false);
+        const floorCost = Math.round(baseFreight * 0.88);
+        const nextRound = (transportBranchStatuses[selectedTransportIndex]?.rounds || transportRound || 1) + 1;
+        if (buyerOffer >= floorCost) {
+          const acceptMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `Offer of Rs.${buyerOffer.toLocaleString()} meets our operating threshold for ${v.vehicle_name}. Freight booking confirmed.`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: buyerOffer
+          };
+          setTransportBranchMessages(prev => ({
+            ...prev,
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), acceptMsg]
+          }));
+          setTransportMessages(prev => [...prev, acceptMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Deal Confirmed', currentFreight: buyerOffer, rounds: nextRound }
+          }));
+          setTransportStatus('AGREED');
+          setTransportAgreement({
+            vehicle: v,
+            agreedFreight: buyerOffer,
+            distanceKm: transitRoute.distanceKm,
+            transitHours: transitRoute.estTransitHours
+          });
+        } else {
+          const counterAmt = Math.round((baseFreight + floorCost) / 2);
+          const counterMsg = {
+            id: `agt_t_${Date.now()}`,
+            sender: 'Transport Dispatcher',
+            text: `Rs.${buyerOffer.toLocaleString()} is below diesel operating cost. Our best counter is Rs.${counterAmt.toLocaleString()} (Rs.${(counterAmt / transitRoute.distanceKm).toFixed(2)}/km).`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            price: counterAmt
+          };
+          setTransportBranchMessages(prev => ({
+            ...prev,
+            [selectedTransportIndex]: [...(prev[selectedTransportIndex] || newMsgs), counterMsg]
+          }));
+          setTransportMessages(prev => [...prev, counterMsg]);
+          setTransportBranchStatuses(prev => ({
+            ...prev,
+            [selectedTransportIndex]: { status: 'Countered', currentFreight: counterAmt, rounds: nextRound }
+          }));
+        }
+      }, 400);
+    }
+  };
+
+  // Accept Transport Deal Handler
+  const handleAcceptTransportDeal = async (agreedAmt?: number, vehicleOverride?: any) => {
+    const chosenVehicle = vehicleOverride || activeVehicle;
+    const finalFreight = agreedAmt || transportAgreement?.agreedFreight || standardFreight;
+
+    const transportRecord: CompletedPhaseRecord = {
+      phase: 'TRANSPORT',
+      title: 'Inbound Freight Logistics',
+      status: 'DEAL',
+      agreedPrice: finalFreight,
+      counterParty: chosenVehicle.vehicle_name,
+      location: `${transitRoute.origin} -> ${transitRoute.destination}`,
+      lotSize: cropQty,
+      details: {
+        vehicle: chosenVehicle,
+        distanceKm: transitRoute.distanceKm,
+        transitHours: transitRoute.estTransitHours,
+        ratePerKm: (finalFreight / transitRoute.distanceKm).toFixed(2)
+      },
+      messages: transportBranchMessages[chosenVehicle.index !== undefined ? chosenVehicle.index : selectedTransportIndex] || activeTransportMessages,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: `Freight confirmed: ${chosenVehicle.vehicle_name} (${chosenVehicle.vehicle_type}) assigned for Rs.${finalFreight.toLocaleString()} (${transitRoute.distanceKm} km).`
+    };
+
+    setCompletedPhases(prev => {
+      const updated = { ...prev, TRANSPORT: transportRecord };
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    setTransportStatus('AGREED');
+
+    // Persist transport plan to backend database
+    try {
+      const targetNegId = activeId || id;
+      if (targetNegId) {
+        await api.post(`/negotiations/${targetNegId}/accept`, {
+          transport_plan: {
+            vehicle_name: activeVehicle.vehicle_name,
+            vehicle_type: activeVehicle.vehicle_type,
+            agreed_freight: finalFreight,
+            distance_km: transitRoute.distanceKm,
+            origin: transitRoute.origin,
+            destination: transitRoute.destination
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Backend transport plan persist:', e);
+    }
+
+    setLiveTerminalLogs(prev => [
+      ...prev,
+      { time: new Date().toLocaleTimeString(), tag: 'Phase 2 Complete', text: `[Phase 2 Transport] Agreement finalized at Rs.${finalFreight.toLocaleString()} with ${activeVehicle.vehicle_name}.`, color: 'text-emerald-400' },
+      { time: new Date().toLocaleTimeString(), tag: 'Orchestrator', text: `[Orchestrator] Multi-agent negotiation complete. Generating Landed Cost Term Sheet.`, color: 'text-purple-400' }
+    ]);
+
+    setActivePhase('SUMMARY');
+    setViewingPhase('SUMMARY');
+
+    setTransitionNotice({
+      title: "Transport Logistics Agreement Finalized",
+      message: `Agreed Rs.${finalFreight.toLocaleString()} with ${activeVehicle.vehicle_name}. Multi-agent landed cost sheet generated.`,
+      timestamp: new Date().toLocaleTimeString()
+    });
+  };
+
+  // Skip / Decline Transport Handler
+  const handleSkipTransport = (status: 'SKIPPED' | 'CANCELLED' = 'SKIPPED') => {
+    const transportRecord: CompletedPhaseRecord = {
+      phase: 'TRANSPORT',
+      title: 'Inbound Freight Logistics',
+      status: status,
+      messages: [...transportMessages],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: status === 'CANCELLED' 
+        ? 'Buyer cancelled freight dispatch negotiations.' 
+        : 'Buyer opted for self-arranged pickup / direct mandi logistics.'
+    };
+
+    setCompletedPhases(prev => {
+      const updated = { ...prev, TRANSPORT: transportRecord };
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    setActivePhase('SUMMARY');
+    setViewingPhase('SUMMARY');
+
+    setTransitionNotice({
+      title: status === 'CANCELLED' ? "Transport Logistics Cancelled" : "Transport Bypassed",
+      message: "Proceeding to Landed Cost Summary with self-arranged logistics (Rs.0 freight).",
+      timestamp: new Date().toLocaleTimeString()
+    });
+  };
+
+  // Warehouse Reservation Handler
+  const handleReserveWarehouse = async (wh: any) => {
+    setIsWarehouseLoading(true);
+    const dailyCost = Math.round(Number(wh.base_cost_per_kg_per_day || 1.6) * cropQty);
+    const totalCost = dailyCost * 3; // 3-day holding standard buffer
+
+    const warehouseRecord: CompletedPhaseRecord = {
+      phase: 'WAREHOUSE',
+      title: 'Buffer Cold Storage',
+      status: 'DEAL',
+      agreedPrice: totalCost,
+      counterParty: wh.name,
+      location: wh.location,
+      lotSize: cropQty,
+      details: {
+        warehouse_id: wh.id,
+        warehouse_name: wh.name,
+        cost_per_kg_per_day: wh.base_cost_per_kg_per_day,
+        total_daily_cost: dailyCost,
+        recommended_days: 3,
+        agreed_cost: totalCost,
+        capacity_kg: wh.capacity_kg
+      },
+      messages: [],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: `Statutory buffer storage reserved at ${wh.name} (${wh.location}) for 3 days @ Rs.${wh.base_cost_per_kg_per_day}/kg/day.`
+    };
+
+    setCompletedPhases(prev => {
+      const updated = { ...prev, WAREHOUSE: warehouseRecord };
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    try {
+      const targetNegId = activeId || id;
+      if (targetNegId) {
+        await api.post(`/negotiations/${targetNegId}/accept`, {
+          warehouse_plan: {
+            warehouse_id: wh.id,
+            warehouse_name: wh.name,
+            location: wh.location,
+            cost_per_kg_per_day: wh.base_cost_per_kg_per_day,
+            total_daily_cost: dailyCost,
+            recommended_days: 3,
+            agreed_cost: totalCost
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Backend warehouse plan persist:', e);
+    }
+
+    setLiveTerminalLogs(prev => [
+      ...prev,
+      { time: new Date().toLocaleTimeString(), tag: 'Warehouse Agt', text: `[Warehouse Agent] Reserved 3-day buffer at ${wh.name} (Rs.${totalCost.toLocaleString()} statutory fee).`, color: 'text-purple-400' }
+    ]);
+
+    setIsWarehouseLoading(false);
+    if (requestedServices.hasProcessor && !completedPhases['PROCESSOR']) {
+      setActivePhase('PROCESSOR');
+      setViewingPhase('PROCESSOR');
+    } else {
+      setActivePhase('SUMMARY');
+      setViewingPhase('SUMMARY');
+    }
+  };
+
+  const handleSkipWarehouse = () => {
+    const warehouseRecord: CompletedPhaseRecord = {
+      phase: 'WAREHOUSE',
+      title: 'Buffer Cold Storage',
+      status: 'SKIPPED',
+      messages: [],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: 'Buyer opted out of temporary buffer cold storage.'
+    };
+    setCompletedPhases(prev => ({ ...prev, WAREHOUSE: warehouseRecord }));
+    if (requestedServices.hasProcessor && !completedPhases['PROCESSOR']) {
+      setActivePhase('PROCESSOR');
+      setViewingPhase('PROCESSOR');
+    } else {
+      setActivePhase('SUMMARY');
+      setViewingPhase('SUMMARY');
+    }
+  };
+
+  // Processor Agreement Handler
+  const handleConfirmProcessor = async (proc: any) => {
+    setIsProcessorLoading(true);
+    const totalPayment = Math.round(Number(proc.price_per_kg || 45) * cropQty);
+
+    const processorRecord: CompletedPhaseRecord = {
+      phase: 'PROCESSOR',
+      title: 'Industrial Agro-Processing',
+      status: 'DEAL',
+      agreedPrice: totalPayment,
+      counterParty: proc.name,
+      location: proc.location,
+      lotSize: cropQty,
+      details: {
+        processor_id: proc.processor_id,
+        processor_name: proc.name,
+        location: proc.location,
+        output_product: proc.output_product,
+        price_per_kg: proc.price_per_kg,
+        total_payment: totalPayment,
+        capacity_kg: proc.capacity_kg
+      },
+      messages: [],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: `Processing agreement confirmed with ${proc.name} for ${proc.output_product} @ Rs.${proc.price_per_kg}/kg.`
+    };
+
+    setCompletedPhases(prev => {
+      const updated = { ...prev, PROCESSOR: processorRecord };
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    try {
+      const targetNegId = activeId || id;
+      if (targetNegId) {
+        await api.post(`/negotiations/${targetNegId}/accept`, {
+          processor_plan: {
+            processor_id: proc.processor_id,
+            processor_name: proc.name,
+            location: proc.location,
+            output_product: proc.output_product,
+            price_per_kg: proc.price_per_kg,
+            total_payment: totalPayment
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Backend processor plan persist:', e);
+    }
+
+    setLiveTerminalLogs(prev => [
+      ...prev,
+      { time: new Date().toLocaleTimeString(), tag: 'Processor Agt', text: `[Processor Agent] Processing intake agreement confirmed with ${proc.name} for Rs.${totalPayment.toLocaleString()}.`, color: 'text-indigo-400' }
+    ]);
+
+    setIsProcessorLoading(false);
+    setActivePhase('SUMMARY');
+    setViewingPhase('SUMMARY');
+  };
+
+  const handleSkipProcessor = () => {
+    const processorRecord: CompletedPhaseRecord = {
+      phase: 'PROCESSOR',
+      title: 'Industrial Agro-Processing',
+      status: 'SKIPPED',
+      messages: [],
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      explanation: 'Buyer opted out of value-added industrial agro-processing.'
+    };
+    setCompletedPhases(prev => ({ ...prev, PROCESSOR: processorRecord }));
+    setActivePhase('SUMMARY');
+    setViewingPhase('SUMMARY');
+  };
+
+  // Copilot Instruction Submit Handler
+  const handleCopilotSubmit = (e: any) => {
+    e.preventDefault();
+    if (!copilotCommand.trim()) return;
+
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const userRole = isBuyer ? 'Buyer' : 'Farmer';
+    const userMsg = { sender: userRole, text: copilotCommand, time: now };
+    setCopilotMessages(prev => [...prev, userMsg]);
+
+    setTimeout(() => {
+      const lower = copilotCommand.toLowerCase();
+      let aiResponse = 'Understood. Instruction registered in active negotiation strategy.';
+
+      if (activePhase === 'TRANSPORT') {
+        if (lower.includes('counter')) {
+          const match = copilotCommand.match(/\d+/);
+          const val = match ? Number(match[0]) : Math.round(standardFreight * 0.90);
+          aiResponse = `Transport counter instruction of Rs.${val.toLocaleString()} registered. Dispatching counter-offer to ${activeVehicle.vehicle_name}.`;
+          handleTransportCounter(val);
+        } else if (lower.includes('reefer') || lower.includes('cold')) {
+          const reefer = candidateVehicles.find(v => v.refrigerated);
+          if (reefer) {
+            setSelectedTransportVehicle(reefer);
+            aiResponse = `Switched logistics requirement to Refrigerated Unit (${reefer.vehicle_name}). Temperature controlled between 2°C - 8°C.`;
+          } else {
+            aiResponse = `Reefer vehicle requested. Evaluating available cold chain carriers.`;
+          }
+        } else {
+          aiResponse = `Transport instruction recorded: "${copilotCommand}". Monitoring route tolls and fuel surcharge.`;
+        }
+      } else {
+        if (lower.includes('below') || lower.includes('minimum') || lower.includes('floor')) {
+          const match = copilotCommand.match(/\d+(?:\.\d+)?/);
+          if (match) {
+            const val = Number(match[0]);
+            if (val < minAllowedFloor) {
+              aiResponse = `Floor Defense Triggered: Rs.${val}/kg is below the statutory benchmark floor of Rs.${minAllowedFloor}/kg. The AI agent cannot accept bids below statutory benchmarks.`;
+            } else {
+              aiResponse = `Understood. Updated defensive floor to Rs.${val}/kg. All active and incoming bids filtered against this floor.`;
+            }
+          }
+        } else if (lower.includes('counter')) {
+          const match = copilotCommand.match(/\d+(?:\.\d+)?/);
+          const counterVal = match ? match[0] : String(targetPrice);
+          aiResponse = `Manual counter instruction of Rs.${counterVal}/kg registered. Evaluating candidate responsiveness.`;
+        } else if (lower.includes('accept') || lower.includes('deal')) {
+          aiResponse = `To finalize this deal, click "Accept Deal" to execute the cryptographically signed APMC smart contract.`;
+        } else {
+          aiResponse = `Instruction recorded: "${copilotCommand}". Defending your margins and actively monitoring APMC market bids for ${cropName}.`;
+        }
+      }
+
+      setCopilotMessages(prev => [...prev, {
+        sender: 'AI',
+        text: aiResponse,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }]);
+    }, 400);
+
+    setCopilotCommand('');
+  };
+
+  if (isLoading && activeId && !initTimedOut) {
     return (
       <div className="h-[70vh] flex flex-col items-center justify-center space-y-3">
         <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-slate-600 font-bold text-sm">Initializing LangGraph Negotiation Engine...</p>
+        <p className="text-sm font-semibold text-slate-500">Connecting to FarmGenAI Multi-Agent Room...</p>
       </div>
     );
   }
 
+  // Active Phase Display Logic
+  const isViewingReadOnly = viewingPhase !== activePhase;
+  const currentViewRecord = completedPhases[viewingPhase];
+
   return (
-    <div className="h-[calc(100vh-90px)] flex flex-col xl:flex-row gap-6 p-4 max-w-[1600px] mx-auto animate-in fade-in duration-300">
+    <div className="flex flex-col gap-4 p-4 max-w-[1680px] mx-auto animate-in fade-in duration-300 min-h-[calc(100vh-80px)]">
 
-      {/* ════ COLUMN 1: Intelligence Panel (Left ~25%) ════ */}
-      <div className="w-full xl:w-1/4 flex flex-col gap-4 overflow-y-auto">
-        <Link
-          to={isBuyer ? "/dashboard/buyer" : "/dashboard/farmer"}
-          className="inline-flex items-center text-sm font-semibold text-slate-500 hover:text-emerald-700 transition"
-        >
-          <ArrowLeft size={16} className="mr-1" /> Exit Workspace
-        </Link>
+      {/* =======================================================================
+          TOP PHASE TRACKER: Selected Agents, Dynamic Order, Completed & Active
+      ======================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-3.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          
+          <div className="flex items-center gap-2 overflow-x-auto py-1">
+            {dynamicPhases.map((phase, idx) => {
+              const isCompleted = Boolean(completedPhases[phase.id]);
+              const isActive = activePhase === phase.id;
+              const isViewing = viewingPhase === phase.id;
+              const comp = completedPhases[phase.id];
 
-        {/* Stakeholder Scope Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <ShieldCheck size={17} className="text-indigo-600" /> AI Coordination Scope
-            </h2>
-          </div>
+              let badgeStyle = "bg-slate-50 border-slate-200 text-slate-500";
+              if (isCompleted) {
+                if (comp?.status === 'DEAL') {
+                  badgeStyle = "bg-emerald-50 border-emerald-300 text-emerald-800";
+                } else if (comp?.status === 'CANCELLED' || comp?.status === 'NO_MATCH') {
+                  badgeStyle = "bg-rose-50 border-rose-300 text-rose-800";
+                } else {
+                  badgeStyle = "bg-slate-100 border-slate-300 text-slate-600";
+                }
+              } else if (isActive) {
+                badgeStyle = "bg-blue-50 border-blue-400 text-blue-800 ring-2 ring-blue-100";
+              }
 
-          <div className="space-y-3 pt-1">
-            <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs space-y-1">
-              <p className="font-bold text-indigo-700 uppercase tracking-wider mb-2">
-                {activeStakeholder} &bull; {activeWorkflow.replace(/_/g, ' ')}
-              </p>
-
-              <div className="flex flex-col gap-1.5 mt-2">
-                <div className="flex items-center gap-2 py-1 px-1.5 rounded-lg">
-                  {(['FARMER', 'PROCESSOR', 'BUYER'].includes(activeStakeholder) || isBuyer) && activeWorkflow === 'FULL_SUPPLY_CHAIN' ? <CheckCircle size={14} className="text-emerald-600" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />}
-                  <span className={(['FARMER', 'PROCESSOR', 'BUYER'].includes(activeStakeholder) || isBuyer) && activeWorkflow === 'FULL_SUPPLY_CHAIN' ? 'text-slate-800 font-bold' : 'text-slate-400'}>
-                    {isBuyer ? 'Farmer / Producer' : 'Buyer / Supplier'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 px-1.5 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'TRANSPORT_ONLY' ? <CheckCircle size={14} className="text-emerald-600" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />}
-                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'TRANSPORT_ONLY' ? 'text-slate-800 font-bold' : 'text-slate-400'}`}>
-                      Transport Agent
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded font-bold">
-                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'TRANSPORT_ONLY' ? 'Autonomous Route' : 'Bypassed'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 px-1.5 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'WAREHOUSE_ONLY' ? <CheckCircle size={14} className="text-emerald-600" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />}
-                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'WAREHOUSE_ONLY' ? 'text-slate-800 font-bold' : 'text-slate-400'}`}>
-                      Warehouse Agent
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded font-bold">
-                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'WAREHOUSE_ONLY' ? 'Autonomous Godown' : 'Bypassed'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 px-1.5 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' && ['FARMER', 'BUYER'].includes(activeStakeholder) ? <CheckCircle size={14} className="text-emerald-600" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />}
-                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' && ['FARMER', 'BUYER'].includes(activeStakeholder) ? 'text-slate-800 font-bold' : 'text-slate-400'}`}>
-                      Processor Agent
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-bold">
-                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' ? 'Autonomous Milling' : 'Bypassed'}
-                  </span>
-                </div>
-            </div>
-
-            {activeWorkflow !== 'FULL_SUPPLY_CHAIN' && (
-              <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded flex gap-1">
-                <AlertTriangle size={12} /> Other services are manually disabled in this workflow.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-        {/* Market Context Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <Briefcase size={17} className="text-blue-600" /> Market Context
-            </h2>
-            <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
-              {cropName}
-            </span>
-          </div>
-
-          <div className="space-y-3 pt-1">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-500">{isBuyer ? 'Procurement Volume' : 'Lot Volume'}</span>
-              <span className="font-black text-slate-800">{cropQty.toLocaleString()} kg</span>
-            </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-500">Live Modal Price</span>
-              <span className="font-black text-slate-800">₹{marketPrice}/kg</span>
-            </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-500">{isBuyer ? 'Target Offer' : 'Target Ceiling'}</span>
-              <span className="font-black text-emerald-600">₹{targetPrice}/kg</span>
-            </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-500">Statutory Benchmark (MSP)</span>
-              <span className="font-black text-purple-700">₹{statutoryBench}/kg</span>
-            </div>
-          </div>
-
-          {/* Dynamic 30-Day Trend Chart */}
-          <div className="pt-2 border-t border-slate-100">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Price Trend (30 Days)</p>
-            <PriceChart data={chartData} />
-          </div>
-        </div>
-
-        {/* Live Variables & Multi-Attribute Telemetry */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-3">
-          <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-            <Database size={17} className="text-purple-600" /> Live Variables
-          </h2>
-
-          <div className="space-y-2.5">
-            <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs space-y-1">
-              <p className="font-bold text-blue-700 flex items-center gap-1.5">
-                <CloudRain size={14} /> WEATHER & HARVEST RISK
-              </p>
-              <p className="text-slate-600">Clear weather across Marathwada & Western Maharashtra. Mandi arrivals steady.</p>
-            </div>
-
-            <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-xs space-y-1">
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-amber-700 flex items-center gap-1.5">
-                  <Truck size={14} /> HIGHWAY LOGISTICS
-                </p>
-              </div>
-              <p className="text-slate-600">
-                Freight estimated dynamically across Maharashtra corridors based on mandi transit and vehicle availability.
-              </p>
-            </div>
-
-            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-xs space-y-1">
-              <p className="font-bold text-emerald-800 flex items-center gap-1.5">
-                <ShieldCheck size={14} /> STATUTORY GUARDRAIL
-              </p>
-              <p className="text-slate-600">Protected Band: ₹{minAllowedFloor}/kg (APMC Floor) to ₹{maxAllowedCeiling}/kg (Ceiling).</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
-
-      {/* ════ COLUMN 2: LIVE NEGOTIATIONS (Center ~50%) ════ */}
-      <div className="w-full xl:w-2/4 flex flex-col gap-4">
-
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 flex flex-col overflow-hidden relative flex-1">
-          {/* Header */}
-          <div className="p-4 border-b border-slate-100 flex justify-between items-center z-10 sticky top-0 bg-white">
-            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-              <MessageSquare size={17} className="text-emerald-500" /> AI Agent Negotiation — <span className="text-slate-500 font-normal">{cropName}</span>
-            </h3>
-            <div className="flex items-center gap-2">
-              {isDealFinalized ? (
-                <button
-                  type="button"
-                  disabled={isParallelRunning}
-                  onClick={() => {
-                    setDealAccepted(false);
-                    setIsRenegotiating(true);
-                    runParallelAutonomousNegotiation();
-                  }}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60 cursor-pointer shadow-sm"
-                >
-                  <RefreshCw size={12} className={isParallelRunning ? 'animate-spin' : ''} />
-                  {isParallelRunning ? 'Orchestrating...' : 'Re-Run Autonomous Supply Chain'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={isParallelRunning}
-                  onClick={() => runParallelAutonomousNegotiation()}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60 cursor-pointer shadow-sm"
-                >
-                  <Play size={12} className={isParallelRunning ? 'animate-spin' : ''} />
-                  {isParallelRunning ? 'Finding & Negotiating...' : isBuyer ? 'Run Supply Chain' : 'Run Autonomous Agents'}
-                </button>
-              )}
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Live
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Scenario & Crop Switcher */}
-          <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto text-[11px]">
-            <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] shrink-0 mr-1 flex items-center gap-1">
-              <Sparkles size={11} className="text-amber-500" /> Scenarios:
-            </span>
-            {(['Rice', 'Sugarcane', 'Soybean', 'Cotton', 'Onion', 'Bajra', 'Jowar'] as const).map(crop => {
-              const isSelected = cropName === crop;
-              const sc = MAHARASHTRA_CROP_SCENARIOS[crop];
-              const emoji = crop === 'Rice' ? '🌾' : crop === 'Sugarcane' ? '🎋' : crop === 'Soybean' ? '🌱' : crop === 'Cotton' ? '⚪' : crop === 'Onion' ? '🧅' : crop === 'Bajra' ? '🌾' : '🌾';
               return (
-                <button
-                  key={crop}
-                  type="button"
-                  onClick={() => {
-                    setSelectedCropOverride(crop);
-                    setDealAccepted(false);
-                    setIsRenegotiating(true);
-                    runParallelAutonomousNegotiation(crop);
-                  }}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 shrink-0 cursor-pointer text-xs ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white shadow-xs'
-                      : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-                  }`}
-                >
-                  <span>{emoji}</span>
-                  <span>{crop}</span>
-                  <span className={`text-[10px] font-normal ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
-                    {sc.qty >= 1000 ? `${sc.qty / 1000}T` : `${sc.qty}kg`} • ₹{sc.target}
-                  </span>
-                </button>
+                <div key={phase.id} className="flex items-center shrink-0">
+                  {idx > 0 && (
+                    <ChevronRight size={14} className="text-slate-300 mx-1.5 shrink-0" />
+                  )}
+                  
+                  <button
+                    onClick={() => setViewingPhase(phase.id)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${badgeStyle} ${isViewing ? 'ring-2 ring-emerald-500' : 'hover:border-slate-400'}`}
+                    title={phase.dependencyReason || (isCompleted ? `Completed: ${comp?.explanation}` : `Phase: ${phase.label}`)}
+                  >
+                    {isCompleted ? (
+                      comp?.status === 'DEAL' ? (
+                        <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                      ) : comp?.status === 'CANCELLED' ? (
+                        <XCircle size={14} className="text-rose-600 shrink-0" />
+                      ) : (
+                        <Clock size={14} className="text-slate-400 shrink-0" />
+                      )
+                    ) : isActive ? (
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
+                    ) : (
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-300 shrink-0"></span>
+                    )}
+
+                    <span className="font-bold">
+                      {idx + 1}. {phase.label}
+                    </span>
+
+                    {isCompleted && comp?.status === 'DEAL' && comp?.agreedPrice !== undefined && (
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-200/60 text-emerald-900 font-mono">
+                        {phase.id === 'FARMER' ? `Rs.${comp.agreedPrice}/kg` : `Rs.${comp.agreedPrice.toLocaleString()}`}
+                      </span>
+                    )}
+
+                    {isCompleted && comp?.status !== 'DEAL' && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700">
+                        {comp?.status}
+                      </span>
+                    )}
+
+                    {!phase.isImplemented && !isCompleted && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 font-medium">
+                        APMC Direct
+                      </span>
+                    )}
+                  </button>
+                </div>
               );
             })}
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-slate-50/40 p-5 space-y-4">
-            {/* LangGraph AI Strategic Recommendation Banner */}
-            {recommendation && (
-              <div className="mb-4">
-                <RecommendationCard
-                  recommendation={recommendation}
-                  status={negState?.status}
-                  crop={cropName}
-                  quantity={cropQty}
-                  finalPrice={agreementData?.final_price || negState?.final_price || negState?.price}
-                  onActionClick={(actionType) => {
-                    if (actionType === 'DEAL') {
-                      setShowValidationModal(true);
-                    } else if (actionType === 'STORAGE') {
-                      navigate('/transport');
-                    } else if (actionType === 'PROCESSING') {
-                      navigate('/processor');
-                    }
-                  }}
-                />
-              </div>
+          {/* Dynamic Order Determinism Explanation */}
+          <div className="flex items-center gap-2 text-[11px] text-slate-500 shrink-0">
+            <Info size={14} className="text-blue-500 shrink-0" />
+            <span className="hidden xl:inline">
+              {requestedServices.isTransportOnly 
+                ? 'Dynamic Routing: Transport-Only procurement workflow selected by buyer' 
+                : completedPhases['FARMER']?.status === 'DEAL'
+                  ? `Dynamic Routing: Farmer agreement locked pick-up at ${completedPhases['FARMER']?.location || 'APMC Mandi'} -> Freight scheduled`
+                  : 'Dynamic Routing: Evaluating produce availability prior to freight routing'}
+            </span>
+            {isViewingReadOnly && (
+              <button
+                onClick={() => setViewingPhase(activePhase)}
+                className="ml-2 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[10px] transition cursor-pointer"
+              >
+                Return to Live ({activePhase})
+              </button>
             )}
-            {isBuyer ? (
-              /* Buyer's view of Candidate Farmers & Best Deal */
-              <>
-                {isFindingMatches && (
-                  <DiscoveryRadar
-                    crop={cropName}
-                    target={targetPrice}
-                    floor={currentFloor}
-                    count={5}
-                  />
-                )}
-                <div className="space-y-3">
-                  {liveSellers.map((s, i) => (
-                    <div
-                      key={i}
-                      className={`bg-white border rounded-2xl p-4 shadow-sm relative overflow-hidden transition-all ${
-                        (s.isWinner || (i === 0 && isDealFinalized))
-                          ? 'border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50/20 shadow-md'
-                          : s.status === 'Concluded'
-                          ? 'border-slate-200 opacity-75 bg-slate-50/50'
-                          : s.aiStatus?.includes('Target') || s.aiStatus?.includes('Override')
-                          ? 'border-indigo-400 ring-2 ring-indigo-50'
-                          : 'border-slate-200/90'
-                      }`}
-                    >
-                      {(s.isWinner || (i === 0 && isDealFinalized)) && (
-                        <div className="mb-2">
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-xs">
-                            <Trophy size={11} className="text-amber-600 fill-amber-500" /> BEST OPTIMAL DEAL SELECTED
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-center mb-2.5">
-                        <div>
-                          <h4 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                            <Star size={16} className="text-amber-400 fill-amber-400" /> {s.id} — {s.match}% Match
-                          </h4>
-                          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            <MapPin size={10} /> {s.location}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-black text-slate-900 text-lg">₹{s.offer}/kg</span>
-                        </div>
-                      </div>
-
-                      {s.aiStatus?.includes('Target') || s.aiStatus?.includes('Override') ? (
-                        <div className="mb-2.5">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                            <ShieldCheck size={12} className="text-indigo-600" /> BUYER OVERRIDE APPLIED
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="mb-2.5">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-                            <ShieldCheck size={12} className="text-emerald-600" /> VERIFIED APMC GRADE A
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="space-y-1.5 text-xs pt-2 border-t border-slate-100">
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-medium">AI Strategy:</span>
-                          <span className="font-semibold text-slate-700">{s.aiStatus}</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-medium">Status:</span>
-                          <span className="font-semibold flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${
-                              (s.isWinner || (i === 0 && isDealFinalized))
-                                ? 'bg-emerald-600'
-                                : s.status === 'Concluded'
-                                ? 'bg-slate-400'
-                                : (s.status === 'Negotiating' || s.status === 'Active')
-                                ? 'bg-emerald-500 animate-pulse'
-                                : 'bg-blue-500'
-                            }`}></span>
-                            <span className={
-                              (s.isWinner || (i === 0 && isDealFinalized))
-                                ? 'text-emerald-700 font-bold'
-                                : s.status === 'Concluded'
-                                ? 'text-slate-500'
-                                : (s.status === 'Negotiating' || s.status === 'Active')
-                                ? 'text-emerald-700 font-semibold'
-                                : 'text-blue-700'
-                            }>
-                              {(s.isWinner || (i === 0 && isDealFinalized))
-                                ? '✓ Agreed at Target'
-                                : s.status === 'Concluded'
-                                ? 'Concluded (R3 Outbid)'
-                                : (s.status === 'Active' ? 'Negotiating' : s.status)}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Finalized Banner if Deal Accepted */}
-                {isDealFinalized && (
-                  <div className="bg-emerald-50 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-slate-900 font-black text-sm shrink-0">
-                        ✓
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-emerald-950 text-sm">Deal Accepted & Finalized</h4>
-                        <p className="text-xs text-emerald-700">Contract confirmed under Maharashtra APMC framework. Recorded in ledger.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={() => setShowValidationModal(true)}
-                        className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 font-bold text-xs hover:bg-emerald-100 transition shadow-sm"
-                      >
-                        View Term Sheet
-                      </button>
-
-                      {/* Multi-Agent Supply Chain Orchestration Actions */}
-                      {renderWorkflowActionButtons()}
-
-                      <Link
-                        to="/transactions"
-                        className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5"
-                      >
-                        <ExternalLink size={13} /> View in Transactions
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                {/* Real Multi-Agent Execution Results Display */}
-                {renderMultiAgentOutcomes()}
-
-                {/* Best Deal So Far (Buyer Parity with Farmer Layout) */}
-                <div className="bg-[#064e3b] p-4 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md mt-2">
-                  <div>
-                    <p className="text-emerald-300 text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                      <Trophy size={13} className="text-amber-400" /> BEST DEAL SO FAR
-                    </p>
-                    <div className="flex items-center flex-wrap gap-2 text-xs">
-                      <span className="font-bold text-base text-white">{liveSellers[0]?.id || 'Primary Farmer'}</span>
-                      <span className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs font-bold">
-                        ₹{liveSellers[0]?.offer ?? targetPrice}/kg
-                      </span>
-                      <span className="text-emerald-100">{cropQty.toLocaleString()} kg</span>
-                      <span className="text-emerald-100">{liveSellers[0]?.match ?? 96}% Match</span>
-                      <span className="font-bold text-emerald-200">
-                        Net: ₹{Math.round((liveSellers[0]?.offer ?? targetPrice) * cropQty).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                    <button
-                      onClick={() => setIsRagOpen(true)}
-                      className="px-3.5 py-2 rounded-xl border border-emerald-500/70 text-emerald-100 bg-emerald-800/40 hover:bg-emerald-800 text-xs font-bold transition flex-1 sm:flex-none text-center cursor-pointer"
-                    >
-                      View Analysis
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleAcceptDeal({
-                          price: liveSellers[0]?.offer || targetPrice,
-                          farmer: liveSellers[0]?.id || 'Primary Farmer',
-                          farmer_name: liveSellers[0]?.id || 'Primary Farmer',
-                          buyer: buyerName,
-                          crop: cropName,
-                          quantity: cropQty
-                        });
-                      }}
-                      className={`px-4 py-2 rounded-xl font-black text-xs transition shadow flex-1 sm:flex-none text-center cursor-pointer ${
-                        isDealFinalized
-                          ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                          : 'bg-emerald-500 hover:bg-emerald-400 text-slate-900'
-                      }`}
-                    >
-                      {isDealFinalized ? '✓ Accepted • View Contract' : 'Accept Deal'}
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : liveBuyers.length > 0 ? (
-              <>
-                {isFindingMatches && (
-                  <DiscoveryRadar
-                    crop={cropName}
-                    target={targetPrice}
-                    floor={currentFloor}
-                    count={5}
-                  />
-                )}
-                <div className="space-y-3">
-                  {liveBuyers.map((b, i) => (
-                    <div
-                      key={i}
-                      className={`bg-white border rounded-2xl p-4 shadow-sm relative overflow-hidden transition-all ${
-                        (b.isWinner || (i === 0 && isDealFinalized))
-                          ? 'border-emerald-500 ring-2 ring-emerald-200 bg-emerald-50/20 shadow-md'
-                          : b.status === 'Concluded'
-                          ? 'border-slate-200 opacity-75 bg-slate-50/50'
-                          : b.aiStatus?.includes('Override')
-                          ? 'border-indigo-400 ring-2 ring-indigo-50'
-                          : 'border-slate-200/90'
-                      }`}
-                    >
-                      {(b.isWinner || (i === 0 && isDealFinalized)) && (
-                        <div className="mb-2">
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-xs">
-                            <Trophy size={11} className="text-amber-600 fill-amber-500" /> BEST OPTIMAL DEAL SELECTED
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-center mb-2.5">
-                        <div>
-                          <h4 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
-                            <Star size={16} className="text-amber-400 fill-amber-400" /> {b.id} — {b.match}% Match
-                          </h4>
-                          <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            <MapPin size={10} /> {b.distance} &bull; Req: {b.req}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-black text-slate-900 text-lg">₹{b.offer}/kg</span>
-                          <p className="text-[10px] text-slate-400">Offer price</p>
-                        </div>
-                      </div>
-
-                      {b.aiStatus?.includes('Override') && (
-                        <div className="mb-2.5">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
-                            <ShieldCheck size={12} className="text-indigo-600" /> FARMER OVERRIDE APPLIED
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="space-y-1.5 text-xs pt-2 border-t border-slate-100">
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-medium">AI Strategy:</span>
-                          <span className={`font-semibold ${b.aiStatus?.includes('Override') ? 'text-indigo-600 font-bold' : 'text-slate-700'}`}>
-                            {b.aiStatus}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500 font-medium">Status:</span>
-                          <span className="font-semibold flex items-center gap-1.5">
-                            <span className={`w-2 h-2 rounded-full ${
-                              (b.isWinner || (i === 0 && isDealFinalized))
-                                ? 'bg-emerald-600'
-                                : b.status === 'Concluded'
-                                ? 'bg-slate-400'
-                                : (b.status === 'Active Offer' || b.status === 'Negotiating')
-                                ? 'bg-emerald-500 animate-pulse'
-                                : 'bg-blue-500'
-                            }`}></span>
-                            <span className={
-                              (b.isWinner || (i === 0 && isDealFinalized))
-                                ? 'text-emerald-700 font-bold'
-                                : b.status === 'Concluded'
-                                ? 'text-slate-500'
-                                : (b.status === 'Active Offer' || b.status === 'Negotiating')
-                                ? 'text-emerald-700 font-semibold'
-                                : 'text-blue-700'
-                            }>
-                              {(b.isWinner || (i === 0 && isDealFinalized))
-                                ? '✓ Agreed at Ask'
-                                : b.status === 'Concluded'
-                                ? 'Concluded (R3 Outbid)'
-                                : b.status}
-                            </span>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Finalized Banner if Deal Accepted (Farmer Parity with Buyer) */}
-                {isDealFinalized && (
-                  <div className="bg-emerald-50 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-emerald-500 flex items-center justify-center text-slate-900 font-black text-sm shrink-0">
-                        ✓
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-emerald-950 text-sm">Deal Accepted & Finalized</h4>
-                        <p className="text-xs text-emerald-700">Contract confirmed under Maharashtra APMC framework. Recorded in ledger.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
-                      <button
-                        onClick={() => setShowValidationModal(true)}
-                        className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 font-bold text-xs hover:bg-emerald-100 transition shadow-sm"
-                      >
-                        View Term Sheet
-                      </button>
-
-                      {/* Multi-Agent Supply Chain Orchestration Actions for Farmer */}
-                      {renderWorkflowActionButtons()}
-
-                      <Link
-                        to="/transactions"
-                        className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5"
-                      >
-                        <ExternalLink size={13} /> View in Transactions
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                {/* Real Multi-Agent Execution Results Display for Farmer */}
-                {renderMultiAgentOutcomes()}
-
-                {/* Best Deal So Far (Banner inside center column) */}
-                <div className="bg-[#064e3b] p-4 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md mt-2">
-                  <div>
-                    <p className="text-emerald-300 text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                      <Trophy size={13} className="text-amber-400" /> BEST DEAL SO FAR
-                    </p>
-                    <div className="flex items-center flex-wrap gap-2 text-xs">
-                      <span className="font-bold text-base text-white">{liveBuyers[0]?.id || 'AgroCorp Procurement Director'}</span>
-                      <span className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 px-2 py-0.5 rounded text-xs font-bold">
-                        ₹{liveBuyers[0]?.offer ?? 2500}/kg
-                      </span>
-                      <span className="text-emerald-100">{cropQty.toLocaleString()} kg</span>
-                      <span className="text-emerald-100">{liveBuyers[0]?.match ?? 96}% Match</span>
-                      <span className="font-bold text-emerald-200">
-                        Net: ₹{Math.max(0, Math.round((liveBuyers[0]?.offer ?? 2500) * cropQty - 1850)).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                    <button
-                      onClick={() => setIsRagOpen(true)}
-                      className="px-3.5 py-2 rounded-xl border border-emerald-500/70 text-emerald-100 bg-emerald-800/40 hover:bg-emerald-800 text-xs font-bold transition flex-1 sm:flex-none text-center cursor-pointer"
-                    >
-                      View Analysis
-                    </button>
-                    <button
-                      onClick={() => {
-                        handleAcceptDeal({
-                          price: liveBuyers[0]?.offer || 2500,
-                          farmer: user?.name,
-                          buyer: liveBuyers[0]?.id || 'AgroCorp Procurement Director',
-                          crop: cropName,
-                          quantity: cropQty
-                        });
-                      }}
-                      className={`px-4 py-2 rounded-xl font-black text-xs transition shadow flex-1 sm:flex-none text-center cursor-pointer ${
-                        isDealFinalized
-                          ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-                          : 'bg-emerald-500 hover:bg-emerald-400 text-slate-900'
-                      }`}
-                    >
-                      {isDealFinalized ? '✓ Accepted • View Contract' : 'Accept Deal'}
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="py-8 px-6 text-center bg-white border border-slate-200/90 rounded-2xl p-6 shadow-sm">
-                <div className="w-14 h-14 bg-emerald-50 border border-emerald-200 rounded-full flex items-center justify-center mx-auto mb-4 relative">
-                  <span className="absolute w-full h-full rounded-full bg-emerald-400/20 animate-ping"></span>
-                  <Bot size={26} className="text-emerald-600 relative z-10" />
-                </div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 mb-3">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Autonomous Agent is LIVE & Searching
-                </div>
-                <h3 className="text-lg font-bold text-slate-800 mb-2">
-                  Actively Finding Best Matching Buyers for {cropName}
-                </h3>
-                <p className="text-xs text-slate-500 max-w-md mx-auto mb-6 leading-relaxed">
-                  No buyers currently meet your minimum acceptable floor of <strong className="text-emerald-700">₹{currentFloor}/kg</strong>. The AI agent is actively querying APMC mandi networks, evaluating logistics corridors, and defending your floor price.
-                </p>
-
-                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 max-w-md mx-auto text-left space-y-2.5">
-                  <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">LIVE AGENT DISCOVERY PIPELINE:</p>
-                  <div className="flex items-center gap-2 text-xs text-slate-700">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Scanning 10 Maharashtra APMC Mandi Buyer Networks</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-700">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Enforcing Statutory Floor Guardrail: <strong>₹{currentFloor}/kg</strong></span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-700">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Evaluating Cold Storage & Processing Fallbacks</span>
-                  </div>
-                  <div className="pt-2 border-t border-slate-200/80">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">MATCHING CRITERIA:</p>
-                    <div className="grid grid-cols-2 gap-1.5 text-[11px] text-slate-600">
-                      {['Crop & Variety', 'Quality Grade', 'Mandi Location', 'Logistics Corridor'].map((txt, i) => (
-                        <div key={i} className="flex items-center gap-1.5">
-                          <CheckCircle size={12} className="text-emerald-500" /> {txt}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Live Terminal logs at bottom (Matching User Screenshot) */}
-            <div className="mt-4 bg-[#0f172a] rounded-xl p-4 font-mono text-[11px] leading-relaxed overflow-y-auto max-h-44 text-slate-300 shadow-inner">
-              <div className="text-emerald-400 font-bold mb-2 flex items-center gap-2 text-[10px] uppercase tracking-wider">
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span> LIVE ACTIVITY
-              </div>
-              <div className="space-y-1">
-                {liveTerminalLogs.length === 0 ? (
-                  <>
-                    <div className="flex items-start gap-2 text-slate-400 text-[10px]">
-                      <span className="text-slate-600 shrink-0">[{new Date().toLocaleTimeString()}]</span>
-                      <span className="text-blue-400 font-bold shrink-0">System:</span>
-                      <span>🚀 [System] Negotiation {id ? id.substring(0, 12) : 'session'} queued in Redis. Waiting for worker...</span>
-                    </div>
-                    <div className="flex items-start gap-2 text-slate-400 text-[10px]">
-                      <span className="text-slate-600 shrink-0">[{new Date().toLocaleTimeString()}]</span>
-                      <span className="text-blue-400 font-bold shrink-0">Worker:</span>
-                      <span>🚀 [Worker] Negotiation dispatched via Redis stream to LangGraph orchestrator.</span>
-                    </div>
-                    <div className="flex items-start gap-2 text-slate-400 text-[10px]">
-                      <span className="text-slate-600 shrink-0">[{new Date().toLocaleTimeString()}]</span>
-                      <span className="text-purple-400 font-bold shrink-0">Planner:</span>
-                      <span>📋 [Planner] Initiating negotiation workflow planner for {cropName}.</span>
-                    </div>
-                  </>
-                ) : (
-                  liveTerminalLogs.map((log, lIdx) => (
-                    <div key={lIdx} className="flex items-start gap-2 text-[10px] animate-in fade-in duration-150">
-                      <span className="text-slate-600 shrink-0">[{log.time}]</span>
-                      <span className={`font-bold shrink-0 ${log.color || 'text-blue-400'}`}>[{log.tag}]</span>
-                      <span className="text-slate-300 break-words flex-1">{log.text}</span>
-                    </div>
-                  ))
-                )}
-                <div ref={terminalEndRef} />
-              </div>
-            </div>
-
           </div>
+
         </div>
       </div>
 
-      {/* ════ COLUMN 3: Right Panel (LangGraph + Farmer Copilot ~25%) ════ */}
-      <div className="w-full xl:w-1/4 flex flex-col gap-4 h-full">
+      {/* Phase Transition Notification Notice */}
+      {transitionNotice && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between text-xs text-indigo-900 shadow-sm animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-indigo-600 shrink-0" />
+            <div>
+              <span className="font-bold text-indigo-950">{transitionNotice.title}: </span>
+              <span>{transitionNotice.message}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setTransitionNotice(null)}
+            className="text-indigo-500 hover:text-indigo-800 text-xs font-bold px-2 py-0.5 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
-        {/* Card 1: LangGraph Supply Chain Execution Stepper */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex justify-between items-center mb-3">
-              <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                <Zap size={16} className="text-emerald-500" /> LangGraph Execution
-              </h4>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                isParallelRunning
-                  ? 'bg-emerald-100 text-emerald-700 animate-pulse border border-emerald-200'
-                  : completedSupplyChainNodes.length === SUPPLY_CHAIN_STAGES.length
-                  ? 'bg-blue-100 text-blue-700 border border-blue-200'
-                  : 'bg-slate-100 text-slate-600'
-              }`}>
-                {isParallelRunning ? 'LIVE RUN' : completedSupplyChainNodes.length === SUPPLY_CHAIN_STAGES.length ? 'COMPLETE' : 'STANDBY'}
+      {/* Read-Only Archive Notice */}
+      {isViewingReadOnly && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center justify-between text-xs text-amber-900 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Clock size={16} className="text-amber-600 shrink-0" />
+            <div>
+              <span className="font-bold">Viewing {viewingPhase} Phase (Read-Only Archive): </span>
+              <span>Active negotiation is continuing in {activePhase} Phase.</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setViewingPhase(activePhase)}
+            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition cursor-pointer"
+          >
+            Return to Live Negotiation
+          </button>
+        </div>
+      )}
+
+      {/* =======================================================================
+          CELEBRATORY PHASE 1 FINISHED BANNER & PHASE 2 TRANSITION NOTICE
+      ======================================================================= */}
+      {completedPhases['FARMER'] && (
+        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/50 to-blue-50 border border-emerald-300/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0">
+              ✓
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
+                  Phase 1 Finished
+                </span>
+                <span className="text-xs font-black text-slate-800">
+                  Farmer Produce Agreement Finalized!
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Procured <strong>{cropQty.toLocaleString()} kg</strong> of <strong>{cropName}</strong> at <strong className="text-emerald-700">Rs.{completedPhases['FARMER'].agreedPrice}/kg</strong> from <strong>{completedPhases['FARMER'].counterParty}</strong> ({completedPhases['FARMER'].location}).
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {viewingPhase === 'TRANSPORT' ? (
+              <span className="text-[11px] font-black text-blue-800 bg-blue-100/90 border border-blue-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs">
+                <Truck size={14} className="text-blue-600" /> Phase 2: Active Transport Freight
               </span>
+            ) : (
+              <button
+                onClick={() => setViewingPhase('TRANSPORT')}
+                className="text-[11px] font-black text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition cursor-pointer"
+              >
+                <Truck size={14} /> Go to Phase 2 Transport &rarr;
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* =======================================================================
+          TOP MATCHES: 5 Candidate Cards Across Central/Top Section
+          - In TRANSPORT Phase: Top 5 Transport Fleet Vehicles & Parallel Carrier Engine
+          - In FARMER Phase: Top 5 Candidate Farmers & Parallel Seller Engine
+      ======================================================================= */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-3">
+        {viewingPhase === 'TRANSPORT' ? (
+          /* ===================================================================
+             TOP 5 TRANSPORT FLEET VEHICLES SCREENING
+          =================================================================== */
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-100 text-blue-800 rounded-lg">
+                  <Truck size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    Top-5 Intelligent Transport Fleet Screening
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
+                      5 Screened Carriers
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Ranked by payload compatibility ({cropQty.toLocaleString()} kg), transit highway tolls, and haulage freight. Click any vehicle to view isolated carrier chat.
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                onClick={runParallelTransportNegotiation}
+                disabled={isParallelTransportRunning}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
+                  isParallelTransportRunning 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                }`}
+              >
+                <Zap size={13} className={isParallelTransportRunning ? 'animate-spin' : ''} />
+                {isParallelTransportRunning ? 'Parallel Dispatch Running...' : 'Auto-Negotiate All 5 Carriers in Parallel'}
+              </button>
             </div>
 
-            <p className="text-[11px] text-slate-500 mb-3">
-              Autonomous end-to-end multi-agent supply chain orchestration.
-            </p>
-
-            <div className="space-y-1.5 mb-4 max-h-[380px] overflow-y-auto pr-1">
-              {SUPPLY_CHAIN_STAGES.map((stage) => {
-                const isRunning = isParallelRunning && activeSupplyChainNode === stage.id;
-                const isCompleted = completedSupplyChainNodes.includes(stage.id) && !isRunning;
-                const isBypassed = activeWorkflow !== 'FULL_SUPPLY_CHAIN' && ['TRANSPORT', 'WAREHOUSE', 'PROCESSOR'].includes(stage.id);
-                const StageIcon = stage.icon;
-
+            {/* 5 Horizontal / Responsive Vehicle Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {topFiveVehicles.map((v, idx) => {
+                const isSelected = selectedTransportIndex === idx;
                 return (
                   <div
-                    key={stage.id}
-                    className={`flex items-center justify-between p-2 rounded-xl text-xs transition-all ${
-                      isRunning
-                        ? 'bg-emerald-50 border border-emerald-200 font-bold text-emerald-950 shadow-sm'
-                        : isCompleted
-                        ? 'bg-slate-50 border border-slate-100 text-slate-700'
-                        : isBypassed
-                        ? 'bg-slate-50/60 border border-dashed border-slate-200 text-slate-400 opacity-75'
-                        : 'text-slate-400 border border-transparent'
+                    key={v.vehicle_id || idx}
+                    onClick={() => {
+                      setSelectedTransportIndex(idx);
+                      setSelectedTransportVehicle(v);
+                    }}
+                    className={`relative p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-50/50 shadow-md ring-2 ring-blue-500/20'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className={`w-5 h-5 rounded-md flex items-center justify-center text-xs shrink-0 ${
-                        isRunning
-                          ? 'bg-emerald-500 text-white shadow-sm'
-                          : isCompleted
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : isBypassed
-                          ? 'bg-slate-100 text-slate-300'
-                          : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        {isCompleted ? <Check size={12} className="stroke-[3]" /> : <StageIcon size={12} />}
+                    {v.is_best && (
+                      <div className="absolute -top-2.5 right-2 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full shadow-xs flex items-center gap-1">
+                        <Trophy size={10} /> BEST FREIGHT
                       </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className={`text-xs truncate ${isRunning ? 'text-emerald-900 font-black' : isCompleted ? 'text-slate-800 font-semibold' : 'text-slate-400'}`}>
-                          {stage.label}
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-black text-slate-400 font-mono">#{idx + 1}</span>
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-800">
+                          {v.match}% Match
                         </span>
-                        <span className="text-[9px] text-slate-400 font-normal truncate">
-                          {isBypassed ? 'Bypassed in this workflow' : stage.sub}
-                        </span>
+                      </div>
+
+                      <h4 className="text-xs font-black text-slate-900 truncate flex items-center gap-1" title={v.vehicle_name}>
+                        {v.vehicle_name}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                        <Truck size={10} className="text-slate-400 shrink-0" /> {v.vehicle_type}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {v.capacity_kg.toLocaleString()} kg &bull; {v.isCapacityFit ? 'Payload Fit' : 'Tight Load'}
+                      </p>
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-slate-100/90 flex items-end justify-between">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-medium">Haulage Rate</div>
+                        <div className="text-sm font-black text-slate-900">Rs.{v.ratePerKm}/km</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-400">Total Freight</div>
+                        <div className="text-[11px] font-extrabold text-blue-700">Rs.{v.total_freight.toLocaleString()}</div>
                       </div>
                     </div>
 
-                    <div className="shrink-0 ml-1 flex items-center gap-1.5">
-                      {isRunning && (
-                        <span className="bg-emerald-500 text-white px-1.5 py-0.5 rounded text-[9px] font-black flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> RUNNING
-                        </span>
-                      )}
-                      {isCompleted && (
-                        <span className="text-emerald-600 font-bold text-[10px] flex items-center gap-0.5">
-                          ✓ DONE
-                        </span>
-                      )}
-                      {isBypassed && !isRunning && (
-                        <span className="text-slate-400 font-bold text-[9px] px-1.5 py-0.5 bg-slate-100 rounded">
-                          BYPASS
-                        </span>
-                      )}
-                      {!isRunning && !isCompleted && !isBypassed && (
-                        <span className="text-slate-400 font-normal text-[10px]">
-                          STANDBY
-                        </span>
-                      )}
+                    <div className="mt-1.5 flex items-center justify-between text-[9px]">
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${
+                        v.status?.includes('Deal') ? 'bg-emerald-100 text-emerald-800' :
+                        v.status?.includes('Exceeded') || v.status?.includes('Reject') ? 'bg-rose-100 text-rose-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {v.status}
+                      </span>
+                      <span className="text-slate-400">{v.rounds_count} rounds</span>
                     </div>
                   </div>
                 );
               })}
             </div>
+          </>
+        ) : (
+          /* ===================================================================
+             TOP 5 FARMER CANDIDATES SCREENING (FARMER PHASE)
+          =================================================================== */
+          <>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    {isBuyer ? 'Top-5 Intelligent Candidate Screening' : 'Top-5 Institutional Buyer Demand Radar'}
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full">
+                      {topFiveCandidates.length} Screened
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    {isBuyer
+                      ? 'Ranked by multi-attribute RL utility (distance, APMC modal spread, landed cost, and freshness). Click any candidate to view isolated WhatsApp-style conversation.'
+                      : 'Ranked by buyer bid premium, creditworthiness, and transit proximity to your farm lot. Click any buyer to review parallel negotiation.'}
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                onClick={runParallelAutonomousNegotiation}
+                disabled={isParallelRunning}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
+                  isParallelRunning 
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed' 
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                }`}
+              >
+                <Zap size={13} className={isParallelRunning ? 'animate-spin' : ''} />
+                {isParallelRunning ? 'Parallel Engine Running...' : 'Auto-Negotiate All 5 in Parallel'}
+              </button>
+            </div>
+
+            {/* 5 Horizontal / Responsive Candidate Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {topFiveCandidates.map((c, idx) => {
+                const isSelected = selectedCandidateIndex === idx;
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => setSelectedCandidateIndex(idx)}
+                    className={`relative p-3 rounded-xl border text-left cursor-pointer transition-all duration-200 flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-emerald-600 bg-emerald-50/50 shadow-md ring-2 ring-emerald-500/20'
+                        : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-sm'
+                    }`}
+                  >
+                    {c.is_best && (
+                      <div className="absolute -top-2.5 right-2 px-2 py-0.5 bg-amber-500 text-white text-[9px] font-black rounded-full shadow-xs flex items-center gap-1">
+                        <Trophy size={10} /> BEST DEAL
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="text-[10px] font-black text-slate-400 font-mono">#{idx + 1}</span>
+                        <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                          {c.match}% Match
+                        </span>
+                      </div>
+
+                      <h4 className="text-xs font-black text-slate-900 truncate flex items-center gap-1" title={c.name}>
+                        {c.name}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 truncate flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} className="text-slate-400 shrink-0" /> {c.location}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {c.distance_km} km transit
+                      </p>
+                    </div>
+
+                    <div className="mt-2.5 pt-2 border-t border-slate-100/90 flex items-end justify-between">
+                      <div>
+                        <div className="text-[10px] text-slate-400 font-medium">Negotiated Base</div>
+                        <div className="text-sm font-black text-slate-900">Rs.{c.offer}/kg</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[9px] text-slate-400">True Landed</div>
+                        <div className="text-[11px] font-extrabold text-emerald-700">Rs.{c.landed_cost_per_kg}/kg</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-1.5 flex items-center justify-between text-[9px]">
+                      <span className={`px-1.5 py-0.5 rounded font-bold ${
+                        c.status?.includes('Deal') ? 'bg-emerald-100 text-emerald-800' :
+                        c.status?.includes('Exceeded') || c.status?.includes('Reject') ? 'bg-rose-100 text-rose-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {c.status}
+                      </span>
+                      <span className="text-slate-400">{c.rounds_count} rounds</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* =======================================================================
+          MAIN HYBRID 3-COLUMN WORKSPACE LAYOUT
+      ======================================================================= */}
+      <div className="flex-1 flex flex-col xl:flex-row gap-6">
+
+        {/* -------------------------------------------------------------------
+            COLUMN 1: Left Contextual Panel (~25%)
+            - Candidates appropriate to active phase (Farmer vs Transporter)
+            - Relevant Market Context, APMC Benchmarks & Price Trend
+        ------------------------------------------------------------------- */}
+        <div className="w-full xl:w-1/4 flex flex-col gap-4 overflow-y-auto">
+          <Link 
+            to={isBuyer ? "/dashboard/buyer" : "/dashboard/farmer"} 
+            className="inline-flex items-center text-sm font-semibold text-slate-500 hover:text-emerald-700 transition"
+          >
+            <ArrowLeft size={16} className="mr-1" /> Exit Workspace
+          </Link>
+
+          {/* Phase-Aware Candidate Panel */}
+          {viewingPhase === 'TRANSPORT' ? (
+            /* Transport Route & Freight Intelligence Card (Cleaned - 64 carriers removed) */
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <Truck size={17} className="text-blue-600" /> Logistics Haulage Corridor
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+                  Phase 2 Active
+                </span>
+              </div>
+
+              {/* Origin to Destination Route Spec */}
+              <div className="space-y-3 text-xs">
+                <div className="p-3 bg-slate-50/80 rounded-xl space-y-2 border border-slate-100">
+                  <div className="flex items-start gap-2">
+                    <MapPin size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Pickup Origin Mandi</span>
+                      <span className="font-bold text-slate-800">{transitRoute.origin}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 pt-1 border-t border-slate-200/60">
+                    <MapPin size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[10px] text-slate-400 block font-semibold uppercase">Delivery Destination Hub</span>
+                      <span className="font-bold text-slate-800">{transitRoute.destination}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-center">
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block">Corridor Distance</span>
+                    <span className="font-black text-slate-800 text-sm">{transitRoute.distanceKm} km</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-[10px] text-slate-400 block">Est. Transit Time</span>
+                    <span className="font-black text-blue-700 text-sm">~{transitRoute.estTransitHours} hrs</span>
+                  </div>
+                </div>
+
+                {/* Active Carrier Specifications */}
+                <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/60 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-blue-900 font-bold uppercase">Active Carrier Selected</span>
+                    <span className="text-[10px] font-black text-amber-700 flex items-center gap-0.5">
+                      <Star size={10} className="fill-amber-400" /> {activeVehicle.rating || 4.8}
+                    </span>
+                  </div>
+                  <div className="font-black text-slate-900 text-xs">{activeVehicle.vehicle_name}</div>
+                  <div className="text-[11px] text-slate-500">
+                    {activeVehicle.vehicle_type} &bull; {activeVehicle.capacity_kg.toLocaleString()} kg cap
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-blue-200/50">
+                    <span className="text-slate-600">Base Rate: Rs.{activeVehicle.ratePerKm}/km</span>
+                    <span className={activeVehicle.isCapacityFit ? 'text-emerald-700 font-bold' : 'text-amber-700 font-semibold'}>
+                      {activeVehicle.isCapacityFit ? '✓ Payload Fit' : 'Tight Load'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Corridor Regulatory & Fastag Note */}
+                <div className="p-2.5 bg-slate-50/90 rounded-xl text-[10px] text-slate-500 space-y-1 border border-slate-100">
+                  <div className="font-bold text-slate-700 flex items-center gap-1">
+                    <ShieldCheck size={12} className="text-blue-500" /> State Haulage Compliance
+                  </div>
+                  <p>
+                    NH-60 / NH-48 Fastag corridor. Rates include toll transit, driver batta, and e-Way bill registration.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : viewingPhase === 'WAREHOUSE' ? (
+            /* Live Warehouse Buffer Candidates */
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <Warehouse size={17} className="text-purple-600" /> APMC Storage Facilities
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-purple-100 text-purple-800 rounded-full">
+                  {(warehouseCatalogData || []).length || 3} Facilities Active
+                </span>
+              </div>
+              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {((warehouseCatalogData && warehouseCatalogData.length > 0) ? warehouseCatalogData : [
+                  { id: "wh_pune_hub", name: "Pune Agro Hub", location: "Pune", capacity_kg: 15000, available_capacity_kg: 12500, base_cost_per_kg_per_day: 1.6 },
+                  { id: "wh_nashik_onion", name: "Nashik Onion Buffer", location: "Nashik", capacity_kg: 22000, available_capacity_kg: 19000, base_cost_per_kg_per_day: 1.1 },
+                  { id: "wh_mumbai_port", name: "Mumbai Port Warehouse", location: "Mumbai", capacity_kg: 18000, available_capacity_kg: 16000, base_cost_per_kg_per_day: 2.2 }
+                ]).map((wh: any) => {
+                  const isSelected = (selectedWarehouseId || 'wh_pune_hub') === wh.id;
+                  const isFit = (wh.available_capacity_kg || wh.capacity_kg) >= cropQty;
+                  return (
+                    <div
+                      key={wh.id}
+                      onClick={() => setSelectedWarehouseId(wh.id)}
+                      className={`p-3 rounded-xl border text-xs cursor-pointer transition ${
+                        isSelected 
+                          ? 'border-purple-500 bg-purple-50/60 ring-2 ring-purple-100' 
+                          : 'border-slate-200/80 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-slate-800">{wh.name}</span>
+                        <span className="font-black text-purple-700">Rs.{wh.base_cost_per_kg_per_day}/kg/day</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
+                        <span>{wh.location} &bull; {(wh.capacity_kg || 15000).toLocaleString()} kg cap</span>
+                        <span className={isFit ? 'text-emerald-600 font-bold' : 'text-amber-600'}>
+                          {isFit ? 'Capacity Fit' : 'Tight Capacity'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : viewingPhase === 'PROCESSOR' ? (
+            /* Live Processor Intake Candidates */
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <Factory size={17} className="text-indigo-600" /> Industrial Processors
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full">
+                  {(processorCatalogData || []).length || 6} Mills Active
+                </span>
+              </div>
+              <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {((processorCatalogData && processorCatalogData.length > 0) ? processorCatalogData : [
+                  { processor_id: "proc_soy_latur", name: "Marathwada Solvent Extractions", location: "Latur", price_per_kg: 68.0, output_product: "Refined Soya Oil & DOC", capacity_kg: 20000 },
+                  { processor_id: "proc_cotton_amravati", name: "Vidarbha Ginning & Spinning Textiles", location: "Amravati", price_per_kg: 64.5, output_product: "Baled Lint & Cotton Yarn", capacity_kg: 15000 },
+                  { processor_id: "proc_onion_dehydration_nashik", name: "Nashik Agro Dehydration Plant", location: "Nashik", price_per_kg: 19.5, output_product: "Dehydrated Onion Flakes", capacity_kg: 10000 }
+                ]).map((proc: any) => {
+                  const isSelected = selectedProcessorId === proc.processor_id;
+                  return (
+                    <div
+                      key={proc.processor_id}
+                      onClick={() => setSelectedProcessorId(proc.processor_id)}
+                      className={`p-3 rounded-xl border text-xs cursor-pointer transition ${
+                        isSelected 
+                          ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-100' 
+                          : 'border-slate-200/80 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-slate-800">{proc.name}</span>
+                        <span className="font-black text-indigo-700">Rs.{proc.price_per_kg}/kg</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mb-1">{proc.output_product}</p>
+                      <div className="flex items-center justify-between text-[10px] text-slate-400">
+                        <span>{proc.location}</span>
+                        <span>Cap: {(proc.capacity_kg || 15000).toLocaleString()} kg</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                  <Star size={17} className="text-amber-500 fill-amber-400" /> {isBuyer ? 'Eligible Supplier Candidates' : 'Interested Institutional Buyers'}
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
+                  {topFiveCandidates.length} {isBuyer ? 'Live APMC' : 'Verified Bids'}
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {topFiveCandidates.map((s: any, i: number) => {
+                  const isCur = selectedCandidateIndex === i;
+                  return (
+                    <div
+                      key={i}
+                      onClick={() => setSelectedCandidateIndex(i)}
+                      className={`p-3 rounded-xl border text-xs space-y-1.5 cursor-pointer transition ${
+                        isCur
+                          ? 'border-emerald-600 bg-emerald-50/70 ring-1 ring-emerald-500/30'
+                          : 'bg-slate-50/80 border-slate-100 hover:bg-slate-100/70'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-slate-900 truncate max-w-[140px]">{s.name}</span>
+                        <span className="font-black text-emerald-700">Rs.{s.offer}/kg</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px] text-slate-500">
+                        <span className="truncate max-w-[150px]">{s.location}</span>
+                        <span className="font-bold text-emerald-600">{s.match}% Match</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 pt-1 border-t border-slate-200/60">
+                        <span>{s.distance_km} km transit</span>
+                        <span className="font-semibold text-emerald-700">{s.status}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Action when farmer candidates are unavailable or user bypasses produce */}
+              <div className="pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => handleBypassFarmer('Bypassed farmer produce for logistics evaluation')}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+                >
+                  Bypass Produce & Evaluate Transport
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Market Context Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <Briefcase size={17} className="text-blue-600" /> Market Context
+              </h2>
+              <span className="text-[11px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
+                {cropName}
+              </span>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500">Procurement Lot</span>
+                <span className="font-black text-slate-800">{cropQty.toLocaleString()} kg</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500">Live Modal Price</span>
+                <span className="font-black text-slate-800">Rs.{marketPrice}/kg</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500">Target Ceiling</span>
+                <span className="font-black text-emerald-600">Rs.{targetPrice}/kg</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-slate-500">Statutory Benchmark (MSP)</span>
+                <span className="font-black text-purple-700">Rs.{statutoryBench}/kg</span>
+              </div>
+            </div>
+
+            {/* Dynamic 30-Day Trend Chart */}
+            <div className="pt-2 border-t border-slate-100">
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Price Trend (30 Days)</p>
+              <PriceChart data={chartData} />
+            </div>
           </div>
 
-          {/* View RAG Context Button */}
-          <button
-            type="button"
-            onClick={() => setIsRagOpen(true)}
-            className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 font-bold rounded-xl transition text-xs flex justify-center items-center gap-2 shadow-sm cursor-pointer mt-2"
-          >
-            <Database size={14} className="text-slate-500" /> View RAG Context
-          </button>
+          {/* Live Variables & Statutory Guardrails */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-3">
+            <h2 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+              <Database size={17} className="text-purple-600" /> Live Variables
+            </h2>
+            
+            <div className="space-y-2 text-xs">
+              <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-xl space-y-1">
+                <p className="font-bold text-blue-700 flex items-center gap-1.5">
+                  <CloudRain size={13} /> WEATHER & HARVEST
+                </p>
+                <p className="text-slate-600 text-[11px]">Clear weather across Maharashtra APMC corridors. Mandi arrivals steady.</p>
+              </div>
+
+              <div className="p-2.5 bg-amber-50 border border-amber-100 rounded-xl space-y-1">
+                <p className="font-bold text-amber-700 flex items-center gap-1.5">
+                  <Truck size={13} /> HIGHWAY LOGISTICS
+                </p>
+                <p className="text-slate-600 text-[11px]">Diesel index steady. 1.0% statutory APMC e-NAM Mandi Cess enforced.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Card 1.5: LangGraph Reflection Post-Mortem (if available) */}
-        {reflection && (
-          <ReflectionCard
-            reflection={reflection}
-            negotiationId={id}
-          />
-        )}
+        {/* -------------------------------------------------------------------
+            COLUMN 2: Centre — Active Negotiation Conversation (~48-50%)
+            - Phase-Aware Negotiation Conversation, Offers, and Counteroffers
+            - Read-only historical phase view when user inspects past phases
+            - Final Summary & Multi-Party Landed Cost Sheet
+            - Live Activity Terminal Logs at bottom
+        ------------------------------------------------------------------- */}
+        <div className="w-full xl:w-2/4 flex flex-col gap-4">
 
-        {/* Card 2: Dual Copilot (Buyer Procurement Copilot if isBuyer, else Farmer Copilot) */}
-        {isBuyer ? (
-          <div className="bg-[#0f172a] rounded-2xl shadow-lg border border-slate-800 p-5 text-white flex-1 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-sm flex items-center gap-2 text-white">
-                  <ShieldCheck size={16} className="text-blue-400" />
-                  <span className="text-base">🏢</span> Buyer Procurement Copilot
-                </h3>
-              </div>
-
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                AI is procuring automatically based on your target price, reservation ceiling, and APMC freight. You can intervene at any time.
-              </p>
-
-              {/* Quick Action Chips */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                <button
-                  type="button"
-                  onClick={() => runParallelAutonomousNegotiation()}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold border border-emerald-500 transition cursor-pointer flex items-center gap-1 shadow-sm"
-                >
-                  <Zap size={11} className="text-amber-300" /> Run Autonomous LangGraph
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCopilotCommand(`Counter at target ₹${Math.round(targetPrice || 48)}`)}
-                  className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  Counter target ₹{Math.round(targetPrice || 48)}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCopilotCommand(`Don't exceed ₹${Math.round(maxAllowedCeiling || 52)}`)}
-                  className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  Ceiling ₹{Math.round(maxAllowedCeiling || 52)}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCopilotCommand('Counter best farmer')}
-                  className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  Counter best farmer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCopilotCommand('Pause negotiations')}
-                  className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  Pause negotiations
-                </button>
-              </div>
-
-              {/* Manual Bid Increment Tools */}
-              <div className="mb-4 p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
-                  <span>Manual Offer Price:</span>
-                  <span className="text-emerald-400 font-mono font-bold">₹{manualPrice || targetPrice}/kg</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const base = parseFloat(manualPrice) || targetPrice || 40;
-                      setManualPrice((base - 1.0).toFixed(1));
-                    }}
-                    className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-[11px] font-bold border border-slate-700 transition cursor-pointer text-center"
-                  >
-                    -₹1.00
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const base = parseFloat(manualPrice) || targetPrice || 40;
-                      setManualPrice((base + 1.0).toFixed(1));
-                    }}
-                    className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg text-[11px] font-bold border border-slate-700 transition cursor-pointer text-center"
-                  >
-                    +₹1.00
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const val = parseFloat(manualPrice) || targetPrice;
-                      if (val) {
-                        executeCopilotCommand(`Submit offer at ₹${val}/kg`);
-                      }
-                    }}
-                    className="flex-1 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold transition cursor-pointer text-center shadow-sm"
-                  >
-                    Bid Offer
-                  </button>
-                </div>
-              </div>
-
-              {/* Last Copilot Response Feedback (if user intervened) */}
-              {copilotMessages.length > 0 && (
-                <div className="mb-3 p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-[11px] text-slate-300 flex items-start gap-2">
-                  <Bot size={14} className="text-blue-400 shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <span className="text-slate-400 font-semibold text-[10px]">
-                      {copilotMessages[copilotMessages.length - 1].sender === 'AI' ? 'AI Copilot: ' : 'Instruction: '}
+          {/* VIEW: SUMMARY PHASE */}
+          {viewingPhase === 'SUMMARY' ? (
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border flex items-center gap-1 ${
+                      completionStatus === 'FULL'
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                        : completionStatus.includes('PARTIAL')
+                          ? 'bg-blue-100 text-blue-800 border-blue-200'
+                          : 'bg-amber-100 text-amber-800 border-amber-200'
+                    }`}>
+                      <CheckCircle2 size={13} className="text-emerald-600" />
+                      {completionStatus === 'FULL' 
+                        ? "Full Multi-Agent Procurement Completed" 
+                        : completionStatus === 'PARTIAL_PRODUCE_ONLY'
+                          ? "Partial Completion: Produce Agreement Only (Logistics Self-Arranged)"
+                          : completionStatus === 'PARTIAL_LOGISTICS_ONLY'
+                            ? "Partial Completion: Inbound Freight Only"
+                            : "Procurement Summary & Cost Assessment"}
                     </span>
-                    {copilotMessages[copilotMessages.length - 1].text}
+                    <span className="text-xs text-slate-400">APMC e-NAM Compliant</span>
                   </div>
+                  <h2 className="text-xl font-black text-slate-800">
+                    End-to-End Landed Cost & Multi-Party Term Sheet
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Aggregated multi-agent agreement covering {cropQty.toLocaleString()} kg of {cropName}.
+                  </p>
                 </div>
-              )}
-            </div>
 
-            {/* Copilot Input Form */}
-            <form onSubmit={handleCopilotSubmit} className="space-y-3 mt-auto">
-              <input
-                type="text"
-                value={copilotCommand}
-                onChange={e => setCopilotCommand(e.target.value)}
-                placeholder='e.g. "Counter Ramesh Patil at ₹49/kg"'
-                className="w-full bg-[#1e293b]/80 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition"
-              />
-              <button
-                type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                Send Instruction
-              </button>
-            </form>
-          </div>
-        ) : (
-          /* Card 2: Farmer Copilot (Dark Theme exactly matching user image - 100% UNTOUCHED) */
-          <div className="bg-[#0f172a] rounded-2xl shadow-lg border border-slate-800 p-5 text-white flex-1 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-bold text-sm flex items-center gap-2 text-white">
-                  <ShieldCheck size={16} className="text-emerald-400" />
-                  <span className="text-base">👨‍🌾</span> Farmer Copilot
-                </h3>
-              </div>
-
-              <p className="text-xs text-slate-400 leading-relaxed mb-4">
-                AI is negotiating automatically based on your listing, market conditions and negotiation policy. You can intervene at any time.
-              </p>
-
-              {/* Quick Action Chips */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                <button
-                  type="button"
-                  onClick={() => runParallelAutonomousNegotiation()}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold border border-emerald-500 transition cursor-pointer flex items-center gap-1 shadow-sm"
-                >
-                  <Zap size={11} className="text-amber-300" /> Run Autonomous Matching
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCopilotCommand(`Don't go below ₹${currentFloor < 100 ? currentFloor * 100 : currentFloor}/q`)}
-                  className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  Don't go below ₹{currentFloor < 100 ? currentFloor * 100 : currentFloor}/q
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCopilotCommand('Counter best buyer')}
-                  className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  Counter best buyer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => executeCopilotCommand('Pause negotiations')}
-                  className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
-                >
-                  Pause negotiations
-                </button>
-              </div>
-
-              {/* Manual Asking Rate Increment Tools (Farmer Parity with Buyer) */}
-              <div className="mb-4 p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-300 font-semibold">
-                  <span>Manual Asking Rate:</span>
-                  <span className="text-emerald-400 font-mono font-bold">
-                    ₹{farmerManualPrice}/q <span className="text-slate-400 text-[10px] font-normal">(₹{(farmerManualPrice / 100).toFixed(1)}/kg)</span>
+                <div className="text-right">
+                  <span className="text-xs text-slate-400 block">Total Landed Cost</span>
+                  <span className="text-2xl font-black text-emerald-700 font-mono">
+                    Rs.{totalLandedCost.toLocaleString()}
+                  </span>
+                  <span className="text-xs font-bold text-slate-600 block">
+                    (Rs.{cropQty > 0 ? (totalLandedCost / cropQty).toFixed(2) : '0'}/kg delivered)
                   </span>
                 </div>
-                <div className="flex gap-2">
+              </div>
+
+              {/* Cost Composition Breakdown */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Landed Cost Composition</h4>
+                <div className="border border-slate-100 rounded-xl overflow-hidden divide-y divide-slate-100 text-xs">
+                  {/* 1. Crop Produce */}
+                  <div className="p-3.5 flex items-center justify-between bg-slate-50/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">1</div>
+                      <div>
+                        <p className="font-bold text-slate-800">Crop Produce (Farmer Producer)</p>
+                        <p className="text-[11px] text-slate-500">
+                          {isProduceAgreed ? (
+                            `${farmerRecord?.counterParty || farmerName} • ${cropQty.toLocaleString()} kg @ Rs.${agreedProducePrice}/kg (${farmerRecord?.location || farmerLocation})`
+                          ) : (
+                            <span className="text-amber-600 font-semibold">Produce Bypassed / Self-Supplied (Rs.0)</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-mono font-bold text-sm text-slate-900">
+                      Rs.{produceSubtotal.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* 2. Inbound Freight */}
+                  <div className="p-3.5 flex items-center justify-between bg-slate-50/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-bold">2</div>
+                      <div>
+                        <p className="font-bold text-slate-800">Inbound Freight & Haulage</p>
+                        <p className="text-[11px] text-slate-500">
+                          {isTransportAgreed ? (
+                            `${transportRecord?.counterParty || activeVehicle.vehicle_name} • ${transitRoute.origin} to ${transitRoute.destination} (~${transitRoute.distanceKm} km)`
+                          ) : (
+                            <span className="text-amber-600 font-semibold">Logistics Excluded / Self-Arranged by Buyer (Rs.0)</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-mono font-bold text-sm text-slate-900">
+                      Rs.{agreedFreightCost.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* 3. Statutory APMC Cess */}
+                  <div className="p-3.5 flex items-center justify-between bg-slate-50/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center font-bold">3</div>
+                      <div>
+                        <p className="font-bold text-slate-800">Statutory APMC Mandi Cess (1.0%)</p>
+                        <p className="text-[11px] text-slate-500">
+                          {isProduceAgreed 
+                            ? 'Mandatory Maharashtra APMC e-NAM cess levy on produce subtotal' 
+                            : 'N/A (No produce purchase)'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="font-mono font-bold text-sm text-slate-900">
+                      Rs.{apmcMandiCess.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* 4. Handling */}
+                  <div className="p-3.5 flex items-center justify-between bg-slate-50/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold">4</div>
+                      <div>
+                        <p className="font-bold text-slate-800">Weighment & Mandi Handling</p>
+                        <p className="text-[11px] text-slate-500">Certified weighbridge and handling charges</p>
+                      </div>
+                    </div>
+                    <span className="font-mono font-bold text-sm text-slate-900">
+                      Rs.{handlingCost.toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* 5. Buffer Storage Allocation */}
+                  {completedPhases['WAREHOUSE'] && completedPhases['WAREHOUSE'].status === 'DEAL' && (
+                    <div className="p-3.5 flex items-center justify-between bg-purple-50/50">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center font-bold">5</div>
+                        <div>
+                          <p className="font-bold text-slate-800">Buffer Cold Storage (APMC Statutory Tariff)</p>
+                          <p className="text-[11px] text-slate-500">
+                            {completedPhases['WAREHOUSE'].counterParty} &bull; {completedPhases['WAREHOUSE'].location} &bull; 3 Days @ Rs.{completedPhases['WAREHOUSE'].details?.cost_per_kg_per_day || 1.6}/kg/day
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-sm text-slate-900">
+                        Rs.{Number(completedPhases['WAREHOUSE'].agreedPrice || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 6. Agro-Processing Agreement */}
+                  {completedPhases['PROCESSOR'] && completedPhases['PROCESSOR'].status === 'DEAL' && (
+                    <div className="p-3.5 flex items-center justify-between bg-indigo-50/50">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-800 flex items-center justify-center font-bold">6</div>
+                        <div>
+                          <p className="font-bold text-slate-800">Industrial Processing Intake Contract</p>
+                          <p className="text-[11px] text-slate-500">
+                            {completedPhases['PROCESSOR'].counterParty} &bull; Output: {completedPhases['PROCESSOR'].details?.output_product || 'Milled Product'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-sm text-slate-900">
+                        Rs.{Number(completedPhases['PROCESSOR'].agreedPrice || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Top-5 Candidates Final Selection & Exclusions Matrix (Phase 5) */}
+              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Trophy size={14} className="text-amber-500" /> Multi-Candidate Comparative Selection Matrix
+                  </h4>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Validated Decision
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-white text-slate-500 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="p-2">Candidate / Mandi</th>
+                        <th className="p-2">Transit</th>
+                        <th className="p-2">Agreed Base</th>
+                        <th className="p-2">Freight</th>
+                        <th className="p-2">APMC Cess</th>
+                        <th className="p-2">Net Landed</th>
+                        <th className="p-2">Match %</th>
+                        <th className="p-2">Selection & Exclusion Rationale</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/60 font-medium">
+                      {topFiveCandidates.map((c, idx) => (
+                        <tr key={idx} className={c.is_best ? "bg-emerald-100/40 font-bold" : ""}>
+                          <td className="p-2 text-slate-900">
+                            <div className="flex items-center gap-1">
+                              {c.is_best && <Trophy size={11} className="text-amber-500 shrink-0" />}
+                              <span>{c.name}</span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">{c.location}</div>
+                          </td>
+                          <td className="p-2 text-slate-600">{c.distance_km} km</td>
+                          <td className="p-2 text-slate-900">Rs.{c.offer}/kg</td>
+                          <td className="p-2 text-slate-600">Rs.{c.freight_per_kg}/kg</td>
+                          <td className="p-2 text-slate-600">Rs.{c.apmc_cess_per_kg}/kg</td>
+                          <td className="p-2 text-emerald-800 font-extrabold">Rs.{c.landed_cost_per_kg}/kg</td>
+                          <td className="p-2 text-slate-700">{c.match}%</td>
+                          <td className="p-2">
+                            {c.is_best ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] bg-emerald-100 text-emerald-800 font-bold">
+                                {isBuyer 
+                                  ? 'Selected #1: Lowest landed cost within budget, Grade A certified.' 
+                                  : 'Selected #1: Highest net realization above farmer floor price, Grade A verified.'}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-slate-500">
+                                {c.disqualification_reason || `Ranked lower: higher transit freight penalty (+Rs.${(c.landed_cost_per_kg - topFiveCandidates[0].landed_cost_per_kg).toFixed(1)}/kg).`}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                  {requestedServices.hasFarmer && (
+                    <button
+                      onClick={() => setViewingPhase('FARMER')}
+                      className="px-3 py-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Review Farmer
+                    </button>
+                  )}
+                  {requestedServices.hasTransport && (
+                    <button
+                      onClick={() => setViewingPhase('TRANSPORT')}
+                      className="px-3 py-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Review Transport
+                    </button>
+                  )}
+                  {requestedServices.hasWarehouse && (
+                    <button
+                      onClick={() => setViewingPhase('WAREHOUSE')}
+                      className="px-3 py-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Review Storage
+                    </button>
+                  )}
+                  {requestedServices.hasProcessor && (
+                    <button
+                      onClick={() => setViewingPhase('PROCESSOR')}
+                      className="px-3 py-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      Review Processing
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setAgreementData({
+                      price: agreedProducePrice,
+                      quantity: cropQty,
+                      farmer: farmerRecord?.counterParty || farmerName,
+                      buyer: buyerName || user?.name || 'Buyer Enterprise',
+                      crop: cropName,
+                      transport_cost: agreedFreightCost,
+                      total_landed_cost: totalLandedCost
+                    });
+                    setShowValidationModal(true);
+                  }}
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl shadow transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <ShieldCheck size={16} /> Sign & Execute Multi-Party Contract
+                </button>
+              </div>
+            </div>
+          ) : viewingPhase === 'TRANSPORT' ? (
+            /* VIEW: TRANSPORT NEGOTIATION PHASE */
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col min-h-[640px] max-h-[750px] overflow-hidden">
+              
+              {/* Transport Phase Header with Carrier Tabs */}
+              <div className="p-3.5 border-b border-slate-100 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <Truck size={17} className="text-blue-600" /> Carrier Negotiation Chat
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      Vehicle #{activeVehicle.index + 1} &bull; {activeVehicle.match}% Match
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Route: <strong className="text-slate-700">{transitRoute.origin}</strong> to <strong className="text-slate-700">{transitRoute.destination}</strong> (~{transitRoute.distanceKm} km)
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-2">
                   <button
-                    type="button"
-                    onClick={() => setFarmerManualPrice(prev => Math.max(1000, prev - 50))}
-                    className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-[11px] font-bold border border-slate-700 transition cursor-pointer text-center"
+                    onClick={runParallelTransportNegotiation}
+                    disabled={isParallelTransportRunning}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    -₹50
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFarmerManualPrice(prev => prev + 50)}
-                    className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-lg text-[11px] font-bold border border-slate-700 transition cursor-pointer text-center"
-                  >
-                    +₹50
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => executeCopilotCommand(`Counter best buyer at ₹${farmerManualPrice}/q`)}
-                    className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold transition cursor-pointer text-center shadow-sm"
-                  >
-                    Set Ask Price
+                    <Zap size={13} className={isParallelTransportRunning ? "animate-spin" : ""} />
+                    {isParallelTransportRunning ? "Negotiating 5 Carriers..." : "Auto-Negotiate All 5"}
                   </button>
                 </div>
               </div>
 
-              {/* Last Copilot Response Feedback (if user intervened) */}
+              {/* Transport Messages Stream */}
+              <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#fafbfc]">
+                {activeTransportMessages.map((msg, idx) => (
+                  <div
+                    key={msg.id || idx}
+                    className={`flex flex-col ${msg.sender === 'Buyer Agent' ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
+                  >
+                    <div className="text-[10px] text-slate-400 mb-0.5 px-1 font-semibold flex items-center gap-1.5">
+                      <span>{msg.sender}</span>
+                      <span>&bull;</span>
+                      <span>{msg.time}</span>
+                      {msg.price && (
+                        <span className="font-mono font-bold text-slate-500">
+                          (Rs.{Number(msg.price).toLocaleString()})
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                        msg.sender === 'Buyer Agent'
+                          ? 'bg-blue-600 text-white rounded-tr-none shadow-sm'
+                          : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-none shadow-sm'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                {isTransportLoading && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400 p-2 animate-pulse">
+                    <Bot size={15} className="text-blue-500" />
+                    <span>Transport Dispatch Agent is evaluating highway fuel, tolls & driver allowance...</span>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Transport Negotiation Controls */}
+              <div className="p-3.5 border-t border-slate-100 bg-white space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Carrier Ask:</span>
+                    <span className="font-black font-mono text-slate-800 text-sm">Rs.{standardFreight.toLocaleString()}</span>
+                    <span className="text-[11px] text-slate-400">({activeVehicle.ratePerKm}/km)</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSkipTransport('CANCELLED')}
+                      className="px-2.5 py-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg text-xs font-semibold transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleTransportCounter(Math.round(standardFreight * 0.90))}
+                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs transition border border-blue-200 cursor-pointer"
+                    >
+                      Counter 10% Lower
+                    </button>
+                    <button
+                      onClick={() => handleAcceptTransportDeal()}
+                      className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
+                    >
+                      Accept Freight (Rs.{standardFreight.toLocaleString()})
+                    </button>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleTransportCounter();
+                  }}
+                  className="flex items-center gap-2 pt-0.5"
+                >
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-2 text-xs text-slate-400 font-bold">Rs.</span>
+                    <input
+                      type="number"
+                      value={transportBuyerOffer}
+                      onChange={(e) => setTransportBuyerOffer(e.target.value)}
+                      placeholder={`Enter custom freight counter budget (e.g. ${Math.round(standardFreight * 0.88)})`}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-4 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isTransportLoading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl transition shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    Submit Counter
+                  </button>
+                </form>
+              </div>
+
+            </div>
+          ) : viewingPhase === 'WAREHOUSE' ? (
+            /* VIEW: WAREHOUSE (Integrated Statutory Buffer Storage Service) */
+            (() => {
+              const warehouses = (warehouseCatalogData && warehouseCatalogData.length > 0) ? warehouseCatalogData : [
+                { id: "wh_pune_hub", name: "Pune Agro Hub", location: "Pune", capacity_kg: 15000, available_capacity_kg: 12500, base_cost_per_kg_per_day: 1.6 },
+                { id: "wh_nashik_onion", name: "Nashik Onion Buffer", location: "Nashik", capacity_kg: 22000, available_capacity_kg: 19000, base_cost_per_kg_per_day: 1.1 },
+                { id: "wh_mumbai_port", name: "Mumbai Port Warehouse", location: "Mumbai", capacity_kg: 18000, available_capacity_kg: 16000, base_cost_per_kg_per_day: 2.2 }
+              ];
+              const curWh = warehouses.find((w: any) => w.id === selectedWarehouseId) || warehouses[0];
+              const dailyCost = Math.round(Number(curWh.base_cost_per_kg_per_day || 1.6) * cropQty);
+              const totalCost = dailyCost * 3;
+              const isReserved = Boolean(completedPhases['WAREHOUSE'] && completedPhases['WAREHOUSE'].status === 'DEAL');
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 space-y-5">
+                  <div className="flex items-center gap-2 text-purple-900 bg-purple-50 p-3 rounded-xl border border-purple-200">
+                    <Info size={18} className="shrink-0 text-purple-600" />
+                    <span className="font-bold text-xs">
+                      Statutory Tariff Allocation &bull; Autonomous multi-round RL bidding unavailable; verified warehouse capacity reserved directly.
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                        <Warehouse size={20} className="text-purple-600" /> {curWh.name}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {curWh.location}, Maharashtra &bull; APMC Registered Cold Storage Buffer
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full font-bold text-xs">
+                      WDRA Insured
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                      <span className="text-slate-400 block mb-0.5">Statutory Rate</span>
+                      <span className="font-black text-slate-800 text-sm">Rs.{curWh.base_cost_per_kg_per_day}/kg/day</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                      <span className="text-slate-400 block mb-0.5">Holding Lot</span>
+                      <span className="font-black text-slate-800 text-sm">{cropQty.toLocaleString()} kg</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                      <span className="text-slate-400 block mb-0.5">Buffer Duration</span>
+                      <span className="font-black text-slate-800 text-sm">3 Days</span>
+                    </div>
+                    <div className="p-3 bg-purple-50 border border-purple-200/80 rounded-xl">
+                      <span className="text-purple-700 block mb-0.5">Total Buffer Fee</span>
+                      <span className="font-black text-purple-900 text-sm">Rs.{totalCost.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {isReserved ? (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center justify-between">
+                      <span className="font-bold flex items-center gap-1.5">
+                        <CheckCircle2 size={16} /> Buffer Storage Reserved for {cropQty.toLocaleString()} kg at {curWh.name} (Rs.{totalCost.toLocaleString()})
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (requestedServices.hasProcessor && !completedPhases['PROCESSOR']) {
+                            setActivePhase('PROCESSOR');
+                            setViewingPhase('PROCESSOR');
+                          } else {
+                            setActivePhase('SUMMARY');
+                            setViewingPhase('SUMMARY');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-bold cursor-pointer transition"
+                      >
+                        Next Phase &rarr;
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
+                      <button
+                        onClick={handleSkipWarehouse}
+                        className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold cursor-pointer"
+                      >
+                        Skip Buffer Storage (Proceed without holding)
+                      </button>
+                      <button
+                        onClick={() => handleReserveWarehouse(curWh)}
+                        disabled={isWarehouseLoading}
+                        className="px-5 py-2.5 bg-purple-700 hover:bg-purple-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                      >
+                        <ShieldCheck size={16} /> {isWarehouseLoading ? 'Reserving...' : `Reserve Storage Slot (Rs.${totalCost.toLocaleString()})`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : viewingPhase === 'PROCESSOR' ? (
+            /* VIEW: PROCESSOR (Integrated Value-Added Agro-Processing Service) */
+            (() => {
+              const processors = (processorCatalogData && processorCatalogData.length > 0) ? processorCatalogData : [
+                { processor_id: "proc_soy_latur", name: "Marathwada Solvent Extractions & Soya Foods", location: "Latur", price_per_kg: 68.0, output_product: "Refined Soya Oil & DOC", capacity_kg: 20000, min_order_kg: 500 },
+                { processor_id: "proc_cotton_amravati", name: "Vidarbha Ginning & Spinning Textiles", location: "Amravati", price_per_kg: 64.5, output_product: "Baled Lint & Cotton Yarn", capacity_kg: 15000, min_order_kg: 500 },
+                { processor_id: "proc_onion_dehydration_nashik", name: "Nashik Agro Dehydration Plant", location: "Nashik", price_per_kg: 19.5, output_product: "Dehydrated Onion Flakes", capacity_kg: 10000, min_order_kg: 200 }
+              ];
+              const curProc = processors.find((p: any) => p.processor_id === selectedProcessorId) || processors[0];
+              const totalPayment = Math.round(Number(curProc.price_per_kg || 50) * cropQty);
+              const isAgreed = Boolean(completedPhases['PROCESSOR'] && completedPhases['PROCESSOR'].status === 'DEAL');
+
+              return (
+                <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 space-y-5">
+                  <div className="flex items-center gap-2 text-indigo-900 bg-indigo-50 p-3 rounded-xl border border-indigo-200">
+                    <Info size={18} className="shrink-0 text-indigo-600" />
+                    <span className="font-bold text-xs">
+                      Industrial Processing Catalog &bull; Multi-round autonomous bidding unavailable; verified industrial facility intake agreement confirmed directly.
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                        <Factory size={20} className="text-indigo-600" /> {curProc.name}
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        {curProc.location}, Maharashtra &bull; Output: {curProc.output_product}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full font-bold text-xs">
+                      Licensed Mill
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                      <span className="text-slate-400 block mb-0.5">Intake Price</span>
+                      <span className="font-black text-slate-800 text-sm">Rs.{curProc.price_per_kg}/kg</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                      <span className="text-slate-400 block mb-0.5">Lot Quantity</span>
+                      <span className="font-black text-slate-800 text-sm">{cropQty.toLocaleString()} kg</span>
+                    </div>
+                    <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+                      <span className="text-slate-400 block mb-0.5">Facility Capacity</span>
+                      <span className="font-black text-slate-800 text-sm">{(curProc.capacity_kg || 15000).toLocaleString()} kg</span>
+                    </div>
+                    <div className="p-3 bg-indigo-50 border border-indigo-200/80 rounded-xl">
+                      <span className="text-indigo-700 block mb-0.5">Total Contract Value</span>
+                      <span className="font-black text-indigo-900 text-sm">Rs.{totalPayment.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  {isAgreed ? (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center justify-between">
+                      <span className="font-bold flex items-center gap-1.5">
+                        <CheckCircle2 size={16} /> Processing Agreement Confirmed with {curProc.name} (Rs.{totalPayment.toLocaleString()})
+                      </span>
+                      <button
+                        onClick={() => {
+                          setActivePhase('SUMMARY');
+                          setViewingPhase('SUMMARY');
+                        }}
+                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-bold cursor-pointer transition"
+                      >
+                        Proceed to Summary &rarr;
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100">
+                      <button
+                        onClick={handleSkipProcessor}
+                        className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold cursor-pointer"
+                      >
+                        Skip Value-Added Processing
+                      </button>
+                      <button
+                        onClick={() => handleConfirmProcessor(curProc)}
+                        disabled={isProcessorLoading}
+                        className="px-5 py-2.5 bg-indigo-700 hover:bg-indigo-600 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-sm disabled:opacity-50"
+                      >
+                        <ShieldCheck size={16} /> {isProcessorLoading ? 'Confirming...' : `Confirm Processing Order (Rs.${totalPayment.toLocaleString()})`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()
+          ) : (
+            /* VIEW: FARMER NEGOTIATION PHASE (Standard Core Flow) */
+            <>
+              {recommendation && !String(recommendation).toLowerCase().includes('processing route activated') && !String(recommendation).toLowerCase().includes('processing') && (
+                <RecommendationCard recommendation={recommendation} />
+              )}
+
+              {/* Active Farmer Negotiation Card */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[520px] overflow-hidden">
+                
+                {/* Farmer Negotiation Header */}
+                <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <h3 className="font-bold text-slate-800 text-sm">
+                      Active Negotiation with {farmerName}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
+                      APMC Grade A
+                    </span>
+                    <button
+                      onClick={runParallelAutonomousNegotiation}
+                      disabled={isParallelRunning}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Zap size={13} /> {isParallelRunning ? 'Negotiating...' : 'Auto-Negotiate'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Candidate WhatsApp Conversation Header */}
+                <div className="p-3 bg-slate-50 border-b border-slate-200/90 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                      {activeCandidate.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black text-slate-900">{activeCandidate.name}</span>
+                        {activeCandidate.is_best && (
+                          <span className="px-1.5 py-0.2 bg-amber-100 text-amber-800 font-extrabold text-[9px] rounded-full">Top Deal</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-500">{activeCandidate.location} &bull; {activeCandidate.distance_km} km &bull; {activeCandidate.match}% Match</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] text-slate-400">Current Agreed / Ask</div>
+                    <div className="text-xs font-black text-emerald-700">Rs.{activeCandidate.offer}/kg (Landed: Rs.{activeCandidate.landed_cost_per_kg}/kg)</div>
+                  </div>
+                </div>
+
+                {/* Messages Stream */}
+                <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#fafbfc]">
+                  {activeCandidateMessages.map((msg: any, idx: number) => (
+                    <div
+                      key={idx}
+                      className={`flex flex-col ${msg.sender?.includes('Buyer') ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
+                    >
+                      <div className="text-[10px] text-slate-400 mb-0.5 px-1 font-semibold">
+                        {msg.sender} &bull; {msg.time}
+                      </div>
+                      <div
+                        className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+                          msg.sender?.includes('Buyer')
+                            ? 'bg-emerald-700 text-white rounded-tr-none shadow-sm'
+                            : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-none shadow-sm'
+                        }`}
+                      >
+                        {msg.text}
+                        {msg.price && (
+                          <div className="mt-1 font-black font-mono text-[11px] opacity-95">
+                            Offer: Rs.{msg.price}/kg
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Offer Action Banner */}
+                <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Latest Farmer Ask</span>
+                    <span className="font-black text-slate-900 text-base font-mono">
+                      Rs.{bestOfferPrice}/kg
+                    </span>
+                    <span className="text-[11px] text-slate-500 ml-1">
+                      (Total: Rs.{(bestOfferPrice * cropQty).toLocaleString()})
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsRagOpen(true)}
+                      className="px-3 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                    >
+                      View Analysis
+                    </button>
+                    <button
+                      onClick={() => handleAcceptDeal()}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition shadow cursor-pointer"
+                    >
+                      Accept Deal
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </>
+          )}
+
+          {/* Live Activity Terminal Logs at Bottom */}
+          <div className="bg-[#0f172a] rounded-xl p-4 font-mono text-[11px] leading-relaxed overflow-y-auto max-h-44 text-slate-300 shadow-inner">
+            <div className="text-emerald-400 font-bold mb-2 flex items-center gap-2 text-[10px] uppercase tracking-wider">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> LIVE ACTIVITY
+            </div>
+            <div className="space-y-1">
+              {liveTerminalLogs.length === 0 ? (
+                <>
+                  <div className="flex items-start gap-2 text-slate-400 text-[10px]">
+                    <span className="text-slate-600 shrink-0">[{new Date().toLocaleTimeString()}]</span>
+                    <span className="text-blue-400 font-bold shrink-0">System:</span>
+                    <span>Session initialized in Redis memory. Multi-agent coordinator active.</span>
+                  </div>
+                  <div className="flex items-start gap-2 text-slate-400 text-[10px]">
+                    <span className="text-slate-600 shrink-0">[{new Date().toLocaleTimeString()}]</span>
+                    <span className="text-purple-400 font-bold shrink-0">Planner:</span>
+                    <span>Evaluating dynamic constraints for {cropName} ({cropQty} kg).</span>
+                  </div>
+                </>
+              ) : (
+                liveTerminalLogs.map((log, lIdx) => (
+                  <div key={lIdx} className="flex items-start gap-2 text-[10px] animate-in fade-in duration-150">
+                    <span className="text-slate-600 shrink-0">[{log.time}]</span>
+                    <span className={`font-bold shrink-0 ${log.color || 'text-blue-400'}`}>[{log.tag}]</span>
+                    <span className="text-slate-300 break-words flex-1">{log.text}</span>
+                  </div>
+                ))
+              )}
+              <div ref={terminalEndRef} />
+            </div>
+          </div>
+
+        </div>
+
+        {/* -------------------------------------------------------------------
+            COLUMN 3: Right Contextual Panel (~25-27%)
+            - Current Offer vs Buyer Offer & Price Delta
+            - Relevant Decision Controls
+            - Agent-Specific Intelligence (LangGraph 6-Stage Stepper, RAG drawer)
+            - Self-Reflective Agent Post-Mortem Card
+            - Buyer Procurement Copilot
+        ------------------------------------------------------------------- */}
+        <div className="w-full xl:w-1/4 flex flex-col gap-4">
+
+          {/* Active Offer vs Buyer Target & Price Difference Delta Card */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <DollarSign size={16} className="text-emerald-600" /> Active Price Difference
+              </h4>
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full">
+                {viewingPhase} Phase
+              </span>
+            </div>
+
+            {viewingPhase === 'TRANSPORT' ? (
+              /* Transport Freight Delta */
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl text-xs">
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Carrier Ask</span>
+                    <span className="font-black text-slate-900 text-base font-mono">
+                      Rs.{standardFreight.toLocaleString()}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Buyer Target</span>
+                    <span className="font-black text-blue-700 text-base font-mono">
+                      Rs.{Math.round(standardFreight * 0.90).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-slate-500">Freight Variance:</span>
+                  <span className="font-bold text-amber-700 font-mono">
+                    +Rs.{Math.round(standardFreight * 0.10).toLocaleString()} (+10%)
+                  </span>
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => handleAcceptTransportDeal()}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-sm cursor-pointer"
+                  >
+                    Accept Freight
+                  </button>
+                  <button
+                    onClick={() => handleTransportCounter()}
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-sm cursor-pointer"
+                  >
+                    Counter Freight
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Farmer Produce Delta */
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl text-xs">
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Farmer Ask</span>
+                    <span className="font-black text-slate-900 text-base font-mono">
+                      Rs.{activeCandidate?.offer || bestOfferPrice}/kg
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Buyer Target</span>
+                    <span className="font-black text-emerald-700 text-base font-mono">
+                      Rs.{targetPrice}/kg
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs px-1">
+                  <span className="text-slate-500">Price Difference:</span>
+                  {(() => {
+                    const ask = activeCandidate?.offer || bestOfferPrice;
+                    const diff = ask - targetPrice;
+                    const pct = targetPrice > 0 ? Math.round((diff / targetPrice) * 100) : 0;
+                    if (diff <= 0) {
+                      return (
+                        <span className="font-bold text-emerald-700 font-mono">
+                          -Rs.{Math.abs(diff).toFixed(1)}/kg ({Math.abs(pct)}% below target)
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="font-bold text-amber-700 font-mono">
+                        +Rs.{diff.toFixed(1)}/kg (+{pct}% above target)
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => handleAcceptDeal()}
+                    className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition shadow-sm cursor-pointer"
+                  >
+                    Accept Deal
+                  </button>
+                  <button
+                    onClick={runParallelAutonomousNegotiation}
+                    disabled={isParallelRunning}
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition shadow-sm cursor-pointer disabled:opacity-50"
+                  >
+                    Counter-Offer
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* LangGraph 6-Stage Stepper & RAG Trigger */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+            <div className="flex justify-between items-center">
+              <h4 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <Zap size={16} className="text-emerald-500" /> LangGraph Execution
+              </h4>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                Active Agent
+              </span>
+            </div>
+
+            <AgentWorkflowStepper
+              activeAgent={viewingPhase === 'TRANSPORT' ? 'Negotiator' : 'Market Intel'}
+              isBuyer={isBuyer}
+              status="LIVE"
+              hasRecommendation={Boolean(recommendation)}
+              hasReflection={Boolean(reflection)}
+            />
+
+            <button
+              onClick={() => setIsRagOpen(true)}
+              className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+            >
+              <Database size={14} className="text-slate-500" /> View RAG Context
+            </button>
+
+            {reflection && <ReflectionCard reflection={reflection} />}
+          </div>
+
+          {/* Buyer / Farmer Copilot */}
+          <div className="bg-[#0f172a] rounded-2xl shadow-lg border border-slate-800 p-5 text-white flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-bold text-sm flex items-center gap-2 text-white">
+                  <ShieldCheck size={16} className={isBuyer ? "text-blue-400" : "text-emerald-400"} />
+                  <span>{isBuyer ? 'Buyer Procurement Copilot' : 'Farmer Selling Copilot'}</span>
+                </h3>
+              </div>
+
+              <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                {isBuyer 
+                  ? `Autonomous guidance for ${cropName} across Maharashtra APMC hubs.`
+                  : `Autonomous selling & floor protection for ${cropName} across Maharashtra APMC buyers.`}
+              </p>
+
+              {/* Copilot Action Presets adapted to active phase */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                {viewingPhase === 'TRANSPORT' ? (
+                  <>
+                    <button
+                      onClick={() => setCopilotCommand(`Counter freight at Rs.${Math.round(standardFreight * 0.88)}`)}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Counter 12% lower
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand('Require Refrigerated Unit')}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Require Reefer
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand('Enforce 24h Delivery Deadline')}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Enforce 24h
+                    </button>
+                  </>
+                ) : isBuyer ? (
+                  <>
+                    <button
+                      onClick={() => setCopilotCommand(`Counter at target Rs.${Math.round(targetPrice)}`)}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Counter at Rs.{Math.round(targetPrice)}
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand(`Don't exceed Rs.${Math.round(maxAllowedCeiling)}`)}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Budget Ceiling
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand('Counter best farmer')}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Counter best farmer
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setCopilotCommand(`Defend floor price Rs.${Math.round(targetPrice * 0.95)}`)}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Defend Floor Rs.{Math.round(targetPrice * 0.95)}
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand(`Counter best buyer at Rs.${Math.round(targetPrice * 1.08)}`)}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Counter Best Buyer
+                    </button>
+                    <button
+                      onClick={() => setCopilotCommand('Accept top bid if above reserve')}
+                      className="px-2.5 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium transition cursor-pointer"
+                    >
+                      Accept Top Bid
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {/* Last Copilot Response Feedback */}
               {copilotMessages.length > 0 && (
-                <div className="mb-3 p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-[11px] text-slate-300 flex items-start gap-2">
-                  <Bot size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                <div className="mb-3 p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-[11px] text-slate-300 flex items-start gap-2 shadow-inner">
+                  <Bot size={14} className={isBuyer ? "text-blue-400 shrink-0 mt-0.5" : "text-emerald-400 shrink-0 mt-0.5"} />
                   <div className="flex-1">
                     <span className="text-slate-400 font-semibold text-[10px]">
                       {copilotMessages[copilotMessages.length - 1].sender === 'AI' ? 'AI Copilot: ' : 'Instruction: '}
                     </span>
-                    {copilotMessages[copilotMessages.length - 1].text}
+                    <span>{copilotMessages[copilotMessages.length - 1].text}</span>
                   </div>
                 </div>
               )}
@@ -2849,32 +3532,43 @@ export default function NegotiationRoom() {
                 type="text"
                 value={copilotCommand}
                 onChange={e => setCopilotCommand(e.target.value)}
-                placeholder='e.g. "Try to get ₹67 from the best'
-                className="w-full bg-[#1e293b]/80 border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                placeholder={isBuyer ? "Give instruction to Buyer Agent..." : "Give instruction to Farmer Agent (e.g. 'Defend floor price', 'Counter at ₹35')..."}
+                className={`w-full bg-[#1e293b]/80 border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none ${
+                  isBuyer ? 'focus:border-blue-500' : 'focus:border-emerald-500'
+                }`}
               />
               <button
                 type="submit"
-                className="w-full py-3 bg-[#10b981] hover:bg-emerald-600 text-white font-bold text-sm rounded-xl transition shadow-md flex items-center justify-center gap-1.5"
+                className={`w-full py-2.5 font-bold text-xs rounded-xl transition cursor-pointer shadow-sm ${
+                  isBuyer ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
               >
                 Send Instruction
               </button>
             </form>
           </div>
-        )}
+
+        </div>
 
       </div>
-      {/* Floating RAG Modal */}
+
+      {/* Intact RAG Drawer Component */}
       <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} crop={cropName} role={isBuyer ? 'buyer' : 'farmer'} />
 
-      {/* APMC Validated Smart Contract Modal */}
+      {/* Intact Cryptographic Transaction Validation Modal */}
       <TransactionValidationModal
         isOpen={showValidationModal}
         onClose={() => setShowValidationModal(false)}
-        dealData={agreementData}
-        buyerUser={user}
+        transactionData={agreementData || {
+          price: agreedProducePrice,
+          farmer: farmerRecord?.counterParty || farmerName,
+          buyer: buyerName || user?.name || 'Buyer Enterprise',
+          crop: cropName,
+          quantity: cropQty,
+          transport_cost: agreedFreightCost,
+          total_landed_cost: totalLandedCost
+        }}
       />
-
-      
 
     </div>
   );

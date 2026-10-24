@@ -17,10 +17,13 @@ async def history(
     db: AsyncSession = Depends(get_db)
 ):
     auth_user_id = current_user.get("sub")
-    role = current_user.get("role")
-    # Enforce history boundaries
-    if user_id != "all" and auth_user_id != user_id and role != "admin":
-        raise HTTPException(status_code=403, detail="Forbidden: You cannot access history for other users.")
+    role = str(current_user.get("role", "")).lower()
+    # Enforce strict multi-tenant history boundaries
+    if user_id == "all" and role != "admin":
+        # Non-admins requesting 'all' are restricted to their own transaction records
+        user_id = auth_user_id
+    elif user_id != "all" and auth_user_id != user_id and role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden: You cannot access transaction history for other users.")
     return await get_user_history(user_id, db=db)
 
 
