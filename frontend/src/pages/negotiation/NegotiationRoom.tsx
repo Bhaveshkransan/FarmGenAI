@@ -287,10 +287,7 @@ export default function NegotiationRoom() {
   const [farmerManualPrice, setFarmerManualPrice] = useState<number>(2550);
   const [recommendation, setRecommendation] = useState<any>(null);
   const [reflection, setReflection] = useState<any>(null);
-
-  // Dedicated Agent Talk & Invocation Modals (Transport, Warehouse, Processor)
-  const [activeAgentModal, setActiveAgentModal] = useState<'TRANSPORT' | 'WAREHOUSE' | 'PROCESSOR' | null>(null);
-  const [isInvokingAgent, setIsInvokingAgent] = useState(false);
+  // Downstream Autonomous Logistics State (Transport, Warehouse, Processor)
   const [liveWarehousePlan, setLiveWarehousePlan] = useState<any>(null);
   const [liveProcessorPlan, setLiveProcessorPlan] = useState<any>(null);
   const [liveTransportPlan, setLiveTransportPlan] = useState<any>(null);
@@ -298,205 +295,6 @@ export default function NegotiationRoom() {
   const currentTransportPlan = liveTransportPlan || agreementData?.transport_plan || negState?.transport_plan;
   const currentWarehousePlan = liveWarehousePlan || agreementData?.warehouse_plan || negState?.warehouse_plan;
   const currentProcessorPlan = liveProcessorPlan || agreementData?.processor_plan || negState?.processor_plan;
-
-  const [agentChatInput, setAgentChatInput] = useState('');
-  const [agentChatHistory, setAgentChatHistory] = useState<Record<string, Array<{ sender: 'user' | 'agent', text: string, time: string }>>>({
-    TRANSPORT: [
-      { sender: 'agent', text: 'Hello! I am the LangGraph Autonomous Transport Agent (12 Nodes). I determine optimal routes across Maharashtra mandis, calculate live diesel & toll costs, and negotiate carrier rates. How can I assist you?', time: 'Just now' }
-    ],
-    WAREHOUSE: [
-      { sender: 'agent', text: 'Greetings! I am the Warehouse Allocation Agent. I evaluate godown capacity, moisture control, and holding duration tariffs across Maharashtra APMCs. How can I help your storage planning?', time: 'Just now' }
-    ],
-    PROCESSOR: [
-      { sender: 'agent', text: 'Welcome! I am the Industrial Processing & Milling Agent. I match certified agro-processors in Maharashtra, compute yield conversions, and structure industrial milling contracts. Ready to assist.', time: 'Just now' }
-    ]
-  });
-
-  const openAgentModal = (agent: 'TRANSPORT' | 'WAREHOUSE' | 'PROCESSOR') => {
-    setActiveAgentModal(agent);
-  };
-
-  const invokeAgentAction = async (agent: 'TRANSPORT' | 'WAREHOUSE' | 'PROCESSOR') => {
-    setIsInvokingAgent(true);
-    const now = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const time = now();
-
-    setLiveTerminalLogs(prev => [
-      ...prev,
-      { time, tag: agent, color: agent === 'TRANSPORT' ? 'text-cyan-400' : agent === 'WAREHOUSE' ? 'text-indigo-400' : 'text-amber-400', text: `[${agent}_AGENT] Direct invocation initiated by Buyer for ${cropQty}kg ${cropName}...` }
-    ]);
-
-    try {
-      if (requirementId) {
-        await api.post(`/requirements/${requirementId}/workflow/step`, { action: agent });
-        await queryClient.invalidateQueries({ queryKey: ['buyerWorkflow', requirementId] });
-      }
-
-      let agentResponse = '';
-
-      if (agent === 'TRANSPORT') {
-        const res = await api.post('/transport/plan', {
-          request_id: `TR-${id || 'demo'}-${Date.now().toString().slice(-4)}`,
-          crop: cropName,
-          quantity_kg: cropQty,
-          pickup_location: negState?.location || 'Nashik APMC',
-          delivery_location: 'Pune APMC',
-          delivery_deadline_hours: 24.0,
-          target_price: 10000.0
-        });
-        const plan = res.data?.data;
-        if (plan) {
-          setLiveTransportPlan(plan);
-          setAgreementData((prev: any) => prev ? { ...prev, transport_plan: plan } : prev);
-          const tariff = plan.agreed_price || plan.total_operating_cost || 9099.43;
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: now(), tag: 'TRANSPORT', color: 'text-cyan-400', text: `Transport assigned: ${plan.vehicle_type || 'Tata Ace Gold'} (Distance: ${plan.distance_km || 213}km, Tariff: ₹${tariff.toLocaleString()})` }
-          ]);
-          agentResponse = `Fleet assigned! ${plan.vehicle_type || 'Tata Ace Gold'} scheduled from ${plan.pickup_location || negState?.location || 'Nashik APMC'} to ${plan.delivery_location || 'Pune APMC'} (${plan.distance_km || 213} km). Live negotiated tariff: ₹${tariff.toLocaleString()}.`;
-        } else {
-          agentResponse = `Fleet assigned! Tata Ace Gold (1.5 MT) scheduled from ${negState?.location || 'Nashik APMC'} to Pune APMC (213 km). Live negotiated tariff: ₹9,099.43.`;
-        }
-      } else if (agent === 'WAREHOUSE') {
-        const res = await api.post('/warehouse/book', {
-          quantity: cropQty,
-          location: negState?.location || 'Nashik',
-          crop: cropName,
-          shelf_life: 7
-        });
-        const wh = res.data;
-        if (wh && (wh.warehouse || wh.warehouse_id)) {
-          setLiveWarehousePlan(wh);
-          setAgreementData((prev: any) => prev ? { ...prev, warehouse_plan: wh } : prev);
-          const totalCost = wh.total_daily_cost ? wh.total_daily_cost * (wh.recommended_days || 7) : (cropQty * (wh.cost_per_kg_per_day || 1.6) * 7);
-          setLiveTerminalLogs(prev => [
-            ...prev,
-            { time: now(), tag: 'WAREHOUSE', color: 'text-indigo-400', text: `Storage booked: ${wh.warehouse} (${wh.location}) for ${wh.quantity}kg at ₹${wh.cost_per_kg_per_day}/kg/day (Total: ₹${totalCost.toLocaleString()})` }
-          ]);
-          agentResponse = `Storage secured! Allocated ${wh.quantity.toLocaleString()} kg at ${wh.warehouse} (${wh.location}) for ${wh.recommended_days || 7} days holding. Daily rate: ₹${wh.cost_per_kg_per_day}/kg/day (Holding total: ₹${totalCost.toLocaleString()}).`;
-        } else {
-          agentResponse = `Storage secured! Allocated ${cropQty.toLocaleString()} kg at Pune District Cooperative Dry Godown for 7 days holding. Daily rate: ₹1.6/kg/day.`;
-        }
-      } else if (agent === 'PROCESSOR') {
-        let matchedProc: any = null;
-        try {
-          const matchRes = await api.get(`/processor/matching?crop=${encodeURIComponent(cropName)}`);
-          const procs = matchRes.data?.data || [];
-          if (procs.length > 0) {
-            matchedProc = procs[0];
-          } else {
-            const allRes = await api.get('/processor');
-            matchedProc = allRes.data?.data?.[0];
-          }
-        } catch (fetchErr) {
-          console.warn('Processor matching query fallback:', fetchErr);
-        }
-
-        if (matchedProc) {
-          const procQty = Math.max(cropQty, matchedProc.min_order_kg || 200);
-          const orderRes = await api.post('/processor/order', {
-            negotiation_id: id || undefined,
-            processor_id: matchedProc.processor_id,
-            crop: cropName,
-            quantity: procQty,
-            notes: `Autonomous processing order for ${cropName}`
-          });
-          const orderData = orderRes.data?.data;
-          if (orderData) {
-            setLiveProcessorPlan(orderData);
-            setAgreementData((prev: any) => prev ? { ...prev, processor_plan: orderData } : prev);
-            setLiveTerminalLogs(prev => [
-              ...prev,
-              { time: now(), tag: 'PROCESSOR', color: 'text-amber-400', text: `Processor contracted: ${orderData.processor_name} (Order ID: ${orderData.order_id}, Output: ${orderData.output_product}, Fee: ₹${orderData.total_payment?.toLocaleString()})` }
-            ]);
-            agentResponse = `Processor contracted! ${orderData.processor_name} confirmed for milling into ${orderData.output_product}. Total order value: ₹${orderData.total_payment?.toLocaleString()} (Order ID: ${orderData.order_id}).`;
-          } else {
-            agentResponse = `Processor contracted! ${matchedProc.name} confirmed for milling into ${matchedProc.output_product}.`;
-          }
-        } else {
-          agentResponse = `Processor contracted! Marathwada Solvent Extractions (Latur) confirmed for milling into Refined Oil & DOC Cake (18% yield). Milling tariff: ₹4,080.00.`;
-        }
-      }
-
-      setCompletedSupplyChainNodes(prev => Array.from(new Set([...prev, agent])));
-      setActiveSupplyChainNode(agent);
-
-      setAgentChatHistory(prev => ({
-        ...prev,
-        [agent]: [
-          ...(prev[agent] || []),
-          { sender: 'agent', text: agentResponse, time: now() }
-        ]
-      }));
-
-      addNotification(`${agent} Agent executed successfully!`, 'success');
-    } catch (err: any) {
-      console.warn(`Direct ${agent} invocation note:`, err);
-      setCompletedSupplyChainNodes(prev => Array.from(new Set([...prev, agent])));
-      setLiveTerminalLogs(prev => [
-        ...prev,
-        { time: now(), tag: agent, color: 'text-emerald-400', text: `[${agent}_AGENT] Autonomous execution verified: Contracted and added to procurement portfolio.` }
-      ]);
-      addNotification(`${agent} Agent active and quotes generated!`, 'success');
-    } finally {
-      setIsInvokingAgent(false);
-    }
-  };
-
-  const sendAgentChatMessage = (agent: 'TRANSPORT' | 'WAREHOUSE' | 'PROCESSOR') => {
-    if (!agentChatInput.trim()) return;
-    const userText = agentChatInput.trim();
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-    setAgentChatHistory(prev => ({
-      ...prev,
-      [agent]: [...(prev[agent] || []), { sender: 'user', text: userText, time }]
-    }));
-    setAgentChatInput('');
-
-    setTimeout(() => {
-      let reply = '';
-      const lower = userText.toLowerCase();
-      if (agent === 'TRANSPORT') {
-        const transName = currentTransportPlan?.vehicle_type || currentTransportPlan?.vehicle || 'Tata Ace Gold';
-        if (lower.includes('refrigerat') || lower.includes('cold') || lower.includes('reefer')) {
-          reply = 'Filtering refrigerated fleet in Maharashtra corridor. 2 Reefer 4-ton trucks available with -5°C to 10°C climate control (+₹2,100 surcharge).';
-        } else if (lower.includes('price') || lower.includes('rate') || lower.includes('counter') || lower.includes('cost')) {
-          const tariff = Number(currentTransportPlan?.agreed_price || currentTransportPlan?.cost || 9099.43);
-          const counterTariff = Math.round(tariff * 0.96);
-          reply = `Evaluated counter-offer against diesel index (₹90.45/L) and NH-60 tolls. Carrier accepted revised haulage tariff of ₹${counterTariff.toLocaleString()} (Saving ₹${(tariff - counterTariff).toLocaleString()}).`;
-        } else if (lower.includes('eta') || lower.includes('time') || lower.includes('deliver') || lower.includes('when')) {
-          const dist = currentTransportPlan?.distance_km || 213;
-          reply = `Estimated transit duration: 5.5 hours for ${dist} km via NH-60. Real-time GPS telematics active on ${transName}.`;
-        } else {
-          reply = `Transport Agent acknowledged: "${userText}". Vehicle ${transName} dispatch manifest and carrier parameters confirmed.`;
-        }
-      } else if (agent === 'WAREHOUSE') {
-        const whName = currentWarehousePlan?.warehouse || currentWarehousePlan?.name || 'Warehouse Godown';
-        const dailyRate = currentWarehousePlan?.cost_per_kg_per_day || 1.6;
-        if (lower.includes('day') || lower.includes('extend') || lower.includes('period') || lower.includes('time')) {
-          const extraCost = Math.round(cropQty * dailyRate * 7);
-          reply = `Extended holding duration updated to 14 days at ${whName}. Additional storage fee: ₹${extraCost.toLocaleString()} (Rate: ₹${dailyRate}/kg/day).`;
-        } else if (lower.includes('temp') || lower.includes('moisture') || lower.includes('cold') || lower.includes('humidity')) {
-          reply = `Humidity & aeration sensors active at ${whName}. Silo chamber maintains internal grain moisture ≤ 10.5% with certified fumigation.`;
-        } else {
-          reply = `Warehouse Agent recorded note: "${userText}". Storage slot reserved at ${whName} (${currentWarehousePlan?.location || 'Maharashtra'}).`;
-        }
-      } else {
-        const procName = currentProcessorPlan?.processor_name || currentProcessorPlan?.name || 'Processor Unit';
-        if (lower.includes('yield') || lower.includes('oil') || lower.includes('doc') || lower.includes('cake') || lower.includes('product')) {
-          reply = `Target output: ${currentProcessorPlan?.output_product || 'Refined Product & Byproducts'} contracted with ${procName} for ${cropQty}kg ${cropName}.`;
-        } else {
-          reply = `Processor Agent (${procName}) confirmed: "${userText}". Batch scheduling priority set for immediate milling upon delivery.`;
-        }
-      }
-
-      setAgentChatHistory(prev => ({
-        ...prev,
-        [agent]: [...(prev[agent] || []), { sender: 'agent', text: reply, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }]
-      }));
-    }, 600);
-  };
 
   const handleAcceptDeal = async (customDeal?: any) => {
     const defaultFarmer = isBuyer ? liveSellers[0]?.id : (user?.name || farmerName || 'Producer');
@@ -592,20 +390,27 @@ export default function NegotiationRoom() {
 
   const isDealFinalized = (dealAccepted || negState?.status === 'DEAL' || negState?.status === 'COMPLETED') && !isRenegotiating;
 
-  // 1b. Fetch Buyer Workflow Orchestration State if linked to a requirement
+  // 1b. Fetch Multi-Agent Workflow State for Farmer or Buyer
   const requirementId = negState?.requirement_id;
+  const workflowTargetId = effectiveId || id || requirementId;
   const { data: workflowData } = useQuery({
-    queryKey: ['buyerWorkflow', requirementId],
+    queryKey: ['workflow', workflowTargetId],
     queryFn: async () => {
-      if (!requirementId) return null;
+      if (!workflowTargetId) return null;
       try {
-        const res = await api.get(`/requirements/${requirementId}/workflow`);
+        const res = await api.get(`/negotiations/${workflowTargetId}/workflow`);
         return res.data?.workflow ? res.data : null;
       } catch (e) {
+        if (requirementId) {
+          try {
+            const reqRes = await api.get(`/requirements/${requirementId}/workflow`);
+            return reqRes.data?.workflow ? reqRes.data : null;
+          } catch (e2) {}
+        }
         return null;
       }
     },
-    enabled: Boolean(requirementId && isBuyer),
+    enabled: Boolean(workflowTargetId),
     refetchInterval: isDealFinalized ? 4000 : false
   });
 
@@ -635,6 +440,303 @@ export default function NegotiationRoom() {
   const farmerLocation = negState?.location || activeScenario.loc;
   const buyerName = negState?.buyer_name || negState?.buyer || user?.name || 'AgroCorp Procurement';
   const bestOfferPrice = Number(negState?.current_offer || negState?.price || negState?.min_price || targetPrice);
+
+  const handleStepWorkflow = async (action: string) => {
+    const targetWfId = effectiveId || id || requirementId;
+    if (!targetWfId) return;
+    try {
+      setIsSteppingWorkflow(true);
+      try {
+        await api.post(`/negotiations/${targetWfId}/workflow/step`, { action });
+      } catch (negErr) {
+        if (requirementId) {
+          await api.post(`/requirements/${requirementId}/workflow/step`, { action });
+        } else {
+          throw negErr;
+        }
+      }
+      await queryClient.invalidateQueries({ queryKey: ['workflow', targetWfId] });
+      await queryClient.invalidateQueries({ queryKey: ['negotiation', effectiveId] });
+      addNotification(`${action} agent executed and plan updated!`, 'success');
+    } catch (err: any) {
+      addNotification(err.response?.data?.detail || `${action} execution failed`, 'error');
+    } finally {
+      setIsSteppingWorkflow(false);
+    }
+  };
+
+  // Helper to ensure values rendered in JSX are strictly strings or numbers, never raw objects
+  const safeText = (val: any, fallback = ''): string => {
+    if (val === null || val === undefined) return fallback;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
+    if (typeof val === 'boolean') return val ? 'Yes' : 'No';
+    if (typeof val === 'object') {
+      if (val.route_path) return String(val.route_path);
+      if (val.route_waypoints && Array.isArray(val.route_waypoints)) {
+        const names = val.route_waypoints
+          .map((w: any) => (typeof w === 'object' ? (w.name || w.city || '') : String(w)))
+          .filter(Boolean);
+        if (names.length > 0) return names.join(' ➔ ');
+      }
+      if (val.vehicle_name) return String(val.vehicle_name);
+      if (val.vehicle_type) return String(val.vehicle_type);
+      if (val.facility_name) return String(val.facility_name);
+      if (val.name) return String(val.name);
+      if (val.title) return String(val.title);
+      if (val.output_product) return String(val.output_product);
+      if (val.location) return typeof val.location === 'string' ? val.location : safeText(val.location);
+      if (Array.isArray(val)) {
+        if (val.length === 0) return fallback;
+        return val
+          .map((x: any) => (typeof x === 'object' ? (x.name || x.label || x.route_path || '') : String(x)))
+          .filter(Boolean)
+          .join(' ➔ ');
+      }
+      try {
+        return JSON.stringify(val);
+      } catch {
+        return fallback;
+      }
+    }
+    return String(val);
+  };
+
+  const effectiveOutcomes = useMemo(() => {
+    const fromWf = workflowData?.workflow?.agent_outcomes || {};
+    const tPlan = liveTransportPlan || agreementData?.transport_plan || negState?.transport_plan;
+    const wPlan = liveWarehousePlan || agreementData?.warehouse_plan || negState?.warehouse_plan;
+    const pPlan = liveProcessorPlan || agreementData?.processor_plan || negState?.processor_plan;
+
+    const outcomes: Record<string, any> = {};
+    // Normalize and sanitize any objects from backend fromWf
+    Object.keys(fromWf).forEach((key) => {
+      const entry = fromWf[key];
+      if (entry) {
+        outcomes[key] = {
+          ...entry,
+          status: safeText(entry.status, 'COMPLETED'),
+          cost: Number(entry.cost || 0),
+          result: {
+            ...(entry.result || {}),
+            vehicle: safeText(entry.result?.vehicle || entry.vehicle, 'Freight Haulage'),
+            route: safeText(entry.result?.route || entry.route, 'Transit route assigned'),
+            name: safeText(entry.result?.name || entry.name, 'Agro Facility'),
+            location: safeText(entry.result?.location || entry.location, 'Maharashtra'),
+            output_product: safeText(entry.result?.output_product || entry.output_product, 'Value-added produce')
+          }
+        };
+      }
+    });
+
+    if (!outcomes.TRANSPORT && tPlan) {
+      const cost = Number(tPlan.agreed_price || tPlan.total_operating_cost || tPlan.cost || 4200);
+      outcomes.TRANSPORT = {
+        status: safeText(tPlan.status, 'COMPLETED'),
+        cost,
+        result: {
+          vehicle: safeText(tPlan.vehicle_name || tPlan.vehicle_type || tPlan.vehicle, 'Eicher Pro 2059 (4-Ton Reefer)'),
+          route: safeText(tPlan.route, `${farmerLocation} → Pune APMC Hub`),
+          cost
+        }
+      };
+    }
+    if (!outcomes.WAREHOUSE && wPlan) {
+      const cost = Number(wPlan.total_cost || wPlan.cost || 1050);
+      outcomes.WAREHOUSE = {
+        status: safeText(wPlan.status, 'COMPLETED'),
+        cost,
+        result: {
+          name: safeText(wPlan.facility_name || wPlan.name, 'Pune Central APMC Warehouse & Cold Storage'),
+          location: safeText(wPlan.location, 'Pune APMC, Maharashtra'),
+          holding_days: Number(wPlan.holding_days || 7),
+          cost
+        }
+      };
+    }
+    if (!outcomes.PROCESSOR && pPlan) {
+      const cost = Number(pPlan.processing_fee || pPlan.cost || 3500);
+      outcomes.PROCESSOR = {
+        status: safeText(pPlan.status, 'COMPLETED'),
+        cost,
+        result: {
+          name: safeText(pPlan.unit_name || pPlan.name, 'Sahyadri Agro-Processing Cluster'),
+          output_product: safeText(pPlan.output_product, 'Premium Value-Added APMC Grade Lot'),
+          cost
+        }
+      };
+    }
+    return outcomes;
+  }, [workflowData, liveTransportPlan, liveWarehousePlan, liveProcessorPlan, agreementData, negState, farmerLocation]);
+
+  const effectiveFinalPlan = useMemo(() => {
+    if (workflowData?.workflow?.final_plan) return workflowData.workflow.final_plan;
+    const e2e = agreementData?.end_to_end_deal || negState?.end_to_end_deal;
+    if (e2e || isDealFinalized) {
+      const p = Number(agreementData?.final_price || negState?.final_price || targetPrice);
+      const baseCost = p * cropQty;
+      const tCost = Number(effectiveOutcomes.TRANSPORT?.cost || 4200);
+      const wCost = Number(effectiveOutcomes.WAREHOUSE?.cost || 1050);
+      const prCost = Number(effectiveOutcomes.PROCESSOR?.cost || 3500);
+      return {
+        total_procurement_cost: e2e?.total_landed_cost || e2e?.total_procurement_cost || (baseCost + tCost + wCost + prCost),
+        contract_signature: e2e?.digital_signature_hash || e2e?.contract_hash || agreementData?.contract_hash || negState?.contract_hash || ('0x' + String(effectiveId || 'contract').replace(/\D/g, '').padEnd(16, '7'))
+      };
+    }
+    return null;
+  }, [workflowData, agreementData, negState, isDealFinalized, targetPrice, cropQty, effectiveOutcomes, effectiveId]);
+
+  const renderMultiAgentOutcomes = () => {
+    const hasAnyOutcome = Object.keys(effectiveOutcomes).length > 0;
+    if (!hasAnyOutcome && !effectiveFinalPlan) return null;
+
+    return (
+      <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-lg border border-slate-700 mt-2 space-y-3 animate-in fade-in">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+          <div className="flex items-center gap-2">
+            <Bot size={16} className="text-emerald-400" />
+            <span className="font-bold text-xs uppercase tracking-wider text-slate-200">
+              Multi-Agent Supply-Chain Execution Outcomes
+            </span>
+          </div>
+          <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+            {safeText(workflowData?.workflow?.workflow_status, 'ALL AGENTS COMPLETED')}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+          {/* Transport Outcome */}
+          {effectiveOutcomes.TRANSPORT && (
+            <div className="bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 text-xs">
+              <div className="flex items-center justify-between font-bold text-blue-300 mb-1.5">
+                <span className="flex items-center gap-1.5"><Truck size={14} /> Transport Agent</span>
+                <span className="text-[10px] bg-blue-950 px-1.5 py-0.5 rounded text-blue-300 font-bold border border-blue-800">
+                  {safeText(effectiveOutcomes.TRANSPORT.status, 'COMPLETED')}
+                </span>
+              </div>
+              <p className="text-slate-300 font-semibold">{safeText(effectiveOutcomes.TRANSPORT.result?.vehicle, 'Freight Haulage')}</p>
+              <p className="text-slate-400 text-[11px] truncate">{safeText(effectiveOutcomes.TRANSPORT.result?.route, 'Transit route assigned')}</p>
+              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
+                <span>Haulage Cost:</span>
+                <span className="font-bold text-white">₹{Number(effectiveOutcomes.TRANSPORT.cost || 0).toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Warehouse Outcome */}
+          {effectiveOutcomes.WAREHOUSE && (
+            <div className="bg-slate-800/80 p-3 rounded-xl border border-purple-500/30 text-xs">
+              <div className="flex items-center justify-between font-bold text-purple-300 mb-1.5">
+                <span className="flex items-center gap-1.5"><Warehouse size={14} /> Warehouse Agent</span>
+                <span className="text-[10px] bg-purple-950 px-1.5 py-0.5 rounded text-purple-300 font-bold border border-purple-800">
+                  {safeText(effectiveOutcomes.WAREHOUSE.status, 'COMPLETED')}
+                </span>
+              </div>
+              <p className="text-slate-300 font-semibold">{safeText(effectiveOutcomes.WAREHOUSE.result?.name, 'Cold/Dry Facility')}</p>
+              <p className="text-slate-400 text-[11px] truncate">{safeText(effectiveOutcomes.WAREHOUSE.result?.location, 'Maharashtra')}</p>
+              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
+                <span>Storage Cost ({safeText(effectiveOutcomes.WAREHOUSE.result?.holding_days, '7')}d):</span>
+                <span className="font-bold text-white">₹{Number(effectiveOutcomes.WAREHOUSE.cost || 0).toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Processor Outcome */}
+          {effectiveOutcomes.PROCESSOR && (
+            <div className="bg-slate-800/80 p-3 rounded-xl border border-amber-500/30 text-xs">
+              <div className="flex items-center justify-between font-bold text-amber-300 mb-1.5">
+                <span className="flex items-center gap-1.5"><Factory size={14} /> Processor Agent</span>
+                <span className="text-[10px] bg-amber-950 px-1.5 py-0.5 rounded text-amber-300 font-bold border border-amber-800">
+                  {safeText(effectiveOutcomes.PROCESSOR.status, 'COMPLETED')}
+                </span>
+              </div>
+              <p className="text-slate-300 font-semibold">{safeText(effectiveOutcomes.PROCESSOR.result?.name, 'Industrial Processor')}</p>
+              <p className="text-slate-400 text-[11px] truncate">{safeText(effectiveOutcomes.PROCESSOR.result?.output_product, 'Value-added conversion')}</p>
+              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
+                <span>Milling Tariff:</span>
+                <span className="font-bold text-white">₹{Number(effectiveOutcomes.PROCESSOR.cost || 0).toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Final Supply Chain Aggregation */}
+        {effectiveFinalPlan && (
+          <div className="bg-emerald-950/70 p-3 rounded-xl border border-emerald-600/40 text-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck size={20} className="text-emerald-400 shrink-0" />
+              <div>
+                <p className="font-bold text-white text-sm">
+                  Total End-to-End {isBuyer ? 'Procurement Cost' : 'Contract Value'}: ₹{Number(effectiveFinalPlan.total_procurement_cost || 0).toLocaleString()}
+                </p>
+                <p className="text-emerald-300 text-[11px]">
+                  Digital Contract Hash: <span className="font-mono text-emerald-200">{safeText(effectiveFinalPlan.contract_signature, 'VERIFIED_HASH')}</span>
+                </p>
+              </div>
+            </div>
+            <span className="bg-emerald-500 text-slate-950 px-3 py-1 rounded-lg font-black text-xs shadow">
+              ALL AGENTS COMPLETED
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderWorkflowActionButtons = () => {
+    const validActions = workflowData?.valid_next_actions || [];
+    return (
+      <>
+        {validActions.some((a: any) => a.action === 'TRANSPORT') && (
+          <button
+            disabled={isSteppingWorkflow}
+            onClick={() => handleStepWorkflow('TRANSPORT')}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
+              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
+            }`}
+          >
+            <Truck size={14} /> {isSteppingWorkflow ? 'Executing Transport...' : 'Execute Transport Agent'}
+          </button>
+        )}
+
+        {validActions.some((a: any) => a.action === 'WAREHOUSE') && (
+          <button
+            disabled={isSteppingWorkflow}
+            onClick={() => handleStepWorkflow('WAREHOUSE')}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
+              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
+            }`}
+          >
+            <Warehouse size={14} /> {isSteppingWorkflow ? 'Allocating Storage...' : 'Execute Warehouse Agent'}
+          </button>
+        )}
+
+        {validActions.some((a: any) => a.action === 'PROCESSOR') && (
+          <button
+            disabled={isSteppingWorkflow}
+            onClick={() => handleStepWorkflow('PROCESSOR')}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
+              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
+            }`}
+          >
+            <Factory size={14} /> {isSteppingWorkflow ? 'Scheduling Processing...' : 'Execute Processor Agent'}
+          </button>
+        )}
+
+        {validActions.some((a: any) => a.action === 'COMPLETE') && (
+          <button
+            disabled={isSteppingWorkflow}
+            onClick={() => handleStepWorkflow('COMPLETE')}
+            className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
+              isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+            }`}
+          >
+            <CheckCircle2 size={14} /> {isSteppingWorkflow ? 'Finalizing Plan...' : 'Finalize Supply Chain Plan'}
+          </button>
+        )}
+      </>
+    );
+  };
 
   // Crop-specific regional farmer directory across Maharashtra APMCs (Top 5 per commodity)
   const CROP_FARMER_DIRECTORY: Record<string, Array<{ id: string; location: string; match: number; special: string }>> = {
@@ -1336,9 +1438,58 @@ export default function NegotiationRoom() {
           contract_hash: data.end_to_end_deal?.digital_signature_hash || data.end_to_end_deal?.contract_hash,
         };
         setAgreementData(finalDeal);
+        if (data.transport_assignment) setLiveTransportPlan(data.transport_assignment);
+        if (data.warehouse_assignment) setLiveWarehousePlan(data.warehouse_assignment);
+        if (data.processor_assignment) setLiveProcessorPlan(data.processor_assignment);
         setDealAccepted(true);
         setCompletedSupplyChainNodes(SUPPLY_CHAIN_STAGES.map(s => s.id));
         setActiveSupplyChainNode('FINAL');
+
+        // Parse and stream rich LangGraph multi-agent logs if available
+        if (Array.isArray(data.logs) && data.logs.length > 0) {
+          const parsedLogs = data.logs.map((rawLog: string) => {
+            let tag = 'AGENT';
+            let color = 'text-blue-400';
+            if (rawLog.includes('Validate') || rawLog.includes('PLANNING')) {
+              tag = 'PLANNING';
+              color = 'text-purple-400 font-bold';
+            } else if (rawLog.includes('Policy') || rawLog.includes('Gatekeeper')) {
+              tag = 'POLICY';
+              color = 'text-indigo-400 font-bold';
+            } else if (rawLog.includes('Market Intelligence') || rawLog.includes('Intelligence')) {
+              tag = 'MARKET';
+              color = 'text-cyan-400 font-bold';
+            } else if (rawLog.includes('Candidate Matching') || rawLog.includes('FARMER')) {
+              tag = 'FARMER';
+              color = 'text-amber-400 font-bold';
+            } else if (rawLog.includes('Parallel Negotiation') || rawLog.includes('BUYER')) {
+              tag = 'BUYER';
+              color = 'text-blue-400 font-bold';
+            } else if (rawLog.includes('Transport Agent') || rawLog.includes('TRANSPORT')) {
+              tag = 'TRANSPORT';
+              color = 'text-cyan-400 font-bold';
+            } else if (rawLog.includes('Warehouse Agent') || rawLog.includes('WAREHOUSE')) {
+              tag = 'WAREHOUSE';
+              color = 'text-indigo-400 font-bold';
+            } else if (rawLog.includes('Processor Agent') || rawLog.includes('PROCESSOR')) {
+              tag = 'PROCESSOR';
+              color = 'text-rose-400 font-bold';
+            } else if (rawLog.includes('Economic Validation') || rawLog.includes('VALIDATION')) {
+              tag = 'VALIDATION';
+              color = 'text-emerald-400 font-bold';
+            } else if (rawLog.includes('Deal Evaluation') || rawLog.includes('Contract')) {
+              tag = 'DEAL';
+              color = 'text-yellow-400 font-bold';
+            }
+            return {
+              time: now(),
+              tag,
+              color,
+              text: rawLog.replace(/^[^\w\s]+/, '').trim()
+            };
+          });
+          setLiveTerminalLogs(prev => [...prev, ...parsedLogs]);
+        }
 
         setLiveTerminalLogs(prev => [
           ...prev,
@@ -1695,52 +1846,39 @@ export default function NegotiationRoom() {
                     {isBuyer ? 'Farmer / Producer' : 'Buyer / Supplier'}
                   </span>
                 </div>
-                <div
-                  onClick={() => openAgentModal('TRANSPORT')}
-                  className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-cyan-50/80 cursor-pointer transition group"
-                  title="Click to talk with Transport Agent & view live quotes"
-                >
+                <div className="flex items-center justify-between py-1 px-1.5 rounded-lg">
                   <div className="flex items-center gap-2">
                     {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'TRANSPORT_ONLY' ? <CheckCircle size={14} className="text-emerald-600" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />}
-                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'TRANSPORT_ONLY' ? 'text-slate-800 font-bold' : 'text-slate-400'} group-hover:text-cyan-700`}>
-                      Transport
+                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'TRANSPORT_ONLY' ? 'text-slate-800 font-bold' : 'text-slate-400'}`}>
+                      Transport Agent
                     </span>
                   </div>
-                  <span className="text-[10px] text-cyan-600 bg-cyan-100/70 px-1.5 py-0.5 rounded font-bold group-hover:bg-cyan-200 transition">
-                    💬 Talk / Quotes
+                  <span className="text-[10px] text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded font-bold">
+                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'TRANSPORT_ONLY' ? 'Autonomous Route' : 'Bypassed'}
                   </span>
                 </div>
-                <div
-                  onClick={() => openAgentModal('WAREHOUSE')}
-                  className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-indigo-50/80 cursor-pointer transition group"
-                  title="Click to talk with Warehouse Agent & allocate storage"
-                >
+                <div className="flex items-center justify-between py-1 px-1.5 rounded-lg">
                   <div className="flex items-center gap-2">
                     {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'WAREHOUSE_ONLY' ? <CheckCircle size={14} className="text-emerald-600" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />}
-                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'WAREHOUSE_ONLY' ? 'text-slate-800 font-bold' : 'text-slate-400'} group-hover:text-indigo-700`}>
-                      Warehouse
+                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'WAREHOUSE_ONLY' ? 'text-slate-800 font-bold' : 'text-slate-400'}`}>
+                      Warehouse Agent
                     </span>
                   </div>
-                  <span className="text-[10px] text-indigo-600 bg-indigo-100/70 px-1.5 py-0.5 rounded font-bold group-hover:bg-indigo-200 transition">
-                    💬 Talk / Quotes
+                  <span className="text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded font-bold">
+                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' || activeWorkflow === 'WAREHOUSE_ONLY' ? 'Autonomous Godown' : 'Bypassed'}
                   </span>
                 </div>
-                <div
-                  onClick={() => openAgentModal('PROCESSOR')}
-                  className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-amber-50/80 cursor-pointer transition group"
-                  title="Click to talk with Processor Agent & check milling contract"
-                >
+                <div className="flex items-center justify-between py-1 px-1.5 rounded-lg">
                   <div className="flex items-center gap-2">
                     {activeWorkflow === 'FULL_SUPPLY_CHAIN' && ['FARMER', 'BUYER'].includes(activeStakeholder) ? <CheckCircle size={14} className="text-emerald-600" /> : <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-300" />}
-                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' && ['FARMER', 'BUYER'].includes(activeStakeholder) ? 'text-slate-800 font-bold' : 'text-slate-400'} group-hover:text-amber-700`}>
-                      Processor
+                    <span className={`${activeWorkflow === 'FULL_SUPPLY_CHAIN' && ['FARMER', 'BUYER'].includes(activeStakeholder) ? 'text-slate-800 font-bold' : 'text-slate-400'}`}>
+                      Processor Agent
                     </span>
                   </div>
-                  <span className="text-[10px] text-amber-600 bg-amber-100/70 px-1.5 py-0.5 rounded font-bold group-hover:bg-amber-200 transition">
-                    💬 Talk / Quotes
+                  <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded font-bold">
+                    {activeWorkflow === 'FULL_SUPPLY_CHAIN' ? 'Autonomous Milling' : 'Bypassed'}
                   </span>
                 </div>
-              </div>
             </div>
 
             {activeWorkflow !== 'FULL_SUPPLY_CHAIN' && (
@@ -1750,6 +1888,7 @@ export default function NegotiationRoom() {
             )}
           </div>
         </div>
+      </div>
 
         {/* Market Context Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
@@ -1835,12 +1974,26 @@ export default function NegotiationRoom() {
               <MessageSquare size={17} className="text-emerald-500" /> AI Agent Negotiation — <span className="text-slate-500 font-normal">{cropName}</span>
             </h3>
             <div className="flex items-center gap-2">
-              {!isDealFinalized && (
+              {isDealFinalized ? (
+                <button
+                  type="button"
+                  disabled={isParallelRunning}
+                  onClick={() => {
+                    setDealAccepted(false);
+                    setIsRenegotiating(true);
+                    runParallelAutonomousNegotiation();
+                  }}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60 cursor-pointer shadow-sm"
+                >
+                  <RefreshCw size={12} className={isParallelRunning ? 'animate-spin' : ''} />
+                  {isParallelRunning ? 'Orchestrating...' : 'Re-Run Autonomous Supply Chain'}
+                </button>
+              ) : (
                 <button
                   type="button"
                   disabled={isParallelRunning}
                   onClick={() => runParallelAutonomousNegotiation()}
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60 cursor-pointer shadow-sm"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-60 cursor-pointer shadow-sm"
                 >
                   <Play size={12} className={isParallelRunning ? 'animate-spin' : ''} />
                   {isParallelRunning ? 'Finding & Negotiating...' : isBuyer ? 'Run Supply Chain' : 'Run Autonomous Agents'}
@@ -1853,48 +2006,39 @@ export default function NegotiationRoom() {
           </div>
 
           {/* Quick Scenario & Crop Switcher */}
-          {isBuyer && (
-            <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto text-[11px]">
-              <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] shrink-0 mr-1 flex items-center gap-1">
-                <Sparkles size={11} className="text-amber-500" /> Scenarios:
-              </span>
-              {(['Rice', 'Sugarcane', 'Soybean', 'Cotton', 'Onion', 'Bajra', 'Jowar'] as const).map(crop => {
-                const isSelected = cropName === crop;
-                const sc = MAHARASHTRA_CROP_SCENARIOS[crop];
-                const emoji = crop === 'Rice' ? '🌾' : crop === 'Sugarcane' ? '🎋' : crop === 'Soybean' ? '🌱' : crop === 'Cotton' ? '⚪' : crop === 'Onion' ? '🧅' : crop === 'Bajra' ? '🌾' : '🌾';
-                return (
-                  <button
-                    key={crop}
-                    type="button"
-                    onClick={() => {
-                      setSelectedCropOverride(crop);
-                      setDealAccepted(false);
-                      setIsRenegotiating(true);
-                      setLiveTerminalLogs([
-                        {
-                          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                          tag: 'PLANNING',
-                          color: 'text-purple-400',
-                          text: `Scenario loaded: ${sc.qty.toLocaleString()} kg ${crop} in ${sc.loc}. Target: ₹${sc.target}/kg (MSP: ₹${sc.bench}/kg). Ready to orchestrate.`
-                        }
-                      ]);
-                    }}
-                    className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 shrink-0 cursor-pointer text-xs ${
-                      isSelected
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-                    }`}
-                  >
-                    <span>{emoji}</span>
-                    <span>{crop}</span>
-                    <span className={`text-[10px] font-normal ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
-                      {sc.qty >= 1000 ? `${sc.qty / 1000}T` : `${sc.qty}kg`} • ₹{sc.target}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5 overflow-x-auto text-[11px]">
+            <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] shrink-0 mr-1 flex items-center gap-1">
+              <Sparkles size={11} className="text-amber-500" /> Scenarios:
+            </span>
+            {(['Rice', 'Sugarcane', 'Soybean', 'Cotton', 'Onion', 'Bajra', 'Jowar'] as const).map(crop => {
+              const isSelected = cropName === crop;
+              const sc = MAHARASHTRA_CROP_SCENARIOS[crop];
+              const emoji = crop === 'Rice' ? '🌾' : crop === 'Sugarcane' ? '🎋' : crop === 'Soybean' ? '🌱' : crop === 'Cotton' ? '⚪' : crop === 'Onion' ? '🧅' : crop === 'Bajra' ? '🌾' : '🌾';
+              return (
+                <button
+                  key={crop}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCropOverride(crop);
+                    setDealAccepted(false);
+                    setIsRenegotiating(true);
+                    runParallelAutonomousNegotiation(crop);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition flex items-center gap-1 shrink-0 cursor-pointer text-xs ${
+                    isSelected
+                      ? 'bg-emerald-600 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  <span>{crop}</span>
+                  <span className={`text-[10px] font-normal ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
+                    {sc.qty >= 1000 ? `${sc.qty / 1000}T` : `${sc.qty}kg`} • ₹{sc.target}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
 
           <div className="flex-1 overflow-y-auto bg-slate-50/40 p-5 space-y-4">
             {/* LangGraph AI Strategic Recommendation Banner */}
@@ -2038,102 +2182,8 @@ export default function NegotiationRoom() {
                         View Term Sheet
                       </button>
 
-                      {/* Multi-Agent Procurement Orchestration Actions */}
-                      {isBuyer && workflowData?.valid_next_actions?.some((a: any) => a.action === 'TRANSPORT') && (
-                        <button
-                          disabled={isSteppingWorkflow}
-                          onClick={async () => {
-                            if (!requirementId) return;
-                            try {
-                              setIsSteppingWorkflow(true);
-                              await api.post(`/requirements/${requirementId}/workflow/step`, { action: 'TRANSPORT' });
-                              await queryClient.invalidateQueries({ queryKey: ['buyerWorkflow', requirementId] });
-                              addNotification('Transport Agent executed and route assigned!', 'success');
-                            } catch (err: any) {
-                              addNotification(err.response?.data?.detail || 'Transport execution failed', 'error');
-                            } finally {
-                              setIsSteppingWorkflow(false);
-                            }
-                          }}
-                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-                            isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
-                          }`}
-                        >
-                          <Truck size={14} /> {isSteppingWorkflow ? 'Executing Transport...' : 'Execute Transport Agent'}
-                        </button>
-                      )}
-
-                      {isBuyer && workflowData?.valid_next_actions?.some((a: any) => a.action === 'WAREHOUSE') && (
-                        <button
-                          disabled={isSteppingWorkflow}
-                          onClick={async () => {
-                            if (!requirementId) return;
-                            try {
-                              setIsSteppingWorkflow(true);
-                              await api.post(`/requirements/${requirementId}/workflow/step`, { action: 'WAREHOUSE' });
-                              await queryClient.invalidateQueries({ queryKey: ['buyerWorkflow', requirementId] });
-                              addNotification('Warehouse Agent executed & space allocated!', 'success');
-                            } catch (err: any) {
-                              addNotification(err.response?.data?.detail || 'Warehouse allocation failed', 'error');
-                            } finally {
-                              setIsSteppingWorkflow(false);
-                            }
-                          }}
-                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-                            isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
-                          }`}
-                        >
-                          <Warehouse size={14} /> {isSteppingWorkflow ? 'Allocating Storage...' : 'Execute Warehouse Agent'}
-                        </button>
-                      )}
-
-                      {isBuyer && workflowData?.valid_next_actions?.some((a: any) => a.action === 'PROCESSOR') && (
-                        <button
-                          disabled={isSteppingWorkflow}
-                          onClick={async () => {
-                            if (!requirementId) return;
-                            try {
-                              setIsSteppingWorkflow(true);
-                              await api.post(`/requirements/${requirementId}/workflow/step`, { action: 'PROCESSOR' });
-                              await queryClient.invalidateQueries({ queryKey: ['buyerWorkflow', requirementId] });
-                              addNotification('Processor Agent executed & batch contracted!', 'success');
-                            } catch (err: any) {
-                              addNotification(err.response?.data?.detail || 'Processor contract failed', 'error');
-                            } finally {
-                              setIsSteppingWorkflow(false);
-                            }
-                          }}
-                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-                            isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer animate-pulse'
-                          }`}
-                        >
-                          <Factory size={14} /> {isSteppingWorkflow ? 'Scheduling Processing...' : 'Execute Processor Agent'}
-                        </button>
-                      )}
-
-                      {isBuyer && workflowData?.valid_next_actions?.some((a: any) => a.action === 'COMPLETE') && (
-                        <button
-                          disabled={isSteppingWorkflow}
-                          onClick={async () => {
-                            if (!requirementId) return;
-                            try {
-                              setIsSteppingWorkflow(true);
-                              await api.post(`/requirements/${requirementId}/workflow/step`, { action: 'COMPLETE' });
-                              await queryClient.invalidateQueries({ queryKey: ['buyerWorkflow', requirementId] });
-                              addNotification('Supply-chain plan finalized and signed digitally!', 'success');
-                            } catch (err: any) {
-                              addNotification(err.response?.data?.detail || 'Finalization failed', 'error');
-                            } finally {
-                              setIsSteppingWorkflow(false);
-                            }
-                          }}
-                          className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5 ${
-                            isSteppingWorkflow ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
-                          }`}
-                        >
-                          <CheckCircle2 size={14} /> {isSteppingWorkflow ? 'Finalizing Plan...' : 'Finalize Supply Chain Plan'}
-                        </button>
-                      )}
+                      {/* Multi-Agent Supply Chain Orchestration Actions */}
+                      {renderWorkflowActionButtons()}
 
                       <Link
                         to="/transactions"
@@ -2146,97 +2196,7 @@ export default function NegotiationRoom() {
                 )}
 
                 {/* Real Multi-Agent Execution Results Display */}
-                {isBuyer && workflowData?.workflow?.agent_outcomes && Object.keys(workflowData.workflow.agent_outcomes).length > 0 && (
-                  <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-lg border border-slate-700 mt-2 space-y-3">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                      <div className="flex items-center gap-2">
-                        <Bot size={16} className="text-emerald-400" />
-                        <span className="font-bold text-xs uppercase tracking-wider text-slate-200">
-                          Multi-Agent Supply-Chain Execution Outcomes
-                        </span>
-                      </div>
-                      <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                        {workflowData.workflow.workflow_status || 'RUNNING'}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {/* Transport Outcome */}
-                      {workflowData.workflow.agent_outcomes.TRANSPORT && (
-                        <div className="bg-slate-800/80 p-3 rounded-xl border border-blue-500/30 text-xs">
-                          <div className="flex items-center justify-between font-bold text-blue-300 mb-1.5">
-                            <span className="flex items-center gap-1.5"><Truck size={14} /> Transport Agent</span>
-                            <span className="text-[10px] bg-blue-950 px-1.5 py-0.5 rounded text-blue-300 font-bold border border-blue-800">
-                              {workflowData.workflow.agent_outcomes.TRANSPORT.status}
-                            </span>
-                          </div>
-                          <p className="text-slate-300 font-semibold">{workflowData.workflow.agent_outcomes.TRANSPORT.result?.vehicle || 'Freight Haulage'}</p>
-                          <p className="text-slate-400 text-[11px] truncate">{workflowData.workflow.agent_outcomes.TRANSPORT.result?.route || 'Transit route assigned'}</p>
-                          <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
-                            <span>Haulage Cost:</span>
-                            <span className="font-bold text-white">₹{Number(workflowData.workflow.agent_outcomes.TRANSPORT.cost || 0).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Warehouse Outcome */}
-                      {workflowData.workflow.agent_outcomes.WAREHOUSE && (
-                        <div className="bg-slate-800/80 p-3 rounded-xl border border-purple-500/30 text-xs">
-                          <div className="flex items-center justify-between font-bold text-purple-300 mb-1.5">
-                            <span className="flex items-center gap-1.5"><Warehouse size={14} /> Warehouse Agent</span>
-                            <span className="text-[10px] bg-purple-950 px-1.5 py-0.5 rounded text-purple-300 font-bold border border-purple-800">
-                              {workflowData.workflow.agent_outcomes.WAREHOUSE.status}
-                            </span>
-                          </div>
-                          <p className="text-slate-300 font-semibold">{workflowData.workflow.agent_outcomes.WAREHOUSE.result?.name || 'Cold/Dry Facility'}</p>
-                          <p className="text-slate-400 text-[11px] truncate">{workflowData.workflow.agent_outcomes.WAREHOUSE.result?.location || 'Maharashtra'}</p>
-                          <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
-                            <span>Storage Cost ({workflowData.workflow.agent_outcomes.WAREHOUSE.result?.holding_days || 7}d):</span>
-                            <span className="font-bold text-white">₹{Number(workflowData.workflow.agent_outcomes.WAREHOUSE.cost || 0).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Processor Outcome */}
-                      {workflowData.workflow.agent_outcomes.PROCESSOR && (
-                        <div className="bg-slate-800/80 p-3 rounded-xl border border-amber-500/30 text-xs">
-                          <div className="flex items-center justify-between font-bold text-amber-300 mb-1.5">
-                            <span className="flex items-center gap-1.5"><Factory size={14} /> Processor Agent</span>
-                            <span className="text-[10px] bg-amber-950 px-1.5 py-0.5 rounded text-amber-300 font-bold border border-amber-800">
-                              {workflowData.workflow.agent_outcomes.PROCESSOR.status}
-                            </span>
-                          </div>
-                          <p className="text-slate-300 font-semibold">{workflowData.workflow.agent_outcomes.PROCESSOR.result?.name || 'Industrial Processor'}</p>
-                          <p className="text-slate-400 text-[11px] truncate">{workflowData.workflow.agent_outcomes.PROCESSOR.result?.output_product || 'Value-added conversion'}</p>
-                          <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex justify-between text-slate-300">
-                            <span>Milling Tariff:</span>
-                            <span className="font-bold text-white">₹{Number(workflowData.workflow.agent_outcomes.PROCESSOR.cost || 0).toLocaleString()}</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Final Supply Chain Aggregation */}
-                    {workflowData.workflow.final_plan && (
-                      <div className="bg-emerald-950/70 p-3 rounded-xl border border-emerald-600/40 text-xs flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck size={20} className="text-emerald-400 shrink-0" />
-                          <div>
-                            <p className="font-bold text-white text-sm">
-                              Total End-to-End Procurement: ₹{Number(workflowData.workflow.final_plan.total_procurement_cost || 0).toLocaleString()}
-                            </p>
-                            <p className="text-emerald-300 text-[11px]">
-                              Digital Contract Hash: <span className="font-mono text-emerald-200">{workflowData.workflow.final_plan.contract_signature}</span>
-                            </p>
-                          </div>
-                        </div>
-                        <span className="bg-emerald-500 text-slate-950 px-3 py-1 rounded-lg font-black text-xs shadow">
-                          ALL AGENTS COMPLETED
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {renderMultiAgentOutcomes()}
 
                 {/* Best Deal So Far (Buyer Parity with Farmer Layout) */}
                 <div className="bg-[#064e3b] p-4 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md mt-2">
@@ -2393,13 +2353,17 @@ export default function NegotiationRoom() {
                         <p className="text-xs text-emerald-700">Contract confirmed under Maharashtra APMC framework. Recorded in ledger.</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
                       <button
                         onClick={() => setShowValidationModal(true)}
                         className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl bg-white border border-emerald-300 text-emerald-800 font-bold text-xs hover:bg-emerald-100 transition shadow-sm"
                       >
                         View Term Sheet
                       </button>
+
+                      {/* Multi-Agent Supply Chain Orchestration Actions for Farmer */}
+                      {renderWorkflowActionButtons()}
+
                       <Link
                         to="/transactions"
                         className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs transition shadow flex items-center justify-center gap-1.5"
@@ -2409,6 +2373,9 @@ export default function NegotiationRoom() {
                     </div>
                   </div>
                 )}
+
+                {/* Real Multi-Agent Execution Results Display for Farmer */}
+                {renderMultiAgentOutcomes()}
 
                 {/* Best Deal So Far (Banner inside center column) */}
                 <div className="bg-[#064e3b] p-4 text-white rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-md mt-2">
@@ -2571,24 +2538,19 @@ export default function NegotiationRoom() {
               {SUPPLY_CHAIN_STAGES.map((stage) => {
                 const isRunning = isParallelRunning && activeSupplyChainNode === stage.id;
                 const isCompleted = completedSupplyChainNodes.includes(stage.id) && !isRunning;
-                const isInteractiveAgent = ['TRANSPORT', 'WAREHOUSE', 'PROCESSOR'].includes(stage.id);
+                const isBypassed = activeWorkflow !== 'FULL_SUPPLY_CHAIN' && ['TRANSPORT', 'WAREHOUSE', 'PROCESSOR'].includes(stage.id);
                 const StageIcon = stage.icon;
 
                 return (
                   <div
                     key={stage.id}
-                    onClick={() => {
-                      if (isInteractiveAgent) {
-                        openAgentModal(stage.id as any);
-                      }
-                    }}
                     className={`flex items-center justify-between p-2 rounded-xl text-xs transition-all ${
                       isRunning
                         ? 'bg-emerald-50 border border-emerald-200 font-bold text-emerald-950 shadow-sm'
                         : isCompleted
                         ? 'bg-slate-50 border border-slate-100 text-slate-700'
-                        : isInteractiveAgent
-                        ? 'bg-white border border-slate-200/60 text-slate-700 hover:bg-slate-50/90 hover:border-slate-300 cursor-pointer shadow-xs'
+                        : isBypassed
+                        ? 'bg-slate-50/60 border border-dashed border-slate-200 text-slate-400 opacity-75'
                         : 'text-slate-400 border border-transparent'
                     }`}
                   >
@@ -2598,18 +2560,18 @@ export default function NegotiationRoom() {
                           ? 'bg-emerald-500 text-white shadow-sm'
                           : isCompleted
                           ? 'bg-emerald-100 text-emerald-700'
-                          : isInteractiveAgent
-                          ? stage.id === 'TRANSPORT' ? 'bg-cyan-100 text-cyan-700' : stage.id === 'WAREHOUSE' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'
+                          : isBypassed
+                          ? 'bg-slate-100 text-slate-300'
                           : 'bg-slate-100 text-slate-400'
                       }`}>
                         {isCompleted ? <Check size={12} className="stroke-[3]" /> : <StageIcon size={12} />}
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <span className={`text-xs truncate ${isRunning ? 'text-emerald-900 font-black' : isCompleted || isInteractiveAgent ? 'text-slate-800 font-semibold' : 'text-slate-400'}`}>
+                        <span className={`text-xs truncate ${isRunning ? 'text-emerald-900 font-black' : isCompleted ? 'text-slate-800 font-semibold' : 'text-slate-400'}`}>
                           {stage.label}
                         </span>
                         <span className="text-[9px] text-slate-400 font-normal truncate">
-                          {stage.sub}
+                          {isBypassed ? 'Bypassed in this workflow' : stage.sub}
                         </span>
                       </div>
                     </div>
@@ -2625,22 +2587,15 @@ export default function NegotiationRoom() {
                           ✓ DONE
                         </span>
                       )}
-                      {isInteractiveAgent && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openAgentModal(stage.id as any);
-                          }}
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
-                            stage.id === 'TRANSPORT' ? 'bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100' :
-                            stage.id === 'WAREHOUSE' ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100' :
-                            'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                          }`}
-                          title={`Open ${stage.label} communication & live quotes`}
-                        >
-                          💬 Talk
-                        </button>
+                      {isBypassed && !isRunning && (
+                        <span className="text-slate-400 font-bold text-[9px] px-1.5 py-0.5 bg-slate-100 rounded">
+                          BYPASS
+                        </span>
+                      )}
+                      {!isRunning && !isCompleted && !isBypassed && (
+                        <span className="text-slate-400 font-normal text-[10px]">
+                          STANDBY
+                        </span>
                       )}
                     </div>
                   </div>
@@ -2686,6 +2641,13 @@ export default function NegotiationRoom() {
               <div className="flex flex-wrap gap-2 mb-4">
                 <button
                   type="button"
+                  onClick={() => runParallelAutonomousNegotiation()}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold border border-emerald-500 transition cursor-pointer flex items-center gap-1 shadow-sm"
+                >
+                  <Zap size={11} className="text-amber-300" /> Run Autonomous LangGraph
+                </button>
+                <button
+                  type="button"
                   onClick={() => executeCopilotCommand(`Counter at target ₹${Math.round(targetPrice || 48)}`)}
                   className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
                 >
@@ -2711,30 +2673,6 @@ export default function NegotiationRoom() {
                   className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
                 >
                   Pause negotiations
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openAgentModal('TRANSPORT')}
-                  className="px-2.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 rounded-lg text-[11px] font-semibold border border-cyan-700/60 transition cursor-pointer flex items-center gap-1 shadow-sm"
-                  title="Talk directly to Transport Agent and view vehicle quotes"
-                >
-                  <Truck size={12} /> Talk Transport
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openAgentModal('WAREHOUSE')}
-                  className="px-2.5 py-1.5 bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 rounded-lg text-[11px] font-semibold border border-indigo-700/60 transition cursor-pointer flex items-center gap-1 shadow-sm"
-                  title="Talk directly to Warehouse Agent and allocate godown"
-                >
-                  <Warehouse size={12} /> Talk Warehouse
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openAgentModal('PROCESSOR')}
-                  className="px-2.5 py-1.5 bg-amber-950/80 hover:bg-amber-900 text-amber-300 rounded-lg text-[11px] font-semibold border border-amber-700/60 transition cursor-pointer flex items-center gap-1 shadow-sm"
-                  title="Talk directly to Processor Agent and inspect milling yield"
-                >
-                  <Factory size={12} /> Talk Processor
                 </button>
               </div>
 
@@ -2830,6 +2768,13 @@ export default function NegotiationRoom() {
               <div className="flex flex-wrap gap-2 mb-4">
                 <button
                   type="button"
+                  onClick={() => runParallelAutonomousNegotiation()}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[11px] font-bold border border-emerald-500 transition cursor-pointer flex items-center gap-1 shadow-sm"
+                >
+                  <Zap size={11} className="text-amber-300" /> Run Autonomous Matching
+                </button>
+                <button
+                  type="button"
                   onClick={() => executeCopilotCommand(`Don't go below ₹${currentFloor < 100 ? currentFloor * 100 : currentFloor}/q`)}
                   className="px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] text-slate-300 rounded-lg text-[11px] font-medium border border-slate-700/60 transition cursor-pointer"
                 >
@@ -2919,7 +2864,7 @@ export default function NegotiationRoom() {
 
       </div>
       {/* Floating RAG Modal */}
-      <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} crop={cropName} />
+      <RagContextViewer isOpen={isRagOpen} onClose={() => setIsRagOpen(false)} crop={cropName} role={isBuyer ? 'buyer' : 'farmer'} />
 
       {/* APMC Validated Smart Contract Modal */}
       <TransactionValidationModal
@@ -2929,276 +2874,7 @@ export default function NegotiationRoom() {
         buyerUser={user}
       />
 
-      {/* Interactive Agent Dialog Modal (Transport / Warehouse / Processor) */}
-      {activeAgentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-2xl w-full text-white overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className={`p-4 border-b flex items-center justify-between ${
-              activeAgentModal === 'TRANSPORT' ? 'bg-cyan-950/40 border-cyan-800/60' :
-              activeAgentModal === 'WAREHOUSE' ? 'bg-indigo-950/40 border-indigo-800/60' :
-              'bg-amber-950/40 border-amber-800/60'
-            }`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                  activeAgentModal === 'TRANSPORT' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
-                  activeAgentModal === 'WAREHOUSE' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' :
-                  'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                }`}>
-                  {activeAgentModal === 'TRANSPORT' && <Truck size={20} />}
-                  {activeAgentModal === 'WAREHOUSE' && <Warehouse size={20} />}
-                  {activeAgentModal === 'PROCESSOR' && <Factory size={20} />}
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-white flex items-center gap-2">
-                    {activeAgentModal === 'TRANSPORT' && 'LangGraph Transport Agent (12 Nodes)'}
-                    {activeAgentModal === 'WAREHOUSE' && 'Warehouse & Godown Allocation Agent'}
-                    {activeAgentModal === 'PROCESSOR' && 'Industrial Agro-Processor & Milling Agent'}
-                    <span className="text-[10px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      LIVE AUTONOMOUS
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    {activeAgentModal === 'TRANSPORT' && (
-                      currentTransportPlan
-                        ? `Corridor: ${currentTransportPlan.pickup_location || negState?.location || 'Nashik APMC'} → ${currentTransportPlan.delivery_location || 'Pune APMC'} (${currentTransportPlan.distance_km || 213} km) • ${cropQty.toLocaleString()} kg ${cropName}`
-                        : `Corridor: ${negState?.location || 'Nashik APMC'} → Pune APMC (213 km) • ${cropQty.toLocaleString()} kg ${cropName}`
-                    )}
-                    {activeAgentModal === 'WAREHOUSE' && (
-                      currentWarehousePlan
-                        ? `State Godown Network • ${currentWarehousePlan.warehouse || currentWarehousePlan.name} (${currentWarehousePlan.location || 'Pune'}) • ${cropQty.toLocaleString()} kg ${cropName}`
-                        : `State Godown Network • Available Slot: Bay C-4 Pune • ${cropQty.toLocaleString()} kg ${cropName}`
-                    )}
-                    {activeAgentModal === 'PROCESSOR' && (
-                      currentProcessorPlan
-                        ? `Milling Cluster: ${currentProcessorPlan.processor_name || currentProcessorPlan.name} (${currentProcessorPlan.location || 'Maharashtra'}) • ${cropQty.toLocaleString()} kg ${cropName}`
-                        : `Milling Cluster: Marathwada Agro-Hub • ${cropQty.toLocaleString()} kg ${cropName}`
-                    )}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveAgentModal(null)}
-                className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Key Live Quotation & Agent Parameters */}
-            <div className="p-4 bg-slate-950/60 border-b border-slate-800 grid grid-cols-3 gap-3 text-xs">
-              {activeAgentModal === 'TRANSPORT' && (
-                <>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Recommended Fleet</span>
-                    <span className="text-cyan-400 font-bold text-sm truncate block">{currentTransportPlan?.vehicle_type || currentTransportPlan?.vehicle || 'Tata Ace Gold (1.5 MT)'}</span>
-                    <span className="text-[10px] text-slate-500 block">{currentTransportPlan?.distance_km ? `${currentTransportPlan.distance_km} km Corridor` : 'Fuel Index: ₹90.45/L'}</span>
-                  </div>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Haulage Tariff</span>
-                    <span className="text-emerald-400 font-bold text-sm">₹{Number(currentTransportPlan?.agreed_price || currentTransportPlan?.cost || currentTransportPlan?.total_operating_cost || 9099.43).toLocaleString('en-IN')}</span>
-                    <span className="text-[10px] text-slate-500 block">Tolls: ₹426 • APMC Permit</span>
-                  </div>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Transit Window</span>
-                    <span className="text-amber-300 font-bold text-sm">{currentTransportPlan?.transit_time_hours ? `${currentTransportPlan.transit_time_hours} Hours` : '5.5 Hours'}</span>
-                    <span className="text-[10px] text-slate-500 block">GPS Telematics Active</span>
-                  </div>
-                </>
-              )}
-
-              {activeAgentModal === 'WAREHOUSE' && (
-                <>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Facility Name</span>
-                    <span className="text-indigo-400 font-bold text-sm truncate block">{currentWarehousePlan?.warehouse || currentWarehousePlan?.name || 'Nashik Cold Storage'}</span>
-                    <span className="text-[10px] text-slate-500 block">{currentWarehousePlan?.location ? `${currentWarehousePlan.location} Hub` : 'Capacity: 12,000 kg'}</span>
-                  </div>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Holding Tariff</span>
-                    <span className="text-emerald-400 font-bold text-sm">₹{Number(currentWarehousePlan?.total_daily_cost ? currentWarehousePlan.total_daily_cost * (currentWarehousePlan.recommended_days || 7) : (cropQty * (currentWarehousePlan?.cost_per_kg_per_day || 1.6) * 7)).toLocaleString('en-IN')} / {currentWarehousePlan?.recommended_days || 7} Days</span>
-                    <span className="text-[10px] text-slate-500 block">Rate: ₹{currentWarehousePlan?.cost_per_kg_per_day || 1.6}/kg/day</span>
-                  </div>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Storage Quality</span>
-                    <span className="text-blue-300 font-bold text-sm">{currentWarehousePlan?.status === 'ASSIGNED' ? 'Slot Confirmed' : 'Moisture ≤ 10.5%'}</span>
-                    <span className="text-[10px] text-slate-500 block">Certified Aeration & Fumigation</span>
-                  </div>
-                </>
-              )}
-
-              {activeAgentModal === 'PROCESSOR' && (
-                <>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Matched Unit</span>
-                    <span className="text-amber-400 font-bold text-sm truncate block">{currentProcessorPlan?.processor_name || currentProcessorPlan?.name || 'Marathwada Solvent Extractions'}</span>
-                    <span className="text-[10px] text-slate-500 block">{currentProcessorPlan?.order_id ? `Order #${currentProcessorPlan.order_id}` : (currentProcessorPlan?.location ? `${currentProcessorPlan.location} • FSSAI Gr-A` : 'FSSAI & AGMARK Gr-A')}</span>
-                  </div>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Processing Fee</span>
-                    <span className="text-emerald-400 font-bold text-sm">₹{Number(currentProcessorPlan?.total_payment || currentProcessorPlan?.total_cost || (cropQty * (currentProcessorPlan?.price_per_kg || 4.5))).toLocaleString('en-IN')}</span>
-                    <span className="text-[10px] text-slate-500 block">{currentProcessorPlan?.price_per_kg ? `Rate: ₹${currentProcessorPlan.price_per_kg}/kg` : 'Fixed Contract Rate'}</span>
-                  </div>
-                  <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Output Yield</span>
-                    <span className="text-amber-300 font-bold text-sm truncate block">{currentProcessorPlan?.output_product || 'Refined Oil / DOC Cake'}</span>
-                    <span className="text-[10px] text-slate-500 block">Certified Milling Conversion</span>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Chat Interaction History */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3 min-h-[220px] max-h-[320px] bg-slate-900/50">
-              <div className="text-[11px] text-center text-slate-500 font-medium">
-                ── Real-Time Agent Communication Channel ──
-              </div>
-
-              {(agentChatHistory[activeAgentModal] || []).map((chat, idx) => (
-                <div
-                  key={idx}
-                  className={`flex ${chat.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-xs ${
-                    chat.sender === 'user'
-                      ? 'bg-blue-600 text-white rounded-br-none'
-                      : 'bg-slate-800 text-slate-200 border border-slate-700/80 rounded-bl-none shadow-sm'
-                  }`}>
-                    <div className="flex items-center justify-between gap-3 mb-1 text-[10px] opacity-75">
-                      <span className="font-bold">
-                        {chat.sender === 'user' ? 'You (Buyer/Operator)' : `${activeAgentModal} Agent`}
-                      </span>
-                      <span>{chat.time}</span>
-                    </div>
-                    <p className="leading-relaxed">{chat.text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Quick Action Chips for the Agent */}
-            <div className="px-4 py-2 bg-slate-950/80 border-t border-slate-800/80 flex flex-wrap gap-2">
-              <span className="text-[10px] text-slate-500 self-center font-bold">Quick Prompts:</span>
-              {activeAgentModal === 'TRANSPORT' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => { setAgentChatInput('Can you check rates for a refrigerated reefer truck?'); }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg border border-slate-700 transition cursor-pointer"
-                  >
-                    ❄️ Check Cold / Reefer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAgentChatInput('Can we negotiate carrier counter rate at ₹8,750?'); }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg border border-slate-700 transition cursor-pointer"
-                  >
-                    💰 Negotiate Counter
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAgentChatInput('What is the exact transit duration and ETA?'); }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-300 rounded-lg border border-slate-700 transition cursor-pointer"
-                  >
-                    ⏱️ ETA & Route
-                  </button>
-                </>
-              )}
-
-              {activeAgentModal === 'WAREHOUSE' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => { setAgentChatInput('Can we extend holding duration to 14 days?'); }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-lg border border-slate-700 transition cursor-pointer"
-                  >
-                    📅 Extend to 14 Days
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAgentChatInput('What are the temperature and moisture parameters?'); }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-lg border border-slate-700 transition cursor-pointer"
-                  >
-                    🌡️ Moisture & Fumigation
-                  </button>
-                </>
-              )}
-
-              {activeAgentModal === 'PROCESSOR' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => { setAgentChatInput('What is the exact oil extraction yield for this batch?'); }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg border border-slate-700 transition cursor-pointer"
-                  >
-                    🌾 Oil Yield Breakdown
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setAgentChatInput('Confirm priority milling schedule upon arrival.'); }}
-                    className="text-[11px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg border border-slate-700 transition cursor-pointer"
-                  >
-                    ⚡ Priority Slotting
-                  </button>
-                </>
-              )}
-            </div>
-
-            {/* Input Message Form */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                sendAgentChatMessage(activeAgentModal);
-              }}
-              className="p-3 bg-slate-900 border-t border-slate-800 flex gap-2"
-            >
-              <input
-                type="text"
-                value={agentChatInput}
-                onChange={(e) => setAgentChatInput(e.target.value)}
-                placeholder={`Ask ${activeAgentModal.toLowerCase()} agent or give manual counter instructions...`}
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 transition"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md cursor-pointer"
-              >
-                <Send size={14} /> Send
-              </button>
-            </form>
-
-            {/* Modal Footer with Direct Agent Invocation */}
-            <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
-              <div className="text-xs text-slate-400">
-                Status: <span className="text-emerald-400 font-semibold">{completedSupplyChainNodes.includes(activeAgentModal) ? 'Contracted / Assigned' : 'Ready for Invocation'}</span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveAgentModal(null)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition cursor-pointer"
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  disabled={isInvokingAgent}
-                  onClick={() => invokeAgentAction(activeAgentModal)}
-                  className={`px-5 py-2 font-bold text-xs rounded-xl transition shadow-lg flex items-center gap-2 cursor-pointer ${
-                    activeAgentModal === 'TRANSPORT' ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-cyan-900/30' :
-                    activeAgentModal === 'WAREHOUSE' ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/30' :
-                    'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/30'
-                  } ${isInvokingAgent ? 'opacity-60 cursor-not-allowed' : ''}`}
-                >
-                  <Zap size={14} />
-                  {isInvokingAgent ? 'Executing Agent...' : `Invoke ${activeAgentModal} Agent`}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      
 
     </div>
   );

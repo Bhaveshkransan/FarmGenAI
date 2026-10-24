@@ -114,7 +114,9 @@ const AutoNegotiationTracker: React.FC<AutoNegotiationTrackerProps> = ({
     }, 800);
 
     // Progression of Negotiation rounds
-    const maxRounds = Math.max(...negotiations.map(n => n.transcript.length));
+    const maxRounds = negotiations.length > 0
+      ? Math.max(0, ...negotiations.map(n => (n?.transcript ? n.transcript.length : 0)))
+      : 0;
     let currentStep = 0;
     
     const roundInterval = setInterval(() => {
@@ -305,7 +307,7 @@ const AutoNegotiationTracker: React.FC<AutoNegotiationTrackerProps> = ({
 
                     {/* Chat Interface */}
                     <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar min-h-[300px]">
-                      {neg.transcript.slice(0, activeStep + 1).map((round, rIdx) => (
+                      {(neg.transcript || []).slice(0, activeStep + 1).map((round, rIdx) => (
                         <div key={rIdx} className="space-y-4 animate-in slide-in-from-bottom-4 fade-in duration-500">
                           
                           {/* Stakeholder Offer (Right Side) */}

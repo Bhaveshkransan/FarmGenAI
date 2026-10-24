@@ -269,7 +269,12 @@ async def match_requirement_to_listings(requirement: Dict) -> List[Dict]:
     """
     from backend.routes.crop_listing_routes import router as _  # ensure module loaded
     listings = await Database.list_produce_async()
-    active = [l for l in listings if l.get("status") in ("LISTED", "ACTIVE", None, "")]
+    active = [
+        l for l in listings
+        if l.get("status") in ("LISTED", "ACTIVE", "NEGOTIATING", None, "")
+        and l.get("status") not in ("SOLD", "EXPIRED", "WITHDRAWN", "CANCELLED")
+        and float(l.get("quantity") or 0) > 0
+    ]
 
     results = []
     for listing in active:
