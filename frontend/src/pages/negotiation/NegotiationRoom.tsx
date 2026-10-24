@@ -503,8 +503,9 @@ export default function NegotiationRoom() {
       ? parallelBranchesData
       : (negState?.parallel_branches || []);
 
+    let initialList: any[] = [];
     if (rawBranches.length > 0) {
-      return rawBranches.map((b: any, idx: number) => ({
+      initialList = rawBranches.map((b: any, idx: number) => ({
         index: idx,
         id: b.seller_id || `cand_${idx}`,
         name: b.name || b.seller_name || `Candidate Farmer ${idx + 1}`,
@@ -552,6 +553,10 @@ export default function NegotiationRoom() {
         rounds_count: b.rounds_count || (b.rounds ? b.rounds.length : 1),
         chat_messages: b.chat_messages || []
       }));
+
+      if (initialList.length >= 5) {
+        return initialList.slice(0, 5);
+      }
     }
 
     // 2. From real matched listings
@@ -578,7 +583,7 @@ export default function NegotiationRoom() {
       }));
     }
 
-    // 3. Fallback APMC candidates
+    // 3. Fallback APMC candidates & padding up to exactly 5 candidates
     const districts = [
       { name: "Vasantrao Meshram (Dhule APMC)", loc: "Dhule APMC, Maharashtra", dist: 142, match: 96, price: 49.5 },
       { name: "Nitin Patil (Jalgaon APMC)", loc: "Jalgaon APMC, Maharashtra", dist: 185, match: 92, price: 51.0 },
@@ -587,26 +592,33 @@ export default function NegotiationRoom() {
       { name: "Balasaheb Shinde (Amravati APMC)", loc: "Amravati APMC, Maharashtra", dist: 310, match: 83, price: 54.0 }
     ];
 
-    return districts.map((d, idx) => ({
-      index: idx,
-      id: `cand_synth_${idx}`,
-      name: d.name,
-      role: "Farmer / Producer",
-      location: d.loc,
-      distance_km: d.dist,
-      match: d.match,
-      offer: d.price,
-      initial_ask: Math.round(d.price * 1.06 * 10) / 10,
-      freight_per_kg: Math.round(d.dist * 0.018 * 10) / 10,
-      apmc_cess_per_kg: 0.52,
-      landed_cost_per_kg: Math.round((d.price + d.dist * 0.018 + 0.52) * 10) / 10,
-      total_landed_cost: Math.round((d.price + d.dist * 0.018 + 0.52) * cropQty),
-      status: idx === 0 ? "Deal Confirmed" : "Countered",
-      is_best: idx === 0,
-      disqualification_reason: idx >= 3 ? "Price exceeds buyer target reservation" : null,
-      rounds_count: 2,
-      chat_messages: []
-    }));
+    const result = [...initialList];
+    for (let i = 0; i < districts.length && result.length < 5; i++) {
+      const d = districts[i];
+      const idx = result.length;
+      result.push({
+        index: idx,
+        id: `cand_synth_${idx}`,
+        name: d.name,
+        role: "Farmer / Producer",
+        location: d.loc,
+        distance_km: d.dist,
+        match: d.match,
+        offer: d.price,
+        initial_ask: Math.round(d.price * 1.06 * 10) / 10,
+        freight_per_kg: Math.round(d.dist * 0.018 * 10) / 10,
+        apmc_cess_per_kg: 0.52,
+        landed_cost_per_kg: Math.round((d.price + d.dist * 0.018 + 0.52) * 10) / 10,
+        total_landed_cost: Math.round((d.price + d.dist * 0.018 + 0.52) * cropQty),
+        status: idx === 0 ? "Deal Confirmed" : "Countered",
+        is_best: idx === 0,
+        disqualification_reason: idx >= 3 ? "Price exceeds buyer target reservation" : null,
+        rounds_count: 2,
+        chat_messages: []
+      });
+    }
+
+    return result;
   }, [parallelBranchesData, negState, matchedListings, bestOfferPrice, cropQty]);
 
   const activeCandidate = topFiveCandidates[selectedCandidateIndex] || topFiveCandidates[0];
