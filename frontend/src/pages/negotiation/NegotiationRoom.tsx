@@ -386,12 +386,12 @@ export default function NegotiationRoom() {
       dependencyReason?: string;
     }> = [];
 
-    // 1. Farmer Phase (if produce is requested)
+    // 1. Farmer / Buyer Phase (if produce is requested)
     if (requestedServices.hasFarmer) {
       phases.push({
         id: 'FARMER',
-        label: 'Farmer Producer',
-        sublabel: `${cropName} Supply`,
+        label: isBuyer ? 'Farmer Producer' : 'Institutional Buyer',
+        sublabel: isBuyer ? `${cropName} Supply` : `${cropName} Demand`,
         isImplemented: true,
         dependencyMet: true
       });
@@ -2035,8 +2035,8 @@ export default function NegotiationRoom() {
               {requestedServices.isTransportOnly 
                 ? 'Dynamic Routing: Transport-Only procurement workflow selected by buyer' 
                 : completedPhases['FARMER']?.status === 'DEAL'
-                  ? `Dynamic Routing: Farmer agreement locked pick-up at ${completedPhases['FARMER']?.location || 'APMC Mandi'} -> Freight scheduled`
-                  : 'Dynamic Routing: Evaluating produce availability prior to freight routing'}
+                  ? `Dynamic Routing: ${isBuyer ? 'Farmer agreement locked' : 'Buyer procurement bid accepted'} pick-up at ${completedPhases['FARMER']?.location || 'APMC Mandi'} -> Freight scheduled`
+                  : `Dynamic Routing: ${isBuyer ? 'Evaluating produce availability prior to freight routing' : 'Evaluating institutional buyer bids prior to freight routing'}`}
             </span>
             {isViewingReadOnly && (
               <button
@@ -2104,11 +2104,15 @@ export default function NegotiationRoom() {
                   Phase 1 Finished
                 </span>
                 <span className="text-xs font-black text-slate-800">
-                  Farmer Produce Agreement Finalized!
+                  {isBuyer ? 'Farmer Produce Agreement Finalized!' : 'Institutional Buyer Agreement Finalized!'}
                 </span>
               </div>
               <p className="text-xs text-slate-600 mt-0.5">
-                Procured <strong>{cropQty.toLocaleString()} kg</strong> of <strong>{cropName}</strong> at <strong className="text-emerald-700">Rs.{completedPhases['FARMER'].agreedPrice}/kg</strong> from <strong>{completedPhases['FARMER'].counterParty}</strong> ({completedPhases['FARMER'].location}).
+                {isBuyer ? (
+                  <>Procured <strong>{cropQty.toLocaleString()} kg</strong> of <strong>{cropName}</strong> at <strong className="text-emerald-700">Rs.{completedPhases['FARMER'].agreedPrice}/kg</strong> from <strong>{completedPhases['FARMER'].counterParty}</strong> ({completedPhases['FARMER'].location}).</>
+                ) : (
+                  <>Sold <strong>{cropQty.toLocaleString()} kg</strong> of <strong>{cropName}</strong> at <strong className="text-emerald-700">Rs.{completedPhases['FARMER'].agreedPrice}/kg</strong> to <strong>{completedPhases['FARMER'].counterParty}</strong> ({completedPhases['FARMER'].location}).</>
+                )}
               </p>
             </div>
           </div>
@@ -2570,10 +2574,10 @@ export default function NegotiationRoom() {
               {/* Action when farmer candidates are unavailable or user bypasses produce */}
               <div className="pt-2 border-t border-slate-100">
                 <button
-                  onClick={() => handleBypassFarmer('Bypassed farmer produce for logistics evaluation')}
+                  onClick={() => handleBypassFarmer(isBuyer ? 'Bypassed farmer produce for logistics evaluation' : 'Bypassed direct sale to warehouse storage')}
                   className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
-                  Bypass Produce & Evaluate Transport
+                  {isBuyer ? 'Bypass Produce & Evaluate Transport' : 'Bypass Direct Sale & Route to Storage'}
                 </button>
               </div>
             </div>
@@ -2701,7 +2705,7 @@ export default function NegotiationRoom() {
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">1</div>
                       <div>
-                        <p className="font-bold text-slate-800">Crop Produce (Farmer Producer)</p>
+                        <p className="font-bold text-slate-800">{isBuyer ? "Crop Produce (Farmer Producer)" : "Buyer Procurement (Institutional Demand)"}</p>
                         <p className="text-[11px] text-slate-500">
                           {isProduceAgreed ? (
                             `${farmerRecord?.counterParty || farmerName} • ${cropQty.toLocaleString()} kg @ Rs.${agreedProducePrice}/kg (${farmerRecord?.location || farmerLocation})`
@@ -3405,7 +3409,7 @@ export default function NegotiationRoom() {
                 <DollarSign size={16} className="text-emerald-600" /> Active Price Difference
               </h4>
               <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full">
-                {viewingPhase} Phase
+                {viewingPhase === 'FARMER' ? (isBuyer ? 'FARMER' : 'BUYER') : viewingPhase} Phase
               </span>
             </div>
 
@@ -3450,17 +3454,21 @@ export default function NegotiationRoom() {
                 </div>
               </div>
             ) : (
-              /* Farmer Produce Delta */
+              /* Farmer / Buyer Produce Delta */
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl text-xs">
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Farmer Ask</span>
+                    <span className="text-slate-500 block text-[11px]">
+                      {isBuyer ? 'Farmer Ask' : 'Buyer Bid'}
+                    </span>
                     <span className="font-black text-slate-900 text-base font-mono">
                       Rs.{activeCandidate?.offer || bestOfferPrice}/kg
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Buyer Target</span>
+                    <span className="text-slate-500 block text-[11px]">
+                      {isBuyer ? 'Buyer Target' : 'Farmer Floor'}
+                    </span>
                     <span className="font-black text-emerald-700 text-base font-mono">
                       Rs.{targetPrice}/kg
                     </span>
@@ -3468,11 +3476,31 @@ export default function NegotiationRoom() {
                 </div>
 
                 <div className="flex items-center justify-between text-xs px-1">
-                  <span className="text-slate-500">Price Difference:</span>
+                  <span className="text-slate-500">
+                    {isBuyer ? 'Price Difference:' : 'Bid vs Floor Delta:'}
+                  </span>
                   {(() => {
-                    const ask = activeCandidate?.offer || bestOfferPrice;
-                    const diff = ask - targetPrice;
-                    const pct = targetPrice > 0 ? Math.round((diff / targetPrice) * 100) : 0;
+                    const candidatePrice = activeCandidate?.offer || bestOfferPrice;
+                    if (!isBuyer) {
+                      // For farmer: buyer offer >= targetPrice is favorable profit above floor
+                      const diff = candidatePrice - targetPrice;
+                      const pct = targetPrice > 0 ? Math.round((Math.abs(diff) / targetPrice) * 100) : 0;
+                      if (diff >= 0) {
+                        return (
+                          <span className="font-bold text-emerald-700 font-mono">
+                            +Rs.{diff.toFixed(1)}/kg (+{pct}% above floor)
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="font-bold text-rose-700 font-mono">
+                          -Rs.{Math.abs(diff).toFixed(1)}/kg (-{pct}% below floor)
+                        </span>
+                      );
+                    }
+                    // For buyer: lower than targetPrice is favorable discount below target
+                    const diff = candidatePrice - targetPrice;
+                    const pct = targetPrice > 0 ? Math.round((Math.abs(diff) / targetPrice) * 100) : 0;
                     if (diff <= 0) {
                       return (
                         <span className="font-bold text-emerald-700 font-mono">
