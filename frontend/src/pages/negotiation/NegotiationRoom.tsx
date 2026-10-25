@@ -480,124 +480,39 @@ export default function NegotiationRoom() {
     }
   }, [completedPhases, requestedServices, activePhase]);
 
-  // Dynamic Candidate Sellers query from active PostgreSQL matching engine
+  // Dynamic Candidate Matching from active PostgreSQL matching engine
   const { data: matchedListings } = useQuery({
-    queryKey: ['live-matches', cropName, cropQty, targetPrice, farmerLocation],
+    queryKey: ['live-matches', cropName, cropQty, targetPrice, farmerLocation, isBuyer],
     queryFn: async () => {
       if (!cropName) return [];
       try {
-        const res = await api.post('/matching/requirement-to-listings', {
+        const endpoint = isBuyer ? '/matching/requirement-to-listings' : '/matching/listing-to-buyers';
+        const payload = isBuyer ? {
           crop: cropName,
           quantity: cropQty,
           target_price: targetPrice,
           max_price: maxAllowedCeiling,
           location: farmerLocation || 'Maharashtra'
-        });
+        } : {
+          crop: cropName,
+          quantity: cropQty,
+          min_price: targetPrice,
+          expected_price: targetPrice,
+          max_price: targetPrice,
+          location: farmerLocation || 'Maharashtra'
+        };
+        const res = await api.post(endpoint, payload);
         return res.data?.data || [];
       } catch (e) {
         return [];
       }
     },
-    enabled: Boolean(cropName) && requestedServices.hasFarmer,
+    enabled: Boolean(cropName) && (isBuyer ? requestedServices.hasFarmer : true),
     staleTime: 30000
   });
 
   // Intelligent Top-5 Multi-Candidate Discovery & Ranking
   const topFiveCandidates = useMemo(() => {
-    // 1. From real backend parallel branches
-    const rawBranches = (parallelBranchesData && parallelBranchesData.length > 0)
-      ? parallelBranchesData
-      : (negState?.parallel_branches || []);
-
-    let initialList: any[] = [];
-    if (rawBranches.length > 0) {
-      initialList = rawBranches.map((b: any, idx: number) => ({
-        index: idx,
-        id: b.seller_id || `cand_${idx}`,
-        name: b.name || b.seller_name || `Candidate Farmer ${idx + 1}`,
-        role: "Farmer / Producer",
-        location: b.location || "Maharashtra APMC",
-        distance_km: (() => {
-          const loc = (b.location || '').toLowerCase();
-          if (loc.includes('gondia')) return 865;
-          if (loc.includes('nagpur') || loc.includes('hingna')) return 715;
-          if (loc.includes('kolhapur') || loc.includes('hatkanangale')) return 245;
-          if (loc.includes('ratnagiri') || loc.includes('khed')) return 295;
-          if (loc.includes('jalgaon')) return 395;
-          if (loc.includes('amravati')) return 565;
-          if (loc.includes('latur')) return 335;
-          if (loc.includes('solapur')) return 252;
-          if (loc.includes('nashik')) return 210;
-          return b.distance_km && b.distance_km !== 250 ? b.distance_km : (160 + idx * 75);
-        })(),
-        match: Math.round(b.match_score || (96 - idx * 3)),
-        offer: Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2)),
-        initial_ask: Number(b.initial_ask || bestOfferPrice * 1.05),
-        freight_per_kg: (() => {
-          if (b.freight_per_kg) return Number(b.freight_per_kg);
-          const loc = (b.location || '').toLowerCase();
-          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
-          return Math.round((dist * 0.0075) * 100) / 100;
-        })(),
-        apmc_cess_per_kg: (() => {
-          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
-          return Math.round(off * 0.01 * 100) / 100;
-        })(),
-        landed_cost_per_kg: (() => {
-          if (b.landed_cost_per_kg) return Number(b.landed_cost_per_kg);
-          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
-          const loc = (b.location || '').toLowerCase();
-          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
-          const frt = Math.round((dist * 0.0075) * 100) / 100;
-          const cess = Math.round(off * 0.01 * 100) / 100;
-          return Math.round((off + frt + cess) * 100) / 100;
-        })(),
-        total_landed_cost: (() => {
-          if (b.total_landed_cost) return Number(b.total_landed_cost);
-          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
-          const loc = (b.location || '').toLowerCase();
-          const dist = loc.includes('gondia') ? 865 : loc.includes('nagpur') ? 715 : loc.includes('kolhapur') ? 245 : loc.includes('ratnagiri') ? 295 : 240;
-          const frt = Math.round((dist * 0.0075) * 100) / 100;
-          const cess = Math.round(off * 0.01 * 100) / 100;
-          return Math.round((off + frt + cess) * cropQty);
-        })(),
-        status: b.is_best ? "Deal Confirmed" : (b.is_disqualified ? "Exceeded Budget" : (b.status || "Negotiating")),
-        is_best: Boolean(b.is_best || idx === 0),
-        disqualification_reason: b.disqualification_reason || null,
-        rounds_count: b.rounds_count || (b.rounds ? b.rounds.length : 1),
-        chat_messages: b.chat_messages || []
-      }));
-
-      if (initialList.length >= 5) {
-        return initialList.slice(0, 5);
-      }
-    }
-
-    // 2. From real matched listings
-    if (matchedListings && matchedListings.length > 0) {
-      return matchedListings.slice(0, 5).map((m: any, idx: number) => ({
-        index: idx,
-        id: m.farmer_name || `cand_${idx}`,
-        name: m.farmer_name || `Farmer ${idx + 1}`,
-        role: "Farmer / Producer",
-        location: m.location || "Maharashtra APMC",
-        distance_km: Math.round(m.distance_km || (75 + idx * 40)),
-        match: Math.round(m.compatibility_score || (95 - idx * 3)),
-        offer: Number(m.min_price || bestOfferPrice),
-        initial_ask: Number(m.min_price ? m.min_price * 1.05 : bestOfferPrice * 1.06),
-        freight_per_kg: Math.round((75 + idx * 40) * 0.015 * 10) / 10,
-        apmc_cess_per_kg: 0.52,
-        landed_cost_per_kg: Number(m.min_price || bestOfferPrice) + 2.1,
-        total_landed_cost: (Number(m.min_price || bestOfferPrice) + 2.1) * cropQty,
-        status: idx === 0 ? "Deal Confirmed" : "Active",
-        is_best: idx === 0,
-        disqualification_reason: null,
-        rounds_count: 1,
-        chat_messages: []
-      }));
-    }
-
-    // 3. Fallback APMC candidates & padding up to exactly 5 candidates
     const buyerDistricts = [
       { name: "AgroCorp Procurement Director", loc: "Pune APMC Terminal, Maharashtra", dist: 120, match: 96, price: Math.round(bestOfferPrice * 1.05 * 10) / 10 },
       { name: "Sahyadri Agro Processing Ltd", loc: "Nashik Food Park, Maharashtra", dist: 168, match: 93, price: Math.round(bestOfferPrice * 1.02 * 10) / 10 },
@@ -616,10 +531,125 @@ export default function NegotiationRoom() {
 
     const fallbackList = isBuyer ? farmerDistricts : buyerDistricts;
 
+    // 1. From real backend parallel branches
+    const rawBranches = (parallelBranchesData && parallelBranchesData.length > 0)
+      ? parallelBranchesData
+      : (negState?.parallel_branches || []);
+
+    let initialList: any[] = [];
+    if (rawBranches.length > 0) {
+      initialList = rawBranches
+        .filter((b: any) => {
+          // If viewing as Farmer, reject branches that represent farmers / sellers
+          if (!isBuyer) {
+            const rawName = (b.name || b.seller_name || '').toLowerCase();
+            if (rawName === 'farmer' || rawName.includes('shinde') || rawName.includes('thorat') || rawName.includes('suryavanshi') || rawName.includes('meshram') || rawName.includes('dawkhar') || rawName.includes('pawar') || rawName.includes('patil')) {
+              // This is a supplier branch from buyer-engine, don't show to farmer as a buyer candidate!
+              return false;
+            }
+          }
+          return true;
+        })
+        .map((b: any, idx: number) => {
+          const candidateName = isBuyer 
+            ? (b.seller_name || b.name || `Candidate Farmer ${idx + 1}`)
+            : (b.buyer_name || b.buyer || b.name || buyerDistricts[idx % buyerDistricts.length].name);
+          const candidateRole = isBuyer ? "Farmer / Producer" : "Institutional Buyer";
+          const dist = (() => {
+            const loc = (b.location || '').toLowerCase();
+            if (loc.includes('gondia')) return 865;
+            if (loc.includes('nagpur') || loc.includes('hingna')) return 715;
+            if (loc.includes('kolhapur') || loc.includes('hatkanangale')) return 245;
+            if (loc.includes('ratnagiri') || loc.includes('khed')) return 295;
+            if (loc.includes('jalgaon')) return 395;
+            if (loc.includes('amravati')) return 565;
+            if (loc.includes('latur')) return 335;
+            if (loc.includes('solapur')) return 252;
+            if (loc.includes('nashik')) return 210;
+            return b.distance_km && b.distance_km !== 250 ? b.distance_km : (160 + idx * 75);
+          })();
+          const off = Number(b.negotiated_price || b.current_ask || b.initial_ask || (bestOfferPrice + (idx * 0.8) - 1.2));
+          const frt = b.freight_per_kg ? Number(b.freight_per_kg) : Math.round((dist * 0.0075) * 100) / 100;
+          const cess = Math.round(off * 0.01 * 100) / 100;
+          const landed = b.landed_cost_per_kg ? Number(Number(b.landed_cost_per_kg).toFixed(2)) : Math.round((off + frt + cess) * 100) / 100;
+
+          return {
+            index: idx,
+            id: b.seller_id || b.buyer_id || `cand_${idx}`,
+            name: candidateName,
+            role: candidateRole,
+            location: b.location || (isBuyer ? "Maharashtra APMC" : "Maharashtra Agro Hub"),
+            distance_km: dist,
+            match: Math.round(b.match_score || (96 - idx * 3)),
+            offer: off,
+            initial_ask: Number(b.initial_ask || bestOfferPrice * (isBuyer ? 1.05 : 0.95)),
+            freight_per_kg: frt,
+            apmc_cess_per_kg: cess,
+            landed_cost_per_kg: landed,
+            total_landed_cost: Math.round(landed * cropQty),
+            status: b.is_best ? "Deal Confirmed" : (b.is_disqualified ? "Exceeded Budget" : (b.status || "Negotiating")),
+            is_best: Boolean(b.is_best || idx === 0),
+            disqualification_reason: b.disqualification_reason || null,
+            rounds_count: b.rounds_count || (b.rounds ? b.rounds.length : 1),
+            chat_messages: b.chat_messages || []
+          };
+        });
+
+      if (initialList.length >= 5) {
+        return initialList.slice(0, 5);
+      }
+    }
+
+    // 2. From real matched listings / buyers from PostgreSQL
+    if (matchedListings && matchedListings.length > 0) {
+      const dbMatched = matchedListings.slice(0, 5).map((m: any, idx: number) => {
+        const candidateName = isBuyer 
+          ? (m.farmer_name || `Farmer ${idx + 1}`)
+          : (m.buyer_name || m.business_name || buyerDistricts[idx % buyerDistricts.length].name);
+        const candidateRole = isBuyer ? "Farmer / Producer" : "Institutional Buyer";
+        const dist = Math.round(m.distance_km || (75 + idx * 40));
+        const priceVal = Number((!isBuyer ? (m.max_price || m.target_price) : m.min_price) || bestOfferPrice);
+        const frt = Math.round(dist * 0.015 * 10) / 10;
+        const cess = Math.round(priceVal * 0.01 * 100) / 100;
+        const landed = Math.round((priceVal + frt + cess) * 100) / 100;
+
+        return {
+          index: idx,
+          id: candidateName || `cand_${idx}`,
+          name: candidateName,
+          role: candidateRole,
+          location: m.location || (isBuyer ? "Maharashtra APMC" : "Maharashtra Food Terminal"),
+          distance_km: dist,
+          match: Math.round(m.compatibility_score || (95 - idx * 3)),
+          offer: priceVal,
+          initial_ask: Number(m.min_price ? m.min_price * 1.05 : bestOfferPrice * 1.06),
+          freight_per_kg: frt,
+          apmc_cess_per_kg: cess,
+          landed_cost_per_kg: landed,
+          total_landed_cost: Math.round(landed * cropQty),
+          status: idx === 0 ? "Deal Confirmed" : "Active",
+          is_best: idx === 0,
+          disqualification_reason: null,
+          rounds_count: 1,
+          chat_messages: []
+        };
+      });
+
+      if (dbMatched.length >= 5) {
+        return dbMatched;
+      }
+      initialList = [...initialList, ...dbMatched];
+    }
+
+    // 3. Fallback APMC candidates & padding up to exactly 5 candidates
     const result = [...initialList];
     for (let i = 0; i < fallbackList.length && result.length < 5; i++) {
       const d = fallbackList[i];
       const idx = result.length;
+      const frt = Math.round(d.dist * 0.018 * 10) / 10;
+      const cess = Math.round(d.price * 0.01 * 100) / 100;
+      const landed = Math.round((d.price + frt + cess) * 100) / 100;
+
       result.push({
         index: idx,
         id: `cand_synth_${idx}`,
@@ -630,10 +660,10 @@ export default function NegotiationRoom() {
         match: d.match,
         offer: d.price,
         initial_ask: Math.round(d.price * (isBuyer ? 1.06 : 0.94) * 10) / 10,
-        freight_per_kg: Math.round(d.dist * 0.018 * 10) / 10,
-        apmc_cess_per_kg: 0.52,
-        landed_cost_per_kg: Math.round((d.price + d.dist * 0.018 + 0.52) * 10) / 10,
-        total_landed_cost: Math.round((d.price + d.dist * 0.018 + 0.52) * cropQty),
+        freight_per_kg: frt,
+        apmc_cess_per_kg: cess,
+        landed_cost_per_kg: landed,
+        total_landed_cost: Math.round(landed * cropQty),
         status: idx === 0 ? "Deal Confirmed" : "Countered",
         is_best: idx === 0,
         disqualification_reason: idx >= 3 ? (isBuyer ? "Price exceeds buyer target reservation" : "Bid below farmer floor reserve price") : null,
@@ -2295,7 +2325,7 @@ export default function NegotiationRoom() {
                       </div>
                       <div className="text-right">
                         <div className="text-[9px] text-slate-400">True Landed</div>
-                        <div className="text-[11px] font-extrabold text-emerald-700">Rs.{c.landed_cost_per_kg}/kg</div>
+                        <div className="text-[11px] font-extrabold text-emerald-700">Rs.{Number(c.landed_cost_per_kg).toFixed(2)}/kg</div>
                       </div>
                     </div>
 
@@ -2815,7 +2845,7 @@ export default function NegotiationRoom() {
                           <td className="p-2 text-slate-900">Rs.{c.offer}/kg</td>
                           <td className="p-2 text-slate-600">Rs.{c.freight_per_kg}/kg</td>
                           <td className="p-2 text-slate-600">Rs.{c.apmc_cess_per_kg}/kg</td>
-                          <td className="p-2 text-emerald-800 font-extrabold">Rs.{c.landed_cost_per_kg}/kg</td>
+                          <td className="p-2 text-emerald-800 font-extrabold">Rs.{Number(c.landed_cost_per_kg).toFixed(2)}/kg</td>
                           <td className="p-2 text-slate-700">{c.match}%</td>
                           <td className="p-2">
                             {c.is_best ? (
@@ -3218,7 +3248,7 @@ export default function NegotiationRoom() {
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     <h3 className="font-bold text-slate-800 text-sm">
-                      Active Negotiation with {farmerName}
+                      Active Negotiation with {isBuyer ? (farmerName || 'Farmer Producer') : (activeCandidate?.name || buyerName || 'AgroCorp Procurement Director')}
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
@@ -3253,7 +3283,7 @@ export default function NegotiationRoom() {
                   </div>
                   <div className="text-right">
                     <div className="text-[10px] text-slate-400">Current Agreed / Ask</div>
-                    <div className="text-xs font-black text-emerald-700">Rs.{activeCandidate.offer}/kg (Landed: Rs.{activeCandidate.landed_cost_per_kg}/kg)</div>
+                    <div className="text-xs font-black text-emerald-700">Rs.{activeCandidate.offer}/kg (Landed: Rs.{Number(activeCandidate.landed_cost_per_kg).toFixed(2)}/kg)</div>
                   </div>
                 </div>
 
@@ -3262,14 +3292,18 @@ export default function NegotiationRoom() {
                   {activeCandidateMessages.map((msg: any, idx: number) => (
                     <div
                       key={idx}
-                      className={`flex flex-col ${msg.sender?.includes('Buyer') ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
+                      className={`flex flex-col ${
+                        (isBuyer ? (msg.sender_role === 'buyer' || msg.sender?.includes('Buyer') || msg.sender === buyerName) : (msg.sender_role === 'seller' || msg.sender === farmerName || msg.sender === user?.name || msg.sender?.includes('Farmer') || msg.sender?.includes('Ramesh')))
+                          ? 'items-end'
+                          : 'items-start'
+                      } animate-in fade-in duration-200`}
                     >
                       <div className="text-[10px] text-slate-400 mb-0.5 px-1 font-semibold">
                         {msg.sender} &bull; {msg.time}
                       </div>
                       <div
                         className={`max-w-[85%] p-3.5 rounded-2xl text-xs leading-relaxed ${
-                          msg.sender?.includes('Buyer')
+                          (isBuyer ? (msg.sender_role === 'buyer' || msg.sender?.includes('Buyer') || msg.sender === buyerName) : (msg.sender_role === 'seller' || msg.sender === farmerName || msg.sender === user?.name || msg.sender?.includes('Farmer') || msg.sender?.includes('Ramesh')))
                             ? 'bg-emerald-700 text-white rounded-tr-none shadow-sm'
                             : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-none shadow-sm'
                         }`}
@@ -3289,12 +3323,14 @@ export default function NegotiationRoom() {
                 {/* Offer Action Banner */}
                 <div className="p-4 border-t border-slate-100 bg-white flex items-center justify-between gap-3">
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold">Latest Farmer Ask</span>
+                    <span className="text-[10px] text-slate-400 block uppercase font-bold">
+                      {isBuyer ? 'Latest Farmer Ask' : 'Latest Buyer Bid'}
+                    </span>
                     <span className="font-black text-slate-900 text-base font-mono">
-                      Rs.{bestOfferPrice}/kg
+                      Rs.{isBuyer ? bestOfferPrice : (activeCandidate?.offer || bestOfferPrice)}/kg
                     </span>
                     <span className="text-[11px] text-slate-500 ml-1">
-                      (Total: Rs.{(bestOfferPrice * cropQty).toLocaleString()})
+                      (Total: Rs.{((isBuyer ? bestOfferPrice : (activeCandidate?.offer || bestOfferPrice)) * cropQty).toLocaleString()})
                     </span>
                   </div>
 
