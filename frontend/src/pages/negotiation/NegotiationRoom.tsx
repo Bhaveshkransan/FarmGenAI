@@ -722,7 +722,7 @@ export default function NegotiationRoom() {
         location: m.location,
         match: Math.round(m.compatibility_score || (95 - idx * 3)),
         offer: Number(m.min_price || bestOfferPrice),
-        aiStatus: idx === 0 ? 'Verified APMC Grade A' : (idx === 1 ? 'Farmer Asking Rate' : `Counter Rs.${targetPrice}`),
+        aiStatus: idx === 0 ? 'Verified APMC Grade A' : (idx === 1 ? (isBuyer ? 'Farmer Asking Rate' : 'Buyer Bid Rate') : `Counter Rs.${targetPrice}`),
         status: idx === 0 ? 'Negotiating' : (idx === 1 ? 'Active' : 'Waiting'),
         color: idx === 0 ? 'emerald' : (idx === 1 ? 'blue' : 'amber'),
         lotSize: m.quantity
@@ -736,7 +736,7 @@ export default function NegotiationRoom() {
 
     return [
       { id: validFarmer, location: farmerLocation, match: 95, offer: Math.round(p1 * 10) / 10, aiStatus: 'Verified APMC Grade A', status: 'Negotiating', color: 'emerald', lotSize: cropQty },
-      { id: `Maharashtra ${cropName} Producers FPO`, location: farmerLocation, match: 91, offer: Math.round(p1 * 1.04 * 10) / 10, aiStatus: 'Farmer Asking Rate', status: 'Active', color: 'blue', lotSize: cropQty * 2 },
+      { id: `Maharashtra ${cropName} Producers FPO`, location: farmerLocation, match: 91, offer: Math.round(p1 * 1.04 * 10) / 10, aiStatus: isBuyer ? 'Farmer Asking Rate' : 'Buyer Bid Rate', status: 'Active', color: 'blue', lotSize: cropQty * 2 },
       { id: 'Deccan Agri Commodities Syndicate', location: 'Maharashtra APMC Hub', match: 87, offer: Math.round(p1 * 1.08 * 10) / 10, aiStatus: `Counter Rs.${targetPrice}`, status: 'Waiting', color: 'amber', lotSize: cropQty * 3 }
     ];
   }, [matchedListings, farmerName, farmerLocation, bestOfferPrice, targetPrice, cropName, cropQty, statutoryBench]);
@@ -1144,7 +1144,7 @@ export default function NegotiationRoom() {
   useEffect(() => {
     if (messages.length === 0 && negState && requestedServices.hasFarmer) {
       const initialLogs = [
-        { time: new Date().toLocaleTimeString(), tag: 'System', text: `Negotiation session loaded. Buyer target: Rs.${targetPrice}/kg, Max budget: Rs.${maxAllowedCeiling}/kg.`, color: 'text-blue-400' },
+        { time: new Date().toLocaleTimeString(), tag: 'System', text: isBuyer ? `Negotiation session loaded. Buyer target: Rs.${targetPrice}/kg, Max budget: Rs.${maxAllowedCeiling}/kg.` : `Negotiation session loaded. Farmer floor: Rs.${targetPrice}/kg for ${cropQty.toLocaleString()} kg of ${cropName}.`, color: 'text-blue-400' },
         { time: new Date().toLocaleTimeString(), tag: 'Planner', text: `Multi-agent coordinator active for ${cropName} (${cropQty} kg). Enforcing APMC statutory benchmarks.`, color: 'text-purple-400' }
       ];
       setLiveTerminalLogs(prev => prev.length === 0 ? initialLogs : prev);
@@ -3424,7 +3424,7 @@ export default function NegotiationRoom() {
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Buyer Target</span>
+                    <span className="text-slate-500 block text-[11px]">{isBuyer ? 'Buyer Target' : 'Shipper Target'}</span>
                     <span className="font-black text-blue-700 text-base font-mono">
                       Rs.{Math.round(standardFreight * 0.90).toLocaleString()}
                     </span>
