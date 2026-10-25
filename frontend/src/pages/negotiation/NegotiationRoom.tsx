@@ -197,6 +197,12 @@ export default function NegotiationRoom() {
   const [isTransportLoading, setIsTransportLoading] = useState(false);
   const [transportRound, setTransportRound] = useState(1);
 
+  // Warehouse & Processor Phase States
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('wh_pune_hub');
+  const [isWarehouseLoading, setIsWarehouseLoading] = useState<boolean>(false);
+  const [selectedProcessorId, setSelectedProcessorId] = useState<string>('proc_soy_latur');
+  const [isProcessorLoading, setIsProcessorLoading] = useState<boolean>(false);
+
   // Sync completedPhases changes to localStorage for true refresh persistence
   useEffect(() => {
     if (activeId && Object.keys(completedPhases).length > 0) {
@@ -727,7 +733,8 @@ export default function NegotiationRoom() {
     queryFn: async () => {
       try {
         const res = await api.get('/transport/vehicles?status=AVAILABLE');
-        return res.data?.data || [];
+        const list = res.data?.data || res.data?.vehicles || (Array.isArray(res.data) ? res.data : []);
+        return Array.isArray(list) ? list : [];
       } catch (e) {
         return [];
       }
@@ -741,7 +748,8 @@ export default function NegotiationRoom() {
     queryFn: async () => {
       try {
         const res = await api.get('/warehouse/list');
-        return res.data || [];
+        const list = res.data?.data || res.data?.warehouses || (Array.isArray(res.data) ? res.data : []);
+        return Array.isArray(list) ? list : [];
       } catch (e) {
         return [];
       }
@@ -755,7 +763,8 @@ export default function NegotiationRoom() {
     queryFn: async () => {
       try {
         const res = await api.get('/processor', { params: { crop: cropName } });
-        return res.data || [];
+        const list = res.data?.data || res.data?.processors || (Array.isArray(res.data) ? res.data : []);
+        return Array.isArray(list) ? list : [];
       } catch (e) {
         return [];
       }
@@ -821,21 +830,69 @@ export default function NegotiationRoom() {
     };
   }, [completedPhases, farmerLocation, defaultApmcOrigin]);
 
-  // Top-5 Intelligent Transport Fleet Vehicles (5 Distinct Maharashtra Haulage Classes)
+  // Top-5 Intelligent Transport Fleet Vehicles (Dynamically Selected from Real Database Fleet)
   const topFiveVehicles = useMemo(() => {
     const dist = transitRoute.distanceKm || 285;
+    const originStr = (transitRoute.origin || '').toLowerCase();
 
-    // Curated diverse vehicle specifications tailored to Maharashtra mandi corridors
-    const diverseFleetSpecs = [
-      { id: "V03", name: "Mahindra Bolero Maxi Truck", type: "LCV", cap: 2500, rate: 24, rating: 4.8, reefer: false },
-      { id: "V02", name: "Tata 407 Gold SFC", type: "LCV", cap: 3500, rate: 28, rating: 4.75, reefer: false },
-      { id: "V04", name: "Eicher Pro 2049", type: "Medium LCV", cap: 4500, rate: 32, rating: 4.9, reefer: false },
-      { id: "V07", name: "Ashok Leyland Ecomet 1615", type: "Medium Truck", cap: 7500, rate: 36, rating: 4.85, reefer: false },
-      { id: "V05", name: "ColdChain Reefer Unit", type: "Refrigerated Truck", cap: 4000, rate: 44, rating: 4.95, reefer: true }
-    ];
+    // 1. Score each candidate vehicle based on origin location proximity, capacity fit for cropQty, and carrier rating
+    const scored = candidateVehicles.map((v: any) => {
+      let score = 70;
+      const cap = Number(v.capacity_kg || 1500);
+      const loc = String(v.current_location || '').toLowerCase();
 
-    return diverseFleetSpecs.map((v, idx) => {
-      const baseFreight = Math.round(v.rate * dist);
+      // Proximity score: boost vehicles stationed near origin district (Latur, Nashik, Pune, etc.)
+      const originKeywords = originStr.split(/[\s,]+/);
+      for (const kw of originKeywords) {
+        if (kw.length > 3 && loc.includes(kw)) {
+          score += 25;
+          break;
+        }
+      }
+
+      // Capacity scoring: optimal vehicle holds 1x to 3x cropQty
+      if (cap >= cropQty && cap <= cropQty * 3) {
+        score += 20;
+      } else if (cap >= cropQty * 0.85) {
+        score += 10;
+      } else {
+        score -= 30; // Cannot hold shipment
+      }
+
+      // Rating bonus
+      score += (Number(v.rating || 4.5) - 4.0) * 10;
+
+      return { vehicle: v, score };
+    });
+
+    // Sort descending by score
+    scored.sort((a, b) => b.score - a.score);
+
+    // 2. Select top 5 with diversity across vehicle classes
+    const selected: any[] = [];
+    const seenTypes = new Set<string>();
+
+    for (const item of scored) {
+      const vType = (item.vehicle.vehicle_type || '').toLowerCase();
+      if (!seenTypes.has(vType) && selected.length < 5) {
+        seenTypes.add(vType);
+        selected.push(item.vehicle);
+      }
+    }
+
+    // Fill remaining slots up to 5 if needed
+    for (const item of scored) {
+      if (!selected.includes(item.vehicle) && selected.length < 5) {
+        selected.push(item.vehicle);
+      }
+    }
+
+    // Fallback if candidateVehicles had fewer than 5
+    const finalFleet = selected.slice(0, 5);
+
+    return finalFleet.map((v: any, idx: number) => {
+      const rate = Number(v.ratePerKm || 24);
+      const baseFreight = Math.round(rate * dist);
       const branchInfo = transportBranchStatuses[idx];
       const isWinner = idx === 0;
       const negotiatedFreight = isWinner ? Math.round(baseFreight * 0.91) : Math.round(baseFreight * 0.94);
@@ -844,15 +901,16 @@ export default function NegotiationRoom() {
       const rounds = branchInfo?.rounds || 2;
 
       return {
-        vehicle_id: v.id,
-        vehicle_name: v.name,
-        vehicle_type: v.type,
-        capacity_kg: v.cap,
-        ratePerKm: v.rate,
-        rating: v.rating,
-        refrigerated: v.reefer,
-        isCapacityFit: v.cap >= cropQty * 0.85,
-        transporterCompany: `${v.name.split(' ')[0]} Agro Haulage Logistics`,
+        vehicle_id: v.vehicle_id || `V0${idx + 1}`,
+        vehicle_name: v.vehicle_name,
+        vehicle_type: v.vehicle_type,
+        capacity_kg: Number(v.capacity_kg || 1500),
+        ratePerKm: rate,
+        rating: Number(v.rating || 4.8),
+        refrigerated: Boolean(v.refrigerated),
+        isCapacityFit: Number(v.capacity_kg || 1500) >= cropQty * 0.85,
+        transporterCompany: v.transporterCompany || `${(v.vehicle_name || 'Agro').split(' ')[0]} Agro Haulage Logistics`,
+        current_location: v.current_location || 'Maharashtra Transit Corridor',
         index: idx,
         distance_km: dist,
         total_freight: currentFreight,
@@ -863,7 +921,7 @@ export default function NegotiationRoom() {
         rounds_count: rounds
       };
     });
-  }, [transitRoute.distanceKm, cropQty, transportBranchStatuses]);
+  }, [candidateVehicles, transitRoute.distanceKm, transitRoute.origin, cropQty, transportBranchStatuses]);
 
   // Active Vehicle Selection
   const activeVehicle = useMemo(() => {
