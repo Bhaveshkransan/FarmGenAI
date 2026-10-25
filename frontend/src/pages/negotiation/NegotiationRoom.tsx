@@ -1131,13 +1131,19 @@ export default function NegotiationRoom() {
     }
   }, [negState, messages.length, cropName, cropQty, targetPrice, maxAllowedCeiling, farmerName, buyerName, isBuyer, requestedServices.hasFarmer]);
 
-  // Scroll Helpers
+  // Scoped Container Scroll Helpers (Only scrolls the internal container, never jumps or shifts outer window scroll)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesEndRef.current?.parentElement) {
+      const container = messagesEndRef.current.parentElement;
+      container.scrollTop = container.scrollHeight;
+    }
   }, [messages, transportMessages]);
 
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (terminalEndRef.current?.parentElement) {
+      const container = terminalEndRef.current.parentElement;
+      container.scrollTop = container.scrollHeight;
+    }
   }, [liveTerminalLogs]);
 
   // Parallel Autonomous Negotiation Runner

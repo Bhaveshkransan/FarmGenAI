@@ -325,8 +325,16 @@ export default function TransportNegotiationRoom() {
     ];
   }, [payload?.floor_price, bestPrice]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [expandedIdx, results, activeTab]);
-  useEffect(() => { terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [liveTerminalLogs, activeTab]);
+  useEffect(() => {
+    if (messagesEndRef.current?.parentElement) {
+      messagesEndRef.current.parentElement.scrollTop = messagesEndRef.current.parentElement.scrollHeight;
+    }
+  }, [expandedIdx, results, activeTab]);
+  useEffect(() => {
+    if (terminalEndRef.current?.parentElement) {
+      terminalEndRef.current.parentElement.scrollTop = terminalEndRef.current.parentElement.scrollHeight;
+    }
+  }, [liveTerminalLogs, activeTab]);
 
   const dealDataForModal = {
     id: bestNeg?.vehicle?.vehicle_id || 'TRN-123',
