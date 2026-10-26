@@ -1277,20 +1277,17 @@ export default function NegotiationRoom() {
       { time: new Date().toLocaleTimeString(), tag: 'Phase Transition', text: `[Dynamic Router] Evaluating next eligible agent. Transport logistics selected. Pick-up locked to ${farmerLocation}.`, color: 'text-purple-400' }
     ]);
 
-    // Check if Transport is in dynamic phases
-    const hasTransport = dynamicPhases.some(p => p.id === 'TRANSPORT');
-    if (hasTransport) {
-      setTransitionNotice({
-        title: "Dynamic Multi-Agent Phase Transition: Transport Logistics",
-        message: `Farmer agreement finalized at Rs.${agreedPrice}/kg with ${supplier} (${farmerLocation}). Origin set to ${farmerLocation}. Initiating Inbound Transport Agent.`,
-        timestamp: new Date().toLocaleTimeString()
-      });
-      setActivePhase('TRANSPORT');
-      setViewingPhase('TRANSPORT');
-    } else {
-      setActivePhase('SUMMARY');
-      setViewingPhase('SUMMARY');
-    }
+    // Automatically advance to next selected phase (Transport -> Warehouse -> Processor -> Summary)
+    const nextPhase: AgentPhase = (requestedServices.hasTransport && !updated['TRANSPORT'])
+      ? 'TRANSPORT'
+      : (requestedServices.hasWarehouse && !updated['WAREHOUSE'])
+        ? 'WAREHOUSE'
+        : (requestedServices.hasProcessor && !updated['PROCESSOR'])
+          ? 'PROCESSOR'
+          : 'SUMMARY';
+
+    setActivePhase(nextPhase);
+    setViewingPhase(nextPhase);
   };
 
   // Farmer Bypass / Unavailable Handler (Ensures non-produce agents are evaluated even without farmer)
@@ -1317,19 +1314,16 @@ export default function NegotiationRoom() {
       { time: new Date().toLocaleTimeString(), tag: 'Phase Bypass', text: `[Phase 1 Farmer] Produce phase bypassed (${reason}). Proceeding to logistics.`, color: 'text-amber-400' }
     ]);
 
-    const hasTransport = dynamicPhases.some(p => p.id === 'TRANSPORT');
-    if (hasTransport) {
-      setTransitionNotice({
-        title: "Evaluating Next Eligible Agent: Transport Logistics",
-        message: "Farmer produce bypassed. Evaluating logistics and carrier dispatch.",
-        timestamp: new Date().toLocaleTimeString()
-      });
-      setActivePhase('TRANSPORT');
-      setViewingPhase('TRANSPORT');
-    } else {
-      setActivePhase('SUMMARY');
-      setViewingPhase('SUMMARY');
-    }
+    const nextPhase: AgentPhase = (requestedServices.hasTransport && !updated['TRANSPORT'])
+      ? 'TRANSPORT'
+      : (requestedServices.hasWarehouse && !updated['WAREHOUSE'])
+        ? 'WAREHOUSE'
+        : (requestedServices.hasProcessor && !updated['PROCESSOR'])
+          ? 'PROCESSOR'
+          : 'SUMMARY';
+
+    setActivePhase(nextPhase);
+    setViewingPhase(nextPhase);
   };
 
   // Accept Deal Trigger from UI button
@@ -1664,14 +1658,15 @@ export default function NegotiationRoom() {
       { time: new Date().toLocaleTimeString(), tag: 'Orchestrator', text: `[Orchestrator] Multi-agent negotiation complete. Generating Landed Cost Term Sheet.`, color: 'text-purple-400' }
     ]);
 
-    setActivePhase('SUMMARY');
-    setViewingPhase('SUMMARY');
+    // Automatically advance after phase 2 to the next selected phase (Warehouse -> Processor -> Summary)
+    const nextPhase: AgentPhase = (requestedServices.hasWarehouse && !updated['WAREHOUSE'])
+      ? 'WAREHOUSE'
+      : (requestedServices.hasProcessor && !updated['PROCESSOR'])
+        ? 'PROCESSOR'
+        : 'SUMMARY';
 
-    setTransitionNotice({
-      title: "Transport Logistics Agreement Finalized",
-      message: `Agreed Rs.${finalFreight.toLocaleString()} with ${activeVehicle.vehicle_name}. Multi-agent landed cost sheet generated.`,
-      timestamp: new Date().toLocaleTimeString()
-    });
+    setActivePhase(nextPhase);
+    setViewingPhase(nextPhase);
   };
 
   // Skip / Decline Transport Handler
@@ -1695,14 +1690,15 @@ export default function NegotiationRoom() {
       return updated;
     });
 
-    setActivePhase('SUMMARY');
-    setViewingPhase('SUMMARY');
+    // Automatically advance after phase 2 to next selected phase
+    const nextPhase: AgentPhase = (requestedServices.hasWarehouse && !updated['WAREHOUSE'])
+      ? 'WAREHOUSE'
+      : (requestedServices.hasProcessor && !updated['PROCESSOR'])
+        ? 'PROCESSOR'
+        : 'SUMMARY';
 
-    setTransitionNotice({
-      title: status === 'CANCELLED' ? "Transport Logistics Cancelled" : "Transport Bypassed",
-      message: "Proceeding to Landed Cost Summary with self-arranged logistics (Rs.0 freight).",
-      timestamp: new Date().toLocaleTimeString()
-    });
+    setActivePhase(nextPhase);
+    setViewingPhase(nextPhase);
   };
 
   // Warehouse Reservation Handler
@@ -2051,24 +2047,7 @@ export default function NegotiationRoom() {
         </div>
       </div>
 
-      {/* Phase Transition Notification Notice */}
-      {transitionNotice && (
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex items-center justify-between text-xs text-indigo-900 shadow-sm animate-in fade-in duration-200">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-indigo-600 shrink-0" />
-            <div>
-              <span className="font-bold text-indigo-950">{transitionNotice.title}: </span>
-              <span>{transitionNotice.message}</span>
-            </div>
-          </div>
-          <button
-            onClick={() => setTransitionNotice(null)}
-            className="text-indigo-500 hover:text-indigo-800 text-xs font-bold px-2 py-0.5 cursor-pointer"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
+
 
       {/* Read-Only Archive Notice */}
       {isViewingReadOnly && (
@@ -2089,49 +2068,7 @@ export default function NegotiationRoom() {
         </div>
       )}
 
-      {/* =======================================================================
-          CELEBRATORY PHASE 1 FINISHED BANNER & PHASE 2 TRANSITION NOTICE
-      ======================================================================= */}
-      {completedPhases['FARMER'] && (
-        <div className="bg-gradient-to-r from-emerald-50 via-teal-50/50 to-blue-50 border border-emerald-300/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shadow-sm shrink-0">
-              ✓
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md">
-                  Phase 1 Finished
-                </span>
-                <span className="text-xs font-black text-slate-800">
-                  {isBuyer ? 'Farmer Produce Agreement Finalized!' : 'Institutional Buyer Agreement Finalized!'}
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 mt-0.5">
-                {isBuyer ? (
-                  <>Procured <strong>{cropQty.toLocaleString()} kg</strong> of <strong>{cropName}</strong> at <strong className="text-emerald-700">Rs.{completedPhases['FARMER'].agreedPrice}/kg</strong> from <strong>{completedPhases['FARMER'].counterParty}</strong> ({completedPhases['FARMER'].location}).</>
-                ) : (
-                  <>Sold <strong>{cropQty.toLocaleString()} kg</strong> of <strong>{cropName}</strong> at <strong className="text-emerald-700">Rs.{completedPhases['FARMER'].agreedPrice}/kg</strong> to <strong>{completedPhases['FARMER'].counterParty}</strong> ({completedPhases['FARMER'].location}).</>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {viewingPhase === 'TRANSPORT' ? (
-              <span className="text-[11px] font-black text-blue-800 bg-blue-100/90 border border-blue-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs">
-                <Truck size={14} className="text-blue-600" /> Phase 2: Active Transport Freight
-              </span>
-            ) : (
-              <button
-                onClick={() => setViewingPhase('TRANSPORT')}
-                className="text-[11px] font-black text-white bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-              >
-                <Truck size={14} /> Go to Phase 2 Transport &rarr;
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+
 
       {/* =======================================================================
           TOP MATCHES: 5 Candidate Cards Across Central/Top Section
@@ -3240,9 +3177,7 @@ export default function NegotiationRoom() {
           ) : (
             /* VIEW: FARMER NEGOTIATION PHASE (Standard Core Flow) */
             <>
-              {recommendation && !String(recommendation).toLowerCase().includes('processing route activated') && !String(recommendation).toLowerCase().includes('processing') && (
-                <RecommendationCard recommendation={recommendation} />
-              )}
+
 
               {/* Active Farmer Negotiation Card */}
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm flex flex-col h-[520px] overflow-hidden">
