@@ -101,7 +101,7 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
     try:
         status_data = await controller.get_negotiation_status(negotiation_id) or {}
         p_price = (payload.get("price") or payload.get("final_price") or payload.get("agreed_price") or payload.get("counter_price")) if isinstance(payload, dict) else None
-        final_p_raw = p_price or status_data.get("final_price") or status_data.get("price") or status_data.get("min_price") or 50.0
+        final_p_raw = p_price or status_data.get("final_price") or status_data.get("target_price") or status_data.get("price") or status_data.get("min_price") or 50.0
         p_qty = (payload.get("quantity") or payload.get("procurement_volume")) if isinstance(payload, dict) else None
         qty_raw = p_qty or status_data.get("quantity") or 3000.0
         p_farmer = payload.get("farmer") if isinstance(payload, dict) else None
@@ -141,9 +141,9 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
                 break
         bench_info = STATUTORY_BENCHMARKS.get(crop_norm, {"benchmark": 50.0})
         statutory_bench = float(bench_info.get("benchmark", 50.0))
-        target_p = float(status_data.get("target_price") or status_data.get("price") or statutory_bench)
-        max_buyer_ceiling = round(max(target_p * 1.75, statutory_bench * 1.75, float(final_p) * 1.10), 2)
-        min_floor_price = round(min(statutory_bench * 0.25, float(final_p) * 0.5), 2)
+        target_p = float((status_data and (status_data.get("target_price") or status_data.get("price"))) or statutory_bench)
+        max_buyer_ceiling = round(max(target_p * 1.75, statutory_bench * 1.75), 2)
+        min_floor_price = round(min(target_p * 0.25, statutory_bench * 0.25), 2)
 
         if final_p > max_buyer_ceiling:
             raise HTTPException(
@@ -235,7 +235,7 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
         except Exception:
             pass
 
-        # Also update status in negotiations table
+        # Also update status in negotiations table and memory controller
         try:
             update_data = {
                 "status": "DEAL",
@@ -250,7 +250,18 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
             }
             if transport_plan:
                 update_data["transport_plan"] = transport_plan
+            if isinstance(payload, dict):
+                if "transport_plan" in payload:
+                    update_data["transport_plan"] = payload["transport_plan"]
+                if "warehouse_plan" in payload:
+                    update_data["warehouse_plan"] = payload["warehouse_plan"]
+                if "processor_plan" in payload:
+                    update_data["processor_plan"] = payload["processor_plan"]
             await Database.update_negotiation_async(negotiation_id, update_data)
+
+            for nid in (negotiation_id, f"neg_{negotiation_id}", negotiation_id.replace("neg_", "")):
+                if nid in controller.active_negotiations:
+                    controller.active_negotiations[nid].update(update_data)
 
             # Hook into Buyer Workflow Memory (Phase 1 Orchestration)
             req_id = (payload.get("requirement_id") if isinstance(payload, dict) else None) or status_data.get("requirement_id")
@@ -265,8 +276,8 @@ async def accept_deal(negotiation_id: str, payload: dict = None):
                     )
                 except Exception:
                     pass
-        except Exception:
-            pass
+        except Exception as update_err:
+            print("Error updating negotiation record:", update_err)
 
         # Broadcast via WebSocket hub if available
         try:
@@ -454,6 +465,16 @@ async def feedback_deal(negotiation_id: str, payload: dict = None):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/{negotiation_id}/parallel-branches")
+async def get_parallel_branches_route(negotiation_id: str):
+    try:
+        branches = await controller.get_parallel_branches(negotiation_id)
+        return {"status": "SUCCESS", "negotiation_id": negotiation_id, "branches": branches}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @router.post("/{negotiation_id}/parallel-procure")
 async def parallel_procure_route(negotiation_id: str, payload: dict = None):
     try:
@@ -478,6 +499,167 @@ async def dispatch_negotiation_to_worker(negotiation_id: str):
         "stream_job_id": job_id,
         "message": f"Negotiation {negotiation_id} dispatched to Redis Stream 'agri:negotiation:jobs'"
     }
+
+
+@router.get("/{negotiation_id}/workflow")
+async def get_negotiation_workflow(negotiation_id: str):
+    """
+    Authoritative Multi-Agent Supply Chain Workflow State endpoint for any negotiation
+    (Farmer-initiated or Buyer-initiated).
+    """
+    from backend.services.buyer_workflow_service import buyer_workflow_service
+    status_data = await controller.get_negotiation_status(negotiation_id) or {}
+    req_id = status_data.get("requirement_id") or negotiation_id
+
+    state = await buyer_workflow_service.get_workflow_state(requirement_id=req_id)
+    if not state:
+        crop = status_data.get("crop") or "Soybean"
+        qty = float(status_data.get("quantity") or 1000.0)
+        buyer_id = status_data.get("buyer") or status_data.get("user_id") or "buyer_agent"
+        state = await buyer_workflow_service.initialize_workflow(
+            requirement_id=req_id,
+            buyer_id=buyer_id,
+            crop=crop,
+            quantity=qty,
+            quality=status_data.get("quality") or "Grade A",
+            delivery_location=status_data.get("location") or "Maharashtra",
+            selected_services={
+                "farmer_matching": True,
+                "negotiation": True,
+                "transport": True,
+                "warehouse": True,
+                "processor": True
+            }
+        )
+
+    # If deal is already accepted/finalized, record deal outcome so downstream is eligible
+    is_deal = status_data.get("status") in ("DEAL", "COMPLETED") or bool(status_data.get("final_price"))
+    if is_deal and not state.get("farmer_deal", {}).get("valid"):
+        try:
+            await buyer_workflow_service.record_farmer_deal_outcome(
+                requirement_id=req_id,
+                deal_id=negotiation_id,
+                outcome_status="SUCCESS",
+                deal_details=status_data
+            )
+            state = await buyer_workflow_service.get_workflow_state(requirement_id=req_id)
+        except Exception:
+            pass
+
+    # If downstream plans were already computed by parallel procurement, enrich agent outcomes
+    if is_deal and state:
+        outcomes = state.setdefault("agent_outcomes", {})
+        dirty = False
+        t_plan = status_data.get("transport_plan")
+        if t_plan and "TRANSPORT" not in outcomes:
+            cost = float(t_plan.get("agreed_price") or t_plan.get("total_operating_cost") or t_plan.get("cost") or 4200.0)
+            veh = t_plan.get("vehicle_name") or t_plan.get("vehicle_type") or t_plan.get("vehicle") or "Freight Vehicle"
+            r_val = t_plan.get("route")
+            if isinstance(r_val, dict):
+                route_str = r_val.get("route_path") or (" ➔ ".join([wp.get("name", "") for wp in r_val.get("route_waypoints", []) if isinstance(wp, dict) and wp.get("name")])) or f"{status_data.get('location', 'Nashik')} → Pune APMC"
+            elif isinstance(r_val, list):
+                route_str = " ➔ ".join([str(wp.get("name", wp) if isinstance(wp, dict) else wp) for wp in r_val])
+            elif r_val:
+                route_str = str(r_val)
+            else:
+                route_str = f"{status_data.get('location', 'Nashik')} → Pune APMC"
+
+            outcomes["TRANSPORT"] = {
+                "status": "COMPLETED",
+                "cost": cost,
+                "result": {
+                    "vehicle": str(veh),
+                    "route": route_str,
+                    "cost": cost
+                }
+            }
+            if "TRANSPORT" not in state.get("completed_agents", []):
+                state.setdefault("completed_agents", []).append("TRANSPORT")
+            dirty = True
+
+        w_plan = status_data.get("warehouse_plan")
+        if w_plan and "WAREHOUSE" not in outcomes:
+            w_cost = float(w_plan.get("total_cost") or w_plan.get("cost") or 1050.0)
+            w_name = w_plan.get("facility_name") or w_plan.get("name") or "Maharashtra Agro Warehouse"
+            outcomes["WAREHOUSE"] = {
+                "status": "COMPLETED",
+                "cost": w_cost,
+                "result": {
+                    "name": w_name,
+                    "location": w_plan.get("location") or "Pune APMC",
+                    "holding_days": w_plan.get("holding_days") or 7,
+                    "cost": w_cost
+                }
+            }
+            if "WAREHOUSE" not in state.get("completed_agents", []):
+                state.setdefault("completed_agents", []).append("WAREHOUSE")
+            dirty = True
+
+        p_plan = status_data.get("processor_plan")
+        if p_plan and "PROCESSOR" not in outcomes:
+            p_cost = float(p_plan.get("processing_fee") or p_plan.get("cost") or 3500.0)
+            p_name = p_plan.get("unit_name") or p_plan.get("name") or "Maharashtra Agro Mill"
+            outcomes["PROCESSOR"] = {
+                "status": "COMPLETED",
+                "cost": p_cost,
+                "result": {
+                    "name": p_name,
+                    "output_product": p_plan.get("output_product") or "Value-Added Processed Lot",
+                    "cost": p_cost
+                }
+            }
+            if "PROCESSOR" not in state.get("completed_agents", []):
+                state.setdefault("completed_agents", []).append("PROCESSOR")
+            dirty = True
+
+        if dirty:
+            await Database.upsert_buyer_workflow_async(state)
+
+    valid_actions = buyer_workflow_service.get_valid_next_actions(state)
+    return {
+        "success": True,
+        "workflow": state,
+        "valid_next_actions": valid_actions
+    }
+
+
+@router.post("/{negotiation_id}/workflow/step")
+async def step_negotiation_workflow(negotiation_id: str, payload: dict = None):
+    """
+    Executes a step in the multi-agent supply chain workflow for this negotiation.
+    """
+    from backend.services.buyer_workflow_service import buyer_workflow_service
+    status_data = await controller.get_negotiation_status(negotiation_id) or {}
+    req_id = status_data.get("requirement_id") or negotiation_id
+
+    action_override = payload.get("action") if isinstance(payload, dict) else None
+    try:
+        updated_state = await buyer_workflow_service.step_workflow(
+            requirement_id=req_id,
+            action_override=action_override
+        )
+        valid_actions = buyer_workflow_service.get_valid_next_actions(updated_state)
+
+        # If final_plan was generated or updated, sync to negotiation record in DB
+        if updated_state.get("final_plan"):
+            fp = updated_state["final_plan"]
+            await Database.update_negotiation_async(negotiation_id, {
+                "final_plan": fp,
+                "contract_hash": fp.get("contract_signature"),
+                "status": "DEAL",
+                "transport_plan": fp.get("transport_plan"),
+                "warehouse_plan": fp.get("warehouse_plan"),
+                "processor_plan": fp.get("processor_plan")
+            })
+
+        return {
+            "success": True,
+            "workflow": updated_state,
+            "valid_next_actions": valid_actions
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 
 

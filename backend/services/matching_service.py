@@ -52,18 +52,78 @@ CITY_DISTANCES_KM: Dict[str, Dict[str, float]] = {
 MAX_MATCH_DISTANCE_KM = 600.0
 
 
+MAHARASHTRA_DISTRICT_COORDS: Dict[str, tuple] = {
+    "Pune": (18.5204, 73.8567),
+    "Mumbai": (19.0760, 72.8777),
+    "Nashik": (19.9975, 73.7898),
+    "Nagpur": (21.1458, 79.0882),
+    "Thane": (19.2183, 72.9781),
+    "Kalyan": (19.2437, 73.1355),
+    "Aurangabad": (19.8762, 75.3433),
+    "Ahmednagar": (19.0948, 74.7480),
+    "Satara": (17.6805, 74.0183),
+    "Solapur": (17.6599, 75.9064),
+    "Kolhapur": (16.7050, 74.2433),
+    "Latur": (18.4088, 76.5604),
+    "Amravati": (20.9374, 77.7796),
+    "Gondia": (21.4600, 80.1900),
+    "Jalgaon": (21.0077, 75.5626),
+    "Dhule": (20.9042, 74.7749),
+    "Nanded": (19.1383, 77.3210),
+    "Sangli": (16.8524, 74.5815),
+    "Wardha": (20.7453, 78.6022),
+    "Yavatmal": (20.3888, 78.1204),
+    "Akola": (20.7002, 77.0082),
+    "Palghar": (19.6967, 72.7655),
+    "Ratnagiri": (16.9902, 73.3120),
+    "Beed": (18.9891, 75.7601),
+    "Jalna": (19.8410, 75.8864),
+    "Bhandara": (21.1667, 79.6500),
+    "Dharashiv": (18.1856, 76.0420),
+    "Osmanabad": (18.1856, 76.0420)
+}
+
+def extract_maharashtra_district(loc: str) -> str:
+    if not loc:
+        return ""
+    loc_lower = str(loc).lower()
+    for d in MAHARASHTRA_DISTRICT_COORDS:
+        if d.lower() in loc_lower:
+            return d
+    return str(loc).strip().title()
+
 def get_distance_km_sync(loc_a: str, loc_b: str) -> float:
-    """Synchronous distance calculation between two city locations."""
+    """Synchronous distance calculation between two city locations with intelligent district extraction and haversine road fallback."""
     if not loc_a or not loc_b:
         return 150.0
     if loc_a == loc_b:
         return 0.0
-    a = loc_a.strip()
-    b = loc_b.strip()
-    dist = CITY_DISTANCES_KM.get(a, {}).get(b)
+    da = extract_maharashtra_district(loc_a)
+    db = extract_maharashtra_district(loc_b)
+    if da and db and da.lower() == db.lower():
+        return 15.0  # Same district cluster / local APMC mandi transit
+    
+    # 1. Lookup in predefined road distance matrix
+    dist = CITY_DISTANCES_KM.get(da, {}).get(db)
     if dist is None:
-        dist = CITY_DISTANCES_KM.get(b, {}).get(a)
-    return dist if dist is not None else 250.0  # default
+        dist = CITY_DISTANCES_KM.get(db, {}).get(da)
+    if dist is not None:
+        return dist
+        
+    # 2. Highway road approximation via coordinates (1.25x road detour multiplier)
+    ca = MAHARASHTRA_DISTRICT_COORDS.get(da)
+    cb = MAHARASHTRA_DISTRICT_COORDS.get(db)
+    if ca and cb:
+        import math
+        lat1, lon1 = math.radians(ca[0]), math.radians(ca[1])
+        lat2, lon2 = math.radians(cb[0]), math.radians(cb[1])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a_val = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c_val = 2 * math.asin(math.sqrt(a_val))
+        return round(6371.0 * c_val * 1.25, 1)
+
+    return 250.0  # default
 
 
 async def _get_distance_km(loc_a: str, loc_b: str) -> float:
@@ -185,45 +245,64 @@ async def _score_match(listing: Dict, requirement: Dict, buyer_user: Optional[Di
 async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
     """
     Find and score all buyer requirements that match a given crop listing.
-    Returns ranked list of matches.
+    Returns ranked list of matches using the canonical 8-factor NRV model.
+    Prioritizes real active buyer requirements posted in the system, then augments
+    with verified APMC institutional buyers.
     """
     buyers = await Database.list_buyers_async()
-    all_requirements = [r for r in buyers if r.get("kind") == "requirement" and r.get("status") == "ACTIVE"]
+    list_crop = (listing.get("crop") or "").strip()
+
+    # 1. Real active buyer requirements matching this crop
+    real_reqs = [
+        r for r in buyers 
+        if (r.get("kind") == "requirement" or str(r.get("id", "")).startswith("req_"))
+        and (r.get("status") in ("ACTIVE", None, ""))
+        and crops_match(str(r.get("crop", "")), list_crop)
+    ]
     
-    # Also include simulated buyers / default profiles that might not explicitly have kind="requirement"
-    if not all_requirements:
-        all_requirements = [b for b in buyers if b.get("kind") != "offer"]
+    # 2. Institutional / verified buyer profiles as supplementary candidates
+    institutional_profiles = [
+        b for b in buyers 
+        if b not in real_reqs and b.get("kind") != "offer"
+        and (not b.get("crop") or b.get("crop") in ("ALL", "*", "any") or crops_match(str(b.get("crop", "")), list_crop))
+    ]
+
+    all_candidates = []
+    for r in real_reqs:
+        all_candidates.append((r, 1))  # source_priority = 1 (Real Buyer Requirement)
+
+    for p in institutional_profiles:
+        all_candidates.append((p, 2))  # source_priority = 2 (Institutional Pool)
 
     results = []
-    for req in all_requirements:
-        # Crop must match using canonical crop matching
-        req_crop = (req.get("crop") or "").strip()
-        list_crop = (listing.get("crop") or "").strip()
-        if not req_crop or not crops_match(req_crop, list_crop):
+    seen_ids = set()
+
+    for cand, priority in all_candidates:
+        cand_id = cand.get("requirement_id") or cand.get("id") or cand.get("buyer_id")
+        if cand_id and cand_id in seen_ids:
             continue
+        if cand_id:
+            seen_ids.add(cand_id)
 
-
-        buyer_user = await UserRepository.get_by_id(req.get("user_id", "")) or {}
-        score = await _score_match(listing, req, buyer_user)
-        dist = await _get_distance_km(listing.get("location", ""), req.get("location", ""))
+        buyer_user = await UserRepository.get_by_id(cand.get("user_id", "")) or {}
+        score = await _score_match(listing, cand, buyer_user)
+        dist = await _get_distance_km(listing.get("location", ""), cand.get("location", ""))
         
-        # Calculate derived offer details similar to negotiation_service
-        req_qty = float(req.get("quantity") or req.get("max_quantity") or listing.get("quantity", 0))
+        req_qty = float(cand.get("quantity") or cand.get("max_quantity") or listing.get("quantity", 0))
         offered_qty = min(float(listing.get("quantity", 0)), req_qty)
         min_price = float(listing.get("min_price", 0))
         market_price = float(listing.get("market_price", min_price + 1))
-        target_price = float(req.get("target_price") or req.get("max_price") or (min_price * 1.05))
+        target_price = float(cand.get("target_price") or cand.get("max_price") or (min_price * 1.05))
 
-        raw_budget = float(req.get("budget", 0))
+        raw_budget = float(cand.get("budget", 0))
         budget = raw_budget if raw_budget > 0 else max(target_price * req_qty * 1.2, min_price * offered_qty * 1.1)
         budget_limited_price = budget / max(offered_qty, 1)
         
-        strategy = str(req.get("strategy", "")).lower()
+        strategy = str(cand.get("strategy", "")).lower()
         
         if "restaurant" in strategy or "premium" in strategy:
             opening_bid = min(target_price * 0.95, budget_limited_price)
         else:
-            # High-feasibility opening offer: between 88% to 98% of target/market, capped by budget
             base_offer = max(target_price * 0.92, min_price if target_price >= min_price else target_price * 0.88)
             opening_bid = min(target_price, budget_limited_price, max(base_offer, 1.0))
             
@@ -232,34 +311,48 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
 
         # Strategic Labelling
         label = "Market Option"
+        if priority == 1:
+            label = "Verified Live Buyer Demand"
         if is_viable:
             if score > 75: label = "👑 Best Profit"
             elif dist == 0: label = "⚡ Fast Handshake"
             elif "restaurant" in strategy: label = "💎 Premium Match"
             elif score > 50: label = "🎯 Strategic Fit"
 
+        b_name = cand.get("buyer_name") or cand.get("name") or "Institutional Buyer"
+
         results.append({
-            "requirement_id": req.get("requirement_id") or req.get("id"),
-            "buyer_id": req.get("user_id") or req.get("id"),
-            "buyer_name": req.get("buyer_name") or req.get("name", "Unknown Buyer"),
-            "crop": req.get("crop") or list_crop,
+            "requirement_id": cand.get("requirement_id") or cand.get("id"),
+            "buyer_id": cand.get("user_id") or cand.get("id"),
+            "buyer_name": b_name,
+            "crop": cand.get("crop") or list_crop,
             "quantity": req_qty,
             "target_price": target_price,
-            "max_price": req.get("max_price"),
+            "max_price": cand.get("max_price"),
             "budget": budget,
-            "location": req.get("location", "Market"),
+            "location": cand.get("location", "Market"),
             "strategy": label,
             "offered_price": offer_price,
             "offered_quantity": round(offered_qty, 2),
             "status": "VIABLE" if is_viable else "BELOW_MIN_PRICE",
             "distance_km": dist,
             "compatibility_score": score,
-            "score": score, # Alias for compatibility
+            "score": score,
             "match_grade": "A" if score >= 70 else "B" if score >= 45 else "C",
-            "notes": req.get("notes", ""),
+            "source_priority": priority,
+            "notes": cand.get("notes", ""),
         })
 
-    results.sort(key=lambda item: (item["status"] == "VIABLE", item["offered_price"], item["compatibility_score"]), reverse=True)
+    # Strict ranking: Real demands first (priority=1), then viability, then score, then offer price
+    results.sort(
+        key=lambda item: (
+            -item["source_priority"],
+            item["status"] == "VIABLE",
+            item["compatibility_score"],
+            item["offered_price"]
+        ),
+        reverse=True
+    )
     return results
 
 
@@ -269,7 +362,12 @@ async def match_requirement_to_listings(requirement: Dict) -> List[Dict]:
     """
     from backend.routes.crop_listing_routes import router as _  # ensure module loaded
     listings = await Database.list_produce_async()
-    active = [l for l in listings if l.get("status") in ("LISTED", "ACTIVE", None, "")]
+    active = [
+        l for l in listings
+        if l.get("status") in ("LISTED", "ACTIVE", "NEGOTIATING", None, "")
+        and l.get("status") not in ("SOLD", "EXPIRED", "WITHDRAWN", "CANCELLED")
+        and float(l.get("quantity") or 0) > 0
+    ]
 
     results = []
     for listing in active:

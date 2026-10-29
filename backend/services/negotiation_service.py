@@ -322,6 +322,15 @@ class NegotiationService:
         return warehouse, processor, compost, transporter
 
     async def _generate_market_offers(self, payload: dict):
+        # 1. Query the 8-Factor NRV Matching Engine first for real live buyer requirements
+        from backend.services.matching_service import match_listing_to_buyers
+        try:
+            matched_offers = await match_listing_to_buyers(payload)
+            if matched_offers and len(matched_offers) > 0:
+                return matched_offers[:5]
+        except Exception as e:
+            logger.warning(f"Error querying matching engine for market offers: {e}")
+
         await self.ensure_default_buyers()
 
         quantity = max(float(payload["quantity"]), 1)
@@ -340,10 +349,10 @@ class NegotiationService:
         db_buyers = await self.db_repo.list_buyers_async()
         from backend.services.matching_service import crops_match
 
-        # Filter to real buyers from DB that match this crop
+        # Filter to real buyers from DB that match this crop (or general commodity buyers)
         matching_db_buyers = [
             b for b in db_buyers
-            if b.get("crop") and crops_match(b.get("crop"), crop)
+            if not b.get("crop") or b.get("crop") in ("ALL", "*", "any") or crops_match(b.get("crop"), crop)
         ]
 
         buyer_profiles = [
@@ -567,6 +576,10 @@ class NegotiationService:
             "created_at": datetime.now(timezone.utc).isoformat(),
             "transport_plan": None,
             "workflow_mode": payload.get("workflow_mode", "FULL_SUPPLY_CHAIN"),
+            "selected_services": payload.get("selected_services") or {},
+            "district": payload.get("district"),
+            "location": payload.get("location") or payload.get("buyer_location"),
+            "buyer_location": payload.get("buyer_location") or payload.get("location"),
             "permitted_agents": payload.get("permitted_agents", ["buyer_agent", "dynamic_routing_agent"]),
             "has_transport": bool(payload.get("has_transport", False)),
             "has_storage": bool(payload.get("has_storage", False)),
@@ -686,20 +699,79 @@ class NegotiationService:
                 agents_involved.append("CompostAgent")
 
             buyer_loc = selected_offer.get("location", "Market") if selected_offer else "Market"
-            if farmer.location != buyer_loc:
-                dist = 180.0
-                cost = transporter.calculate_transport_cost(payload["quantity"], dist)
+            qty_val = float(payload.get("quantity", 2500))
+            norm_crop = payload.get("crop", "Produce")
+            is_reefer = norm_crop.lower() in {"tomato", "strawberry", "grape", "banana", "mango"} or "onion" in norm_crop.lower()
+
+            try:
+                from backend.services.vehicle_service import filter_suitable_vehicles
+                from backend.services.routing_service import calculate_transport_route
+                from backend.services.transport_cost_service import calculate_transportation_cost
+                
+                route_res = calculate_transport_route(farmer.location, buyer_loc)
+                dist = float(route_res.get("distance_km", 250.0))
+                dur_h = float(route_res.get("estimated_duration_hours", 4.0))
+                
+                veh_filter = await filter_suitable_vehicles(
+                    quantity_kg=qty_val,
+                    refrigerated_required=is_reefer
+                )
+                best_v = veh_filter.get("best_vehicle")
+                if not best_v and veh_filter.get("candidates"):
+                    best_v = veh_filter["candidates"][0]
+                
+                if best_v:
+                    cost_res = await calculate_transportation_cost(
+                        vehicle=best_v,
+                        distance_km=dist,
+                        estimated_duration_hours=dur_h,
+                        deadhead_km=float(route_res.get("deadhead_km", 0.0)),
+                        is_perishable=is_reefer
+                    )
+                    cost = round(float(cost_res.get("agreed_price") or cost_res.get("minimum_acceptable_price") or cost_res.get("initial_quote") or (dist * 28.0)))
+                    transport_plan = {
+                        "agent": best_v["vehicle_name"],
+                        "vehicle_name": best_v["vehicle_name"],
+                        "vehicle_type": best_v["vehicle_type"],
+                        "vehicle_id": best_v.get("vehicle_id"),
+                        "cost": cost,
+                        "agreed_freight": cost,
+                        "distance": dist,
+                        "distance_km": dist,
+                        "estimated_duration_hours": dur_h,
+                        "capacity": best_v["capacity_kg"],
+                        "capacity_kg": best_v["capacity_kg"],
+                        "fuel_type": best_v.get("fuel_type", "Diesel"),
+                        "refrigerated": best_v.get("refrigerated", False),
+                        "cost_breakdown": cost_res.get("cost_breakdown", {}),
+                        "origin": farmer.location,
+                        "destination": buyer_loc,
+                        "routing_source": route_res.get("routing_source", "OSRM Live Routing Engine")
+                    }
+                else:
+                    transport_plan = {
+                        "status": "INFEASIBLE",
+                        "message": f"No vehicle available matching {qty_val:,.0f}kg payload capacity.",
+                        "rejected_vehicles": veh_filter.get("rejected_vehicles", []),
+                        "origin": farmer.location,
+                        "destination": buyer_loc
+                    }
+            except Exception as tp_err:
+                from backend.services.matching_service import get_distance_km_sync
+                dist = get_distance_km_sync(farmer.location, buyer_loc) or 250.0
+                rate = 32.0 if is_reefer else 24.0
+                cost = round(dist * rate)
                 transport_plan = {
-                    "agent": transporter.name,
+                    "agent": "Assigned Carrier",
+                    "vehicle_name": "Agro Haulage Carrier",
+                    "vehicle_type": "Medium Commercial Truck",
                     "cost": cost,
+                    "agreed_freight": cost,
                     "distance": dist,
-                    "capacity": transporter.vehicle_capacity
-                }
-            else:
-                transport_plan = {
-                    "agent": transporter.name,
-                    "base_fee": transporter.base_fee,
-                    "capacity": transporter.vehicle_capacity,
+                    "distance_km": dist,
+                    "capacity": max(qty_val, 5000),
+                    "origin": farmer.location,
+                    "destination": buyer_loc,
                 }
 
             for idx, event in enumerate(manager.memory.get_offers(), start=2):
@@ -917,7 +989,8 @@ class NegotiationService:
         mkt_p = float(row.get("market_price") or (min_p + 2.0))
         tgt_p = float(row.get("target_price") or ((selected_b.get("target_price") or selected_b.get("offered_price")) if isinstance(selected_b, dict) else None) or min_p)
 
-        return {
+        # Baseline dictionary loaded from PostgreSQL
+        res = {
             "id": negotiation_id,
             "negotiation_id": negotiation_id,
             "user_id": row.get("user_id"),
@@ -933,21 +1006,35 @@ class NegotiationService:
             "min_price": min_p,
             "target_price": tgt_p,
             "agents_involved": row.get("agents_involved", []),
-            "offers": offers,
+            "offers": offers or [],
             "next_action": row.get("next_action"),
-            "final_price": row.get("final_price") or next((c.get("price") for c in self.db_repo.contracts.values() if c.get("negotiation_id") == negotiation_id), None),
+            "final_price": row.get("final_price"),
             "market_offers": row.get("market_offers", []),
             "active_buyers": row.get("active_buyers", row.get("market_offers", [])[:3]),
-            "selected_buyer": row.get("selected_buyer"),
+            "selected_buyer": selected_b,
             "transport_plan": row.get("transport_plan"),
             "warehouse_plan": row.get("warehouse_plan"),
             "processor_plan": row.get("processor_plan"),
             "end_to_end_deal": row.get("end_to_end_deal"),
-            "workflow_mode": row.get("workflow_mode"),
+            "workflow_mode": row.get("workflow_mode") or (selected_b.get("workflow_mode") if isinstance(selected_b, dict) else None) or "FULL_SUPPLY_CHAIN",
             "permitted_agents": row.get("permitted_agents"),
+            "selected_services": row.get("selected_services") or (selected_b.get("selected_services") if isinstance(selected_b, dict) else {}),
+            "district": row.get("district") or (selected_b.get("district") if isinstance(selected_b, dict) else None),
+            "location": row.get("location") or (selected_b.get("location") if isinstance(selected_b, dict) else None),
+            "buyer_location": row.get("buyer_location") or (selected_b.get("buyer_location") if isinstance(selected_b, dict) else None) or row.get("location"),
+            "parallel_branches": self.active_negotiations.get(negotiation_id, {}).get("parallel_branches") or row.get("market_offers") or [],
             "logs": row.get("logs", []),
             "contract_hash": row.get("contract_hash"),
         }
+
+        # Merge active memory state if present without overwriting database truth
+        if negotiation_id in self.active_negotiations:
+            active = self.active_negotiations[negotiation_id]
+            for k, v in active.items():
+                if v is not None:
+                    res[k] = v
+
+        return res
 
     async def list_agents(self):
         return [
@@ -1227,6 +1314,27 @@ class NegotiationService:
             "offers": all_offers
         }
 
+    async def get_parallel_branches(self, negotiation_id: str):
+        if not negotiation_id.startswith("neg_"):
+            negotiation_id = f"neg_{negotiation_id}"
+        # 1. From active in-memory state
+        if negotiation_id in self.active_negotiations:
+            branches = self.active_negotiations[negotiation_id].get("parallel_branches")
+            if branches and isinstance(branches, list) and len(branches) > 0 and "chat_messages" in branches[0]:
+                return branches[:5]
+        # 2. From database market_offers
+        try:
+            row = await self.db_repo.get_negotiation_async(negotiation_id)
+            if row and row.get("market_offers"):
+                offers = row.get("market_offers")
+                if offers and isinstance(offers, list) and len(offers) > 0 and "chat_messages" in offers[0]:
+                    return offers[:5]
+        except Exception:
+            pass
+        # 3. Dynamic run if not already present
+        res = await self.run_parallel_procurement(negotiation_id)
+        return (res.get("suppliers", []))[:5]
+
     async def run_parallel_procurement(self, negotiation_id: str, payload: dict = None):
         """
         Executes Autonomous Parallel Buying across top candidate Maharashtra suppliers:
@@ -1391,10 +1499,17 @@ class NegotiationService:
                 "total_landed_cost": neg["total_landed_cost"],
                 "match_score": neg["match_score"],
                 "special": f"Rounds: {neg['rounds_count']} | Status: {neg['status']}",
-                "is_disqualified": not neg["is_valid_deal"],
+                                "is_disqualified": not neg["is_valid_deal"],
                 "disqualification_reason": neg.get("rejection_reason"),
                 "status": "🏆 Auto-Selected Best Deal" if (winner and neg.get("session_id") == winner.get("session_id")) else neg["status"],
                 "is_best": bool(winner and neg.get("session_id") == winner.get("session_id")),
+                "session_id": neg.get("session_id"),
+                "seller_id": neg.get("seller_id"),
+                "branch_index": neg.get("branch_index", rank_idx - 1),
+                "chat_messages": neg.get("chat_messages", []),
+                "rounds": neg.get("rounds", []),
+                "messages": neg.get("messages", []),
+                "contract": neg.get("contract"),
             })
 
         # Update negotiation record in Database
@@ -1414,6 +1529,8 @@ class NegotiationService:
                 f"No executable deal found meeting reservation ceiling (₹{reservation_p:.2f}/kg) or budget."
             )
 
+        self.active_negotiations.setdefault(negotiation_id, {})["parallel_branches"] = ranked_suppliers
+        self.active_negotiations[negotiation_id]["parallel_results"] = negotiations
         update_payload = {
             "crop": crop_norm,
             "quantity": qty,
@@ -1428,6 +1545,7 @@ class NegotiationService:
             "end_to_end_deal": end_to_end_deal,
             "logs": orch_res.get("logs", []),
             "contract_hash": end_to_end_deal.get("contract_hash") if end_to_end_deal else None,
+            "market_offers": ranked_suppliers,
         }
         await self.db_repo.update_negotiation_async(negotiation_id, update_payload)
         if negotiation_id in self.active_negotiations:

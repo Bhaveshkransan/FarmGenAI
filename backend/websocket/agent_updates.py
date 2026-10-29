@@ -44,6 +44,16 @@ class AgentUpdateHub:
         if websocket in self.client_negotiations:
             self.client_negotiations[websocket].add(negotiation_id)
 
+    def subscribe_branch(self, websocket: WebSocket, negotiation_id: str, branch_id: str):
+        if not negotiation_id or not branch_id:
+            return
+        branch_key = f"{negotiation_id}:{branch_id}"
+        if branch_key not in self.subscriptions:
+            self.subscriptions[branch_key] = set()
+        self.subscriptions[branch_key].add(websocket)
+        if websocket in self.client_negotiations:
+            self.client_negotiations[websocket].add(branch_key)
+
     def unsubscribe(self, websocket: WebSocket, negotiation_id: str):
         if negotiation_id in self.subscriptions:
             self.subscriptions[negotiation_id].discard(websocket)

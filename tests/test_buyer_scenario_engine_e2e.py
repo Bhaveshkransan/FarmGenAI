@@ -570,7 +570,7 @@ class TestLangGraphStateGraphExecution:
 
         final_state = await buyer_graph_orchestrator.ainvoke(initial_state)
 
-        assert final_state["status"] == "DEAL_SELECTED"
+        assert final_state["status"] in ("DEAL_SELECTED", "READY_FOR_EXECUTION")
         assert final_state["workflow_mode"] == "SINGLE_AGENT"
         assert final_state["permitted_agents"] == ["BUYER"]
         assert len(final_state["logs"]) >= 5

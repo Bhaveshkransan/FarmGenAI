@@ -19,8 +19,7 @@ if config.config_file_name is not None:
 # add your model's MetaData object here
 # for 'autogenerate' support
 from backend.db.session import Base as BackendBase
-from backend.db.models.user import User
-from backend.db.models.negotiation import Negotiation
+from backend.db.models.schema import DBUser, DBNegotiation
 from database.db import Base as DatabaseBase
 target_metadata = DatabaseBase.metadata
 

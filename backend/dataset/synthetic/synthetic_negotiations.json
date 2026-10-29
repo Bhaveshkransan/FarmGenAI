@@ -1,0 +1,727 @@
+[
+  {
+    "negotiation_id": "synth_neg_001",
+    "buyer_id": "usr_buyer_synth_01",
+    "farmer_id": "usr_synth_farm_pune_002",
+    "crop": "Soybean",
+    "quantity": 2000.0,
+    "current_price": 55.08,
+    "farmer_price": 55.08,
+    "buyer_price": 47.94,
+    "status": "COUNTER_OFFER",
+    "round_number": 3,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 47.94,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Soybean."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 55.08,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 51.51,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_002",
+    "buyer_id": "usr_buyer_synth_02",
+    "farmer_id": "usr_synth_farm_pune_003",
+    "crop": "Cotton",
+    "quantity": 8000.0,
+    "current_price": 76.68,
+    "farmer_price": 76.68,
+    "buyer_price": 66.74,
+    "status": "REJECTED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 66.74,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Cotton."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 76.68,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_003",
+    "buyer_id": "usr_buyer_synth_03",
+    "farmer_id": "usr_synth_farm_pune_004",
+    "crop": "Jowar",
+    "quantity": 15000.0,
+    "current_price": 62.64,
+    "farmer_price": 62.64,
+    "buyer_price": 54.52,
+    "status": "FAILED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 54.52,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Jowar."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 62.64,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_004",
+    "buyer_id": "usr_buyer_synth_04",
+    "farmer_id": "usr_synth_farm_pune_005",
+    "crop": "Onion",
+    "quantity": 1000.0,
+    "current_price": 26.26,
+    "farmer_price": 28.08,
+    "buyer_price": 24.44,
+    "status": "ACCEPTED",
+    "round_number": 4,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 24.44,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Onion."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 28.08,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 26.26,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      },
+      {
+        "round": 4,
+        "sender": "farmer",
+        "offer_price": 26.26,
+        "timestamp": "2026-10-10T11:15:00Z",
+        "notes": "Agreement reached and locked."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_005",
+    "buyer_id": "usr_buyer_synth_05",
+    "farmer_id": "usr_synth_farm_pune_006",
+    "crop": "Bajra",
+    "quantity": 2000.0,
+    "current_price": 31.86,
+    "farmer_price": 31.86,
+    "buyer_price": 27.73,
+    "status": "COUNTER_OFFER",
+    "round_number": 3,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 27.73,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Bajra."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 31.86,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 29.8,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_006",
+    "buyer_id": "usr_buyer_synth_06",
+    "farmer_id": "usr_synth_farm_pune_007",
+    "crop": "Rice",
+    "quantity": 8000.0,
+    "current_price": 45.36,
+    "farmer_price": 45.36,
+    "buyer_price": 39.48,
+    "status": "REJECTED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 39.48,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Rice."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 45.36,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_007",
+    "buyer_id": "usr_buyer_synth_07",
+    "farmer_id": "usr_synth_farm_nashik_008",
+    "crop": "Sugarcane",
+    "quantity": 50000.0,
+    "current_price": 4.1,
+    "farmer_price": 4.1,
+    "buyer_price": 3.57,
+    "status": "FAILED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 3.57,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Sugarcane."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 4.1,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_008",
+    "buyer_id": "usr_buyer_synth_08",
+    "farmer_id": "usr_synth_farm_nashik_009",
+    "crop": "Soybean",
+    "quantity": 15000.0,
+    "current_price": 51.51,
+    "farmer_price": 55.08,
+    "buyer_price": 47.94,
+    "status": "ACCEPTED",
+    "round_number": 4,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 47.94,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Soybean."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 55.08,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 51.51,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      },
+      {
+        "round": 4,
+        "sender": "farmer",
+        "offer_price": 51.51,
+        "timestamp": "2026-10-10T11:15:00Z",
+        "notes": "Agreement reached and locked."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_009",
+    "buyer_id": "usr_buyer_synth_09",
+    "farmer_id": "usr_synth_farm_nashik_010",
+    "crop": "Cotton",
+    "quantity": 40000.0,
+    "current_price": 76.68,
+    "farmer_price": 76.68,
+    "buyer_price": 66.74,
+    "status": "COUNTER_OFFER",
+    "round_number": 3,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 66.74,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Cotton."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 76.68,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 71.71,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_010",
+    "buyer_id": "usr_buyer_synth_10",
+    "farmer_id": "usr_synth_farm_nashik_011",
+    "crop": "Jowar",
+    "quantity": 6000.0,
+    "current_price": 62.64,
+    "farmer_price": 62.64,
+    "buyer_price": 54.52,
+    "status": "REJECTED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 54.52,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Jowar."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 62.64,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_011",
+    "buyer_id": "usr_buyer_synth_11",
+    "farmer_id": "usr_synth_farm_nashik_012",
+    "crop": "Onion",
+    "quantity": 25000.0,
+    "current_price": 28.08,
+    "farmer_price": 28.08,
+    "buyer_price": 24.44,
+    "status": "FAILED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 24.44,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Onion."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 28.08,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_012",
+    "buyer_id": "usr_buyer_synth_12",
+    "farmer_id": "usr_synth_farm_nashik_013",
+    "crop": "Bajra",
+    "quantity": 500.0,
+    "current_price": 29.8,
+    "farmer_price": 31.86,
+    "buyer_price": 27.73,
+    "status": "ACCEPTED",
+    "round_number": 4,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 27.73,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Bajra."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 31.86,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 29.8,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      },
+      {
+        "round": 4,
+        "sender": "farmer",
+        "offer_price": 29.8,
+        "timestamp": "2026-10-10T11:15:00Z",
+        "notes": "Agreement reached and locked."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_013",
+    "buyer_id": "usr_buyer_synth_13",
+    "farmer_id": "usr_synth_farm_nashik_014",
+    "crop": "Rice",
+    "quantity": 3000.0,
+    "current_price": 45.36,
+    "farmer_price": 45.36,
+    "buyer_price": 39.48,
+    "status": "COUNTER_OFFER",
+    "round_number": 3,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 39.48,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Rice."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 45.36,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 42.42,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_014",
+    "buyer_id": "usr_buyer_synth_14",
+    "farmer_id": "usr_synth_farm_latur_015",
+    "crop": "Sugarcane",
+    "quantity": 35000.0,
+    "current_price": 4.1,
+    "farmer_price": 4.1,
+    "buyer_price": 3.57,
+    "status": "REJECTED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 3.57,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Sugarcane."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 4.1,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_015",
+    "buyer_id": "usr_buyer_synth_15",
+    "farmer_id": "usr_synth_farm_latur_016",
+    "crop": "Soybean",
+    "quantity": 500.0,
+    "current_price": 55.08,
+    "farmer_price": 55.08,
+    "buyer_price": 47.94,
+    "status": "FAILED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 47.94,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Soybean."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 55.08,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_016",
+    "buyer_id": "usr_buyer_synth_16",
+    "farmer_id": "usr_synth_farm_latur_017",
+    "crop": "Cotton",
+    "quantity": 3000.0,
+    "current_price": 71.71,
+    "farmer_price": 76.68,
+    "buyer_price": 66.74,
+    "status": "ACCEPTED",
+    "round_number": 4,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 66.74,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Cotton."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 76.68,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 71.71,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      },
+      {
+        "round": 4,
+        "sender": "farmer",
+        "offer_price": 71.71,
+        "timestamp": "2026-10-10T11:15:00Z",
+        "notes": "Agreement reached and locked."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_017",
+    "buyer_id": "usr_buyer_synth_17",
+    "farmer_id": "usr_synth_farm_latur_018",
+    "crop": "Jowar",
+    "quantity": 2500.0,
+    "current_price": 62.64,
+    "farmer_price": 62.64,
+    "buyer_price": 54.52,
+    "status": "COUNTER_OFFER",
+    "round_number": 3,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 54.52,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Jowar."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 62.64,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 58.58,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_018",
+    "buyer_id": "usr_buyer_synth_18",
+    "farmer_id": "usr_synth_farm_latur_019",
+    "crop": "Onion",
+    "quantity": 10000.0,
+    "current_price": 28.08,
+    "farmer_price": 28.08,
+    "buyer_price": 24.44,
+    "status": "REJECTED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 24.44,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Onion."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 28.08,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_019",
+    "buyer_id": "usr_buyer_synth_19",
+    "farmer_id": "usr_synth_farm_latur_020",
+    "crop": "Bajra",
+    "quantity": 12000.0,
+    "current_price": 31.86,
+    "farmer_price": 31.86,
+    "buyer_price": 27.73,
+    "status": "FAILED",
+    "round_number": 2,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 27.73,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Bajra."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 31.86,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  },
+  {
+    "negotiation_id": "synth_neg_020",
+    "buyer_id": "usr_buyer_synth_20",
+    "farmer_id": "usr_synth_farm_latur_021",
+    "crop": "Rice",
+    "quantity": 1000.0,
+    "current_price": 42.42,
+    "farmer_price": 45.36,
+    "buyer_price": 39.48,
+    "status": "ACCEPTED",
+    "round_number": 4,
+    "history": [
+      {
+        "round": 1,
+        "sender": "buyer",
+        "offer_price": 39.48,
+        "timestamp": "2026-10-10T10:00:00Z",
+        "notes": "Opening bid for Rice."
+      },
+      {
+        "round": 2,
+        "sender": "farmer",
+        "offer_price": 45.36,
+        "timestamp": "2026-10-10T10:30:00Z",
+        "notes": "Counter-offer citing APMC arrival rate."
+      },
+      {
+        "round": 3,
+        "sender": "buyer",
+        "offer_price": 42.42,
+        "timestamp": "2026-10-10T11:00:00Z",
+        "notes": "Compromise bid proposal."
+      },
+      {
+        "round": 4,
+        "sender": "farmer",
+        "offer_price": 42.42,
+        "timestamp": "2026-10-10T11:15:00Z",
+        "notes": "Agreement reached and locked."
+      }
+    ],
+    "created_at": "2026-10-10T10:00:00Z",
+    "updated_at": "2026-10-10T11:15:00Z",
+    "is_synthetic": true
+  }
+]

@@ -17,7 +17,60 @@ class FarmerRepository:
                 if "name" in p: db_farmer.name = p["name"]
                 if "location" in p: db_farmer.location = p["location"]
                 if "language" in p: db_farmer.language = p["language"]
+                if "village" in p: db_farmer.village = p["village"]
+                if "taluka" in p: db_farmer.taluka = p["taluka"]
+                if "district" in p: db_farmer.district = p["district"]
+                if "state" in p: db_farmer.state = p["state"]
+                if "contact_number" in p: db_farmer.contact_number = p["contact_number"]
+                if "farm_size_acres" in p: db_farmer.farm_size_acres = p["farm_size_acres"]
+                if "farming_type" in p: db_farmer.farming_type = p["farming_type"]
+                if "preferences" in p: db_farmer.preferences = p["preferences"]
         return p
+
+    @staticmethod
+    async def get_by_id(farmer_id: str) -> dict | None:
+        async with AsyncSessionLocal() as session:
+            db_farmer = await session.get(DBFarmer, farmer_id)
+            if not db_farmer:
+                return None
+            return {
+                "id": db_farmer.id,
+                "name": db_farmer.name,
+                "contact_number": db_farmer.contact_number,
+                "location": db_farmer.location,
+                "village": db_farmer.village,
+                "taluka": db_farmer.taluka,
+                "district": db_farmer.district,
+                "state": db_farmer.state,
+                "language": db_farmer.language,
+                "farm_size_acres": db_farmer.farm_size_acres,
+                "farming_type": db_farmer.farming_type,
+                "preferences": db_farmer.preferences,
+            }
+
+    @staticmethod
+    async def list_all() -> list:
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(DBFarmer))
+            rows = res.scalars().all()
+            return [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "contact_number": r.contact_number,
+                    "location": r.location,
+                    "village": r.village,
+                    "taluka": r.taluka,
+                    "district": r.district,
+                    "state": r.state,
+                    "language": r.language,
+                    "farm_size_acres": r.farm_size_acres,
+                    "farming_type": r.farming_type,
+                    "preferences": r.preferences,
+                }
+                for r in rows
+            ]
+
 
 class BuyerRepository:
     @staticmethod

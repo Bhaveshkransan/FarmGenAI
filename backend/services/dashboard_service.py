@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 from backend.db.session import AsyncSessionLocal
 from backend.db.models.schema import DBNegotiation, DBUser, DBHistory
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 
 logger = logging.getLogger("DashboardService")
 
@@ -110,16 +110,20 @@ async def get_farmer_dashboard(user_id: str) -> Dict[str, Any]:
     """Per-farmer dashboard view — queries PostgreSQL directly."""
     async with AsyncSessionLocal() as session:
         res = await session.execute(
-            select(DBNegotiation).where(DBNegotiation.user_id == user_id)
+            select(DBNegotiation).where(
+                or_(DBNegotiation.user_id == user_id, DBNegotiation.farmer_id == user_id)
+            )
         )
         my_negs = [n.__dict__ for n in res.scalars().all()]
 
         res_h = await session.execute(
-            select(DBHistory).where(DBHistory.user_id == user_id).order_by(DBHistory.id.desc()).limit(5)
+            select(DBHistory).where(
+                or_(DBHistory.user_id == user_id, DBHistory.farmer_id == user_id if hasattr(DBHistory, "farmer_id") else DBHistory.user_id == user_id)
+            ).order_by(DBHistory.id.desc()).limit(5)
         )
         recent_rows = res_h.scalars().all()
 
-    deals = [n for n in my_negs if n.get("status") == "DEAL"]
+    deals = [n for n in my_negs if n.get("status") in ("DEAL", "ACCEPTED", "CONTRACT_FINALIZED")]
     prices = [float(n.get("final_price") or 0) for n in deals if n.get("final_price")]
     avg_price = round(sum(prices) / len(prices), 2) if prices else 0.0
     earnings_values = [
@@ -152,8 +156,8 @@ async def get_farmer_dashboard(user_id: str) -> Dict[str, Any]:
         "negotiations": {
             "total": len(my_negs),
             "successful": len(deals),
-            "pending": len([n for n in my_negs if n.get("status") in ("RUNNING", "ACTIVE", "IN_PROGRESS")]),
-            "failed": len([n for n in my_negs if n.get("status") in ("FAILED", "REJECT", "NO_DEAL")]),
+            "pending": len([n for n in my_negs if n.get("status") in ("RUNNING", "ACTIVE", "IN_PROGRESS", "COUNTER_OFFER")]),
+            "failed": len([n for n in my_negs if n.get("status") in ("FAILED", "REJECT", "REJECTED", "NO_DEAL")]),
         },
         "earnings": {
             "total": total_earnings,

@@ -1,4 +1,4 @@
-from backend.repositories.user_repo import UserRepository
+from backend.repositories.user_repository import UserRepository
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.services.auth_service import signup_user, login_user
