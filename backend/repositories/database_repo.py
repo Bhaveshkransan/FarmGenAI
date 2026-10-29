@@ -105,6 +105,7 @@ class Database:
                     "requirement_id": r.id,
                     "kind": "requirement" if is_req else "profile",
                     "user_id": r.user_id,
+                    "name": r.buyer_name,
                     "buyer_name": r.buyer_name,
                     "crop": r.crop,
                     "min_price": r.min_price,

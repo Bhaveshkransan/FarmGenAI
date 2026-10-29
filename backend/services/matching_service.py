@@ -245,45 +245,64 @@ async def _score_match(listing: Dict, requirement: Dict, buyer_user: Optional[Di
 async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
     """
     Find and score all buyer requirements that match a given crop listing.
-    Returns ranked list of matches.
+    Returns ranked list of matches using the canonical 8-factor NRV model.
+    Prioritizes real active buyer requirements posted in the system, then augments
+    with verified APMC institutional buyers.
     """
     buyers = await Database.list_buyers_async()
-    all_requirements = [r for r in buyers if r.get("kind") == "requirement" and r.get("status") == "ACTIVE"]
+    list_crop = (listing.get("crop") or "").strip()
+
+    # 1. Real active buyer requirements matching this crop
+    real_reqs = [
+        r for r in buyers 
+        if (r.get("kind") == "requirement" or str(r.get("id", "")).startswith("req_"))
+        and (r.get("status") in ("ACTIVE", None, ""))
+        and crops_match(str(r.get("crop", "")), list_crop)
+    ]
     
-    # Also include simulated buyers / default profiles that might not explicitly have kind="requirement"
-    if not all_requirements:
-        all_requirements = [b for b in buyers if b.get("kind") != "offer"]
+    # 2. Institutional / verified buyer profiles as supplementary candidates
+    institutional_profiles = [
+        b for b in buyers 
+        if b not in real_reqs and b.get("kind") != "offer"
+        and (not b.get("crop") or b.get("crop") in ("ALL", "*", "any") or crops_match(str(b.get("crop", "")), list_crop))
+    ]
+
+    all_candidates = []
+    for r in real_reqs:
+        all_candidates.append((r, 1))  # source_priority = 1 (Real Buyer Requirement)
+
+    for p in institutional_profiles:
+        all_candidates.append((p, 2))  # source_priority = 2 (Institutional Pool)
 
     results = []
-    for req in all_requirements:
-        # Crop must match using canonical crop matching
-        req_crop = (req.get("crop") or "").strip()
-        list_crop = (listing.get("crop") or "").strip()
-        if not req_crop or not crops_match(req_crop, list_crop):
+    seen_ids = set()
+
+    for cand, priority in all_candidates:
+        cand_id = cand.get("requirement_id") or cand.get("id") or cand.get("buyer_id")
+        if cand_id and cand_id in seen_ids:
             continue
+        if cand_id:
+            seen_ids.add(cand_id)
 
-
-        buyer_user = await UserRepository.get_by_id(req.get("user_id", "")) or {}
-        score = await _score_match(listing, req, buyer_user)
-        dist = await _get_distance_km(listing.get("location", ""), req.get("location", ""))
+        buyer_user = await UserRepository.get_by_id(cand.get("user_id", "")) or {}
+        score = await _score_match(listing, cand, buyer_user)
+        dist = await _get_distance_km(listing.get("location", ""), cand.get("location", ""))
         
-        # Calculate derived offer details similar to negotiation_service
-        req_qty = float(req.get("quantity") or req.get("max_quantity") or listing.get("quantity", 0))
+        req_qty = float(cand.get("quantity") or cand.get("max_quantity") or listing.get("quantity", 0))
         offered_qty = min(float(listing.get("quantity", 0)), req_qty)
         min_price = float(listing.get("min_price", 0))
         market_price = float(listing.get("market_price", min_price + 1))
-        target_price = float(req.get("target_price") or req.get("max_price") or (min_price * 1.05))
+        target_price = float(cand.get("target_price") or cand.get("max_price") or (min_price * 1.05))
 
-        raw_budget = float(req.get("budget", 0))
+        raw_budget = float(cand.get("budget", 0))
         budget = raw_budget if raw_budget > 0 else max(target_price * req_qty * 1.2, min_price * offered_qty * 1.1)
         budget_limited_price = budget / max(offered_qty, 1)
         
-        strategy = str(req.get("strategy", "")).lower()
+        strategy = str(cand.get("strategy", "")).lower()
         
         if "restaurant" in strategy or "premium" in strategy:
             opening_bid = min(target_price * 0.95, budget_limited_price)
         else:
-            # High-feasibility opening offer: between 88% to 98% of target/market, capped by budget
             base_offer = max(target_price * 0.92, min_price if target_price >= min_price else target_price * 0.88)
             opening_bid = min(target_price, budget_limited_price, max(base_offer, 1.0))
             
@@ -292,34 +311,48 @@ async def match_listing_to_buyers(listing: Dict) -> List[Dict]:
 
         # Strategic Labelling
         label = "Market Option"
+        if priority == 1:
+            label = "Verified Live Buyer Demand"
         if is_viable:
             if score > 75: label = "👑 Best Profit"
             elif dist == 0: label = "⚡ Fast Handshake"
             elif "restaurant" in strategy: label = "💎 Premium Match"
             elif score > 50: label = "🎯 Strategic Fit"
 
+        b_name = cand.get("buyer_name") or cand.get("name") or "Institutional Buyer"
+
         results.append({
-            "requirement_id": req.get("requirement_id") or req.get("id"),
-            "buyer_id": req.get("user_id") or req.get("id"),
-            "buyer_name": req.get("buyer_name") or req.get("name", "Unknown Buyer"),
-            "crop": req.get("crop") or list_crop,
+            "requirement_id": cand.get("requirement_id") or cand.get("id"),
+            "buyer_id": cand.get("user_id") or cand.get("id"),
+            "buyer_name": b_name,
+            "crop": cand.get("crop") or list_crop,
             "quantity": req_qty,
             "target_price": target_price,
-            "max_price": req.get("max_price"),
+            "max_price": cand.get("max_price"),
             "budget": budget,
-            "location": req.get("location", "Market"),
+            "location": cand.get("location", "Market"),
             "strategy": label,
             "offered_price": offer_price,
             "offered_quantity": round(offered_qty, 2),
             "status": "VIABLE" if is_viable else "BELOW_MIN_PRICE",
             "distance_km": dist,
             "compatibility_score": score,
-            "score": score, # Alias for compatibility
+            "score": score,
             "match_grade": "A" if score >= 70 else "B" if score >= 45 else "C",
-            "notes": req.get("notes", ""),
+            "source_priority": priority,
+            "notes": cand.get("notes", ""),
         })
 
-    results.sort(key=lambda item: (item["status"] == "VIABLE", item["offered_price"], item["compatibility_score"]), reverse=True)
+    # Strict ranking: Real demands first (priority=1), then viability, then score, then offer price
+    results.sort(
+        key=lambda item: (
+            -item["source_priority"],
+            item["status"] == "VIABLE",
+            item["compatibility_score"],
+            item["offered_price"]
+        ),
+        reverse=True
+    )
     return results
 
 

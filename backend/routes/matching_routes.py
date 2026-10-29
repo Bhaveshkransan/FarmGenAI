@@ -7,7 +7,7 @@ FR-5: AI-Powered Farmer-Buyer Matching
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from backend.services.security import get_current_user
+from backend.services.security import get_current_user, get_current_user_optional
 from backend.services.matching_service import match_listing_to_buyers, match_requirement_to_listings
 
 router = APIRouter(tags=["Matching"])
@@ -36,7 +36,7 @@ class MatchRequirementRequest(BaseModel):
 @router.post("/listing-to-buyers")
 async def match_listing(
     payload: MatchListingRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict | None = Depends(get_current_user_optional),
 ):
     """
     Find and rank all buyer requirements compatible with a crop listing.
@@ -58,7 +58,7 @@ async def match_listing(
 @router.post("/requirement-to-listings")
 async def match_requirement(
     payload: MatchRequirementRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict | None = Depends(get_current_user_optional),
 ):
     """
     Find and rank all crop listings that satisfy a buyer requirement.
@@ -98,7 +98,7 @@ async def match_requirement(
 @router.get("/auto/{listing_id}")
 async def auto_match(
     listing_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict | None = Depends(get_current_user_optional),
 ):
     """
     Automatically match a saved crop listing to buyers using its stored data.

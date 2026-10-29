@@ -322,6 +322,15 @@ class NegotiationService:
         return warehouse, processor, compost, transporter
 
     async def _generate_market_offers(self, payload: dict):
+        # 1. Query the 8-Factor NRV Matching Engine first for real live buyer requirements
+        from backend.services.matching_service import match_listing_to_buyers
+        try:
+            matched_offers = await match_listing_to_buyers(payload)
+            if matched_offers and len(matched_offers) > 0:
+                return matched_offers[:5]
+        except Exception as e:
+            logger.warning(f"Error querying matching engine for market offers: {e}")
+
         await self.ensure_default_buyers()
 
         quantity = max(float(payload["quantity"]), 1)
